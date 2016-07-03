@@ -111,6 +111,14 @@ def run_model(random_seed, team_capacity, report_number, mean_arrival_time, mean
                                  priority=CRITICAL_PRIORITY), at=100.0)
 
     simulate(until=max_time)
+
+    print "Wait Monitor Avg: ", developer_resource.waitMon.timeAverage(), \
+        " Active Monitor Avg: ", developer_resource.actMon.timeAverage()
+
+    plt = SimPlot()
+    plt.plotStep(developer_resource.waitMon, color="red", width=2)
+    plt.mainloop()
+
     return wait_monitor
 
 
@@ -122,7 +130,7 @@ def main():
     max_time = 400.0
 
     report_number = 20
-    mean_arrival_time = 10.0
+    mean_arrival_time = 10
     mean_fix_effort = 12.0
     team_capacity = 1
 
@@ -133,9 +141,9 @@ def main():
         print "Average wait for ", wait_monitor.count(), " completitions is ", wait_monitor.mean()
 
         wait_histogram = wait_monitor.histogram(low=0.0, high=200.0, nbins=20)
-        plt = SimPlot()
-        plt.plotHistogram(wait_histogram, xlab="Total Bug Time (days)", title="Total Bug Time", color="red", width=2)
-        plt.mainloop()
+        # plt = SimPlot()
+        # plt.plotHistogram(wait_histogram, xlab="Total Bug Time (days)", title="Total Bug Time", color="red", width=2)
+        # plt.mainloop()
 
 
 if __name__ == "__main__":
