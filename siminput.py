@@ -1,23 +1,18 @@
 """
 This modules does the analysis required to find the probability distributions and its parameters for the simulation input
 """
-import math
+import simdata
 import datetime
 import pandas as pd
 import numpy as np
-import dateutil.parser
 import matplotlib.pyplot as plt
 from scipy import stats
 from scipy import arange
 
 from math import ceil
 
-VALID_RESOLUTION_VALUES = ['Done', 'Implemented', 'Fixed']
 
 # ALL_ISSUES_CSV = "C:\Users\Carlos G. Gavidia\git\github-data-miner\UNFILTERED\Release_Counter_UNFILTERED_SPARK.csv"
-
-ALL_ISSUES_CSV = "C:\Users\Carlos G. Gavidia\git\github-data-miner\UNFILTERED\Release_Counter_UNFILTERED.csv"
-TIME_FACTOR = 60.0 * 60.0
 
 
 def week_of_month(dt):
@@ -34,45 +29,13 @@ def week_of_month(dt):
     return int(ceil(adjusted_dom / 7.0))
 
 
-def get_fix_effort(report_series):
-    """
-    Calculates the fix effort in days. It is defined as the days between the resolution and the "In Progress" status
-    change by the resolver.
-
-    :param report_series: Bug report as Series.
-    :return: Fix effort in days.
-    """
-
-    first_contact_str = report_series['JIRA Resolver In Progress']
-    resolution_date_str = report_series['JIRA Resolved Date']
-
-    if isinstance(first_contact_str, basestring) and isinstance(resolution_date_str, basestring):
-        first_contact = dateutil.parser.parse(first_contact_str)
-        resolution_date = dateutil.parser.parse(resolution_date_str)
-
-        return (resolution_date - first_contact).total_seconds() / TIME_FACTOR
-
-    return None
-
-
-def parse_create_date(report_series):
-    """
-    Transforms the create field in a series that is a date string to a datetime instance.
-    :param report_series: The series with the Bug Report info.
-    :return: The date as a datetime instance.
-    """
-    date_string = report_series['Creation Date']
-    return dateutil.parser.parse(date_string)
-
-
 def date_as_string(report_series):
     """
     Returns a string representation of the created
     :param report_series:
     :return:
     """
-    parsed_date = parse_create_date(report_series)
-    # return str(parsed_date.year) + "-" + str(parsed_date.month) + "-" + str(week_of_month(parsed_date))
+    parsed_date = simdata.parse_create_date(report_series)
     return str(parsed_date.year) + "-" + str(parsed_date.month)
 
 
@@ -216,16 +179,13 @@ def get_discrete_distribution(data_series):
 
 
 def main():
-    dataframe = pd.read_csv(ALL_ISSUES_CSV)
+    dataframe = pd.read_csv(simdata.ALL_ISSUES_CSV)
+    dataframe = simdata.enhace_report_dataframe(dataframe)
+
     print "Original dataframe issues ", len(dataframe.index)
 
-    resolved_issues = dataframe[dataframe['Status'].isin(['Closed', 'Resolved'])]
-    resolved_issues = resolved_issues[resolved_issues['Resolution'].isin(VALID_RESOLUTION_VALUES)]
-    resolved_issues = resolved_issues[resolved_issues['Commits'] > 0]
-
-    fix_effort_data = resolved_issues.apply(get_fix_effort, axis=1)
-    fix_effort_column = 'Fix Effort'
-    resolved_issues[fix_effort_column] = fix_effort_data
+    resolved_issues = simdata.filter_resolved(dataframe)
+    fix_effort_data = resolved_issues[simdata.RESOLUTION_TIME_COLUMN]
     fix_effort_data = fix_effort_data.dropna()
 
     # print "Input analysis for Fix Effort ..."
@@ -240,8 +200,6 @@ def main():
     author_column = 'Reported By'
     group_by_column = 'Month'
     # group_by_column = author_column
-
-    dataframe['Month'] = dataframe.apply(date_as_string, axis=1)
 
     grouped_reports = dataframe.groupby([group_by_column]).size().order(ascending=False)
     print "grouped_reports \n", grouped_reports.describe()
@@ -260,7 +218,7 @@ def main():
     category_bugs = category_bugs[category_bugs[author_column] == author_value]
     print "author_value ", author_value, " category_bugs ", len(category_bugs.index)
 
-    report_date = category_bugs.apply(parse_create_date, axis=1)
+    report_date = category_bugs.apply(simdata.parse_create_date, axis=1)
 
     report_date = report_date.order()
     print "report_date: head", report_date.head(1), "tail: ", report_date.tail(1)
@@ -293,9 +251,9 @@ def main():
             distance = created_date - report_date.values[position - 1]
 
             if isinstance(distance, datetime.timedelta):
-                time = distance.total_seconds() / TIME_FACTOR
+                time = distance.total_seconds() / simdata.TIME_FACTOR
             else:
-                time = distance / np.timedelta64(1, 's') / TIME_FACTOR
+                time = distance / np.timedelta64(1, 's') / simdata.TIME_FACTOR
 
             interrival_times.append(time)
 
@@ -306,7 +264,6 @@ def main():
 
     print "Input analysis for Batch Size..."
     batch_sizes = [batch["batch_count"]]
-
 
 
 if __name__ == "__main__":

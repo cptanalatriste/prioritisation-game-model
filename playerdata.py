@@ -3,6 +3,7 @@ This modules contain some data analysis do detect players actions and strategies
 """
 
 import siminput
+import simdata
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -50,10 +51,9 @@ def get_inflation_behaviour(inflation_percentage, real_priority, corrected_issue
 
 if __name__ == "__main__":
     print "Starting analysis ..."
-    all_issues = pd.read_csv(siminput.ALL_ISSUES_CSV)
-    created_date_column = 'Parsed Created Date'
-    all_issues[created_date_column] = all_issues.apply(siminput.parse_create_date, axis=1)
+    all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
 
+    all_issues = simdata.enhace_report_dataframe(all_issues)
     simplified_priorities = {"Blocker": "Severe",
                              "Critical": "Severe",
                              "Major": "Regular",
@@ -68,12 +68,7 @@ if __name__ == "__main__":
     simple_priorities = all_issues[simple_priority_column].value_counts()
     print "Priority distribution: \n", simple_priorities
 
-    priority_changer_column = "Priority Changer"
-    third_party_changer = (~all_issues[priority_changer_column].isnull()) & \
-                          (all_issues['Reported By'] != all_issues[priority_changer_column])
-    print "Priority changed by non-reporter: \n", third_party_changer.value_counts()
-
-    issues_validated_priority = all_issues.loc[third_party_changer]
+    issues_validated_priority = simdata.get_modified_priority_bugs(all_issues)
     issues_by_project = issues_validated_priority['Project Key'].value_counts()
 
     print "Project counts:  \n", issues_by_project
@@ -83,12 +78,10 @@ if __name__ == "__main__":
 
     inflation_catalog = []
     for project_key, _ in top_projects.iteritems():
-        project_filter = issues_validated_priority['Project Key'] == project_key
-
-        project_changed_issues = issues_validated_priority[project_filter]
+        project_changed_issues = simdata.filter_by_project(issues_validated_priority, project_key)
         print "Validated priorities for project ", project_key, ": ", len(project_changed_issues.index)
 
-        creation_dates = project_changed_issues[created_date_column]
+        creation_dates = project_changed_issues[simdata.CREATED_DATE_COLUMN]
         min_creation_date = creation_dates.min()
         max_creation_date = creation_dates.max()
         print "Validated priorities creation range: ", min_creation_date, " - ", max_creation_date
@@ -101,10 +94,8 @@ if __name__ == "__main__":
 
         for reporter, _ in top_reporters.iteritems():
             reporter_filter = all_issues[reported_by_column] == reporter
-            date_filter = (all_issues[created_date_column] <= max_creation_date) & (
-                all_issues[created_date_column] >= min_creation_date)
-
-            issues_for_analysis = all_issues[reporter_filter & date_filter]
+            issues_for_analysis = simdata.filter_by_create_date(all_issues, min_creation_date, max_creation_date)
+            issues_for_analysis = issues_for_analysis[reporter_filter]
             total_issues = len(issues_for_analysis.index)
             print "Issues for analysis for ", reporter, ": ", total_issues
 
@@ -113,8 +104,8 @@ if __name__ == "__main__":
                     issues_for_analysis[simple_priority_column] == simplified_priority]
                 total_per_priority = len(issues_per_priority.index)
 
-                corrected_filter = (~issues_per_priority[priority_changer_column].isnull()) & \
-                                   (issues_per_priority[priority_changer_column] != reporter)
+                corrected_filter = (~issues_per_priority[simdata.PRIORITY_CHANGER_COLUMN].isnull()) & \
+                                   (issues_per_priority[simdata.PRIORITY_CHANGER_COLUMN] != reporter)
                 corrected_issues = issues_per_priority[corrected_filter]
 
                 correction_report = " [ "

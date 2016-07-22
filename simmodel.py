@@ -14,24 +14,23 @@ class TestingContext:
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, mean_fix_effort):
-        self.mean_fix_effort = mean_fix_effort
+    def __init__(self, resolution_time_gen, priority_gen):
+        self.resolution_time_gen = resolution_time_gen
+        self.priority_gen = priority_gen
 
     def get_fix_effort(self):
         """
         Return the time required for a bug to be fixed.
         :return: Effort required to fix a bug.
         """
-        # TODO This probability distribution and its parameters should come from the data.
-        return expovariate(1.0 / self.mean_fix_effort)
+        return self.resolution_time_gen.generate()
 
     def get_priority(self):
         """
         Returns the priority of the produced bug report.
-        :return:
+        :return: The priority of the generate bug.
         """
-        # TODO The reported priority depends on the tester strategy. And probably from the ground-truth priority.
-        return 0
+        return self.priority_gen.generate()
 
 
 class BugReportSource(Process):
@@ -39,13 +38,12 @@ class BugReportSource(Process):
     Represents a Tester, who generates Bug Reports.
     """
 
-    def __init__(self, name, reports_produced, mean_arrival_time, testing_context):
+    def __init__(self, name, reports_produced, interarrival_time_gen, testing_context):
         Process.__init__(self)
         self.name = name
         self.reports_produced = reports_produced
 
-        # TODO We are still not sure what are the parameters of this probability distributions.
-        self.mean_arrival_time = mean_arrival_time
+        self.interarrival_time_gen = interarrival_time_gen
         self.testing_context = testing_context
 
     def start_reporting(self, developer_resource, wait_monitor):
@@ -63,15 +61,18 @@ class BugReportSource(Process):
                      bug_report.arrive(developer_resource=developer_resource,
                                        wait_monitor=wait_monitor))
 
-            yield hold, self, self.get_interarrival_time()
+
+            interarrival_time = self.get_interarrival_time()
+
+            print "start_reporting->interarrival_time ", interarrival_time
+            yield hold, self, interarrival_time
 
     def get_interarrival_time(self):
         """
         Returns the time to wait after producing another bug report.
         :return: Time to hold before next report.
         """
-        # TODO This probability distribution and its parameters should come from the data.
-        return expovariate(1.0 / self.mean_arrival_time)
+        return self.interarrival_time_gen.generate()
 
 
 class BugReport(Process):
@@ -106,9 +107,8 @@ class BugReport(Process):
         print now(), ": Report ", self.name, " got fixed. "
 
 
-def run_model(random_seed, team_capacity, report_number, mean_arrival_time, mean_fix_effort, max_time):
+def run_model(team_capacity, report_number, interarrival_time_gen, resolution_time_gen, priority_gen, max_time):
     start_time = 0.0
-    seed(random_seed)
 
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
@@ -116,28 +116,21 @@ def run_model(random_seed, team_capacity, report_number, mean_arrival_time, mean
     wait_monitor = Monitor()
 
     initialize()
-    testing_context = TestingContext(mean_fix_effort=mean_fix_effort)
-    bug_reporter = BugReportSource(name="a_tester", mean_arrival_time=mean_arrival_time,
+    testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen)
+    bug_reporter = BugReportSource(name="a_tester", interarrival_time_gen=interarrival_time_gen,
                                    testing_context=testing_context, reports_produced=report_number)
     activate(bug_reporter,
              bug_reporter.start_reporting(developer_resource=developer_resource,
                                           wait_monitor=wait_monitor), at=start_time)
-
-    # TODO: Only for testing purposes.
-    critical_bug = BugReport(name="Report-CRITICAL", fix_effort=testing_context.get_fix_effort(),
-                             priority=CRITICAL_PRIORITY)
-    activate(critical_bug,
-             critical_bug.arrive(developer_resource=developer_resource,
-                                 wait_monitor=wait_monitor), at=100.0)
 
     simulate(until=max_time)
 
     print "Wait Monitor Avg: ", developer_resource.waitMon.timeAverage(), \
         " Active Monitor Avg: ", developer_resource.actMon.timeAverage()
 
-    plt = SimPlot()
-    plt.plotStep(developer_resource.waitMon, color="red", width=2)
-    plt.mainloop()
+    # plt = SimPlot()
+    # plt.plotStep(developer_resource.waitMon, color="red", width=2)
+    # plt.mainloop()
 
     return wait_monitor
 
@@ -153,7 +146,7 @@ def main():
     mean_arrival_time = 10
     mean_fix_effort = 12.0
 
-    #TODO The team capacity should also come from a probability distribution.
+    # TODO The team capacity should also come from a probability distribution.
     team_capacity = 1
 
     # random_seeds = [393939, 31555999, 777999555, 319999771]
