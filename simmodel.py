@@ -4,7 +4,6 @@ This module is a discrete event simulation model for the bug reporting process
 
 from SimPy.Simulation import *
 from SimPy.SimPlot import *
-from random import expovariate, seed
 
 CRITICAL_PRIORITY = 100
 
@@ -46,25 +45,24 @@ class BugReportSource(Process):
         self.interarrival_time_gen = interarrival_time_gen
         self.testing_context = testing_context
 
-    def start_reporting(self, developer_resource, wait_monitor):
+    def start_reporting(self, developer_resource, resol_time_monitor):
         """
         Activates a number of bug reports according to an inter-arrival time.
-        :param wait_monitor: Monitor for the waiting time.
+        :param resol_time_monitor: Monitor for the resolution time.
         :param developer_resource: The Development Team resource.
         :return: None
         """
         for key in range(self.reports_produced):
-            bug_report = BugReport(name="Report-" + str(key), fix_effort=self.testing_context.get_fix_effort(),
+            bug_report = BugReport(name="Report-" + str(key), reporter=self.name,
+                                   fix_effort=self.testing_context.get_fix_effort(),
                                    priority=self.testing_context.get_priority())
 
             activate(bug_report,
                      bug_report.arrive(developer_resource=developer_resource,
-                                       wait_monitor=wait_monitor))
-
+                                       resol_time_monitor=resol_time_monitor))
 
             interarrival_time = self.get_interarrival_time()
 
-            print "start_reporting->interarrival_time ", interarrival_time
             yield hold, self, interarrival_time
 
     def get_interarrival_time(self):
@@ -80,31 +78,33 @@ class BugReport(Process):
     A project member whose main responsibility is bug reporting.
     """
 
-    def __init__(self, name, fix_effort, priority):
+    def __init__(self, name, reporter, fix_effort, priority):
         Process.__init__(self)
         self.name = name
+        self.reporter = reporter
         self.fix_effort = fix_effort
         self.priority = priority
 
-    def arrive(self, developer_resource, wait_monitor):
+    def arrive(self, developer_resource, resol_time_monitor):
         """
         The Process Execution Method for the Bug Reported process.
-        :param bug_effort: Effort required for the reported defect. In days
         :return:
         """
         arrival_time = now()
         pending_bugs = len(developer_resource.waitQ)
-        print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, "Pending bugs: ", pending_bugs
+        # print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Priority: ", self.priority,\
+        #     "Pending bugs: ", pending_bugs
 
         yield request, self, developer_resource, self.priority
-        waiting_time = now() - arrival_time
-        wait_monitor.observe(waiting_time)
 
-        print now(), ": Report ", self.name, " ready for fixing after ", waiting_time, " waiting."
+        # print now(), ": Report ", self.name, " ready for fixing after ", waiting_time, " waiting."
 
         yield hold, self, self.fix_effort
         yield release, self, developer_resource
-        print now(), ": Report ", self.name, " got fixed. "
+
+        resol_time = now() - arrival_time
+        resol_time_monitor.observe(resol_time)
+        # print now(), ": Report ", self.name, " got fixed. "
 
 
 def run_model(team_capacity, report_number, interarrival_time_gen, resolution_time_gen, priority_gen, max_time):
@@ -113,7 +113,7 @@ def run_model(team_capacity, report_number, interarrival_time_gen, resolution_ti
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=False, monitored=True)
-    wait_monitor = Monitor()
+    resol_time_monitor = Monitor()
 
     initialize()
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen)
@@ -121,18 +121,15 @@ def run_model(team_capacity, report_number, interarrival_time_gen, resolution_ti
                                    testing_context=testing_context, reports_produced=report_number)
     activate(bug_reporter,
              bug_reporter.start_reporting(developer_resource=developer_resource,
-                                          wait_monitor=wait_monitor), at=start_time)
+                                          resol_time_monitor=resol_time_monitor), at=start_time)
 
     simulate(until=max_time)
-
-    print "Wait Monitor Avg: ", developer_resource.waitMon.timeAverage(), \
-        " Active Monitor Avg: ", developer_resource.actMon.timeAverage()
 
     # plt = SimPlot()
     # plt.plotStep(developer_resource.waitMon, color="red", width=2)
     # plt.mainloop()
 
-    return wait_monitor
+    return resol_time_monitor
 
 
 def main():

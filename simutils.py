@@ -42,7 +42,7 @@ class ContinuousEmpiricalDistribution:
                 else:
                     return self.sorted_observations[k]
 
-        print "k", k, "element_k ", element_k, " cdf_k ", cdf_k, " element_k_next ", element_k_next, " cdf_k_next ", cdf_k_next, " rand_uniform ", rand_uniform
+        # print "k", k, "element_k ", element_k, " cdf_k ", cdf_k, " element_k_next ", element_k_next, " cdf_k_next ", cdf_k_next, " rand_uniform ", rand_uniform
         rand_variate = element_k + (rand_uniform - cdf_k) / \
                                    float(cdf_k_next - cdf_k) * (element_k_next - element_k)
 
