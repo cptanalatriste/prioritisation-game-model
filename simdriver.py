@@ -1,6 +1,7 @@
 """
 This modules triggers the bug report simulation.
 """
+import time
 import datetime
 import pandas as pd
 import pytz
@@ -15,7 +16,7 @@ import numpy as np
 import winsound
 
 
-def launch_simulation(team_capacity, report_number, inter_arrival_sample, resolution_time_sample, priority_sample,
+def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_sample, priority_sample,
                       max_time):
     """
     Triggers the simulation according a given configuration.
@@ -28,32 +29,53 @@ def launch_simulation(team_capacity, report_number, inter_arrival_sample, resolu
     :param max_time: Simulation time.
     :return: List containing the number of fixed reports.
     """
-    print "Launching simulation-> team_capacity:", team_capacity, " report_number: ", report_number, " max_time ", max_time
 
-    inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
     resolution_time_gen = simutils.ContinuousEmpiricalDistribution(resolution_time_sample)
     priority_gen = simutils.DiscreteEmpiricalDistribution(priority_sample)
 
     # max_iterations = 1000
     max_iterations = 100
     completed_reports = []
+
     for a_seed in range(max_iterations):
         np.random.seed(a_seed)
-        resol_time_monitor = simmodel.run_model(team_capacity=team_capacity, report_number=report_number,
-                                                interarrival_time_gen=inter_arrival_time_gen,
-                                                resolution_time_gen=resolution_time_gen,
-                                                priority_gen=priority_gen,
-                                                max_time=max_time)
+        resol_time_monitors = simmodel.run_model(team_capacity=team_capacity, report_number=report_number,
+                                                 reporters_config=reporters_config,
+                                                 resolution_time_gen=resolution_time_gen,
+                                                 priority_gen=priority_gen,
+                                                 max_time=max_time)
 
-        resolved_issues = resol_time_monitor.count()
-        completed_reports.append(resolved_issues)
-
-        avg_resol_time = 0
-        if resolved_issues > 0:
-            avg_resol_time = resol_time_monitor.mean()
-            # print "Completed bug reports: ", resolved_issues, " avg resolution time ", avg_resol_time
+        completed_reports.append(np.sum([monitor.count() for monitor in resol_time_monitors]))
 
     return completed_reports
+
+
+def get_reporters_configuration(issues_in_range):
+    """
+    Returns the reporting information required for the simulation to run.
+    :param issues_in_range: Bug report data frame
+    :return:
+    """
+
+    issues_by_tester = issues_in_range['Reported By'].value_counts()
+    threshold = issues_by_tester.quantile(0.90)
+
+    first_class_testers = [index for index, value in issues_by_tester.iteritems() if value >= threshold]
+    second_class_testers = [index for index, value in issues_by_tester.iteritems() if value < threshold]
+
+    reporters_config = []
+    for index, reporter_list in enumerate([first_class_testers, second_class_testers]):
+        bug_reports = simdata.filter_by_reporter(issues_in_range, reporter_list)
+        inter_arrival_sample = simdata.get_interarrival_times(bug_reports)
+        inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
+
+        print "Interrival-time for tester ", str(index + 1), " mean: ", np.mean(inter_arrival_sample), " std: ", np.std(
+            inter_arrival_sample), " testers ", len(reporter_list)
+
+        reporters_config.append({'name': "Consolidated Tester " + str(index + 1),
+                                 'interarrival_time_gen': inter_arrival_time_gen})
+
+    return reporters_config
 
 
 def main():
@@ -63,7 +85,10 @@ def main():
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-    project_key = "CASSANDRA"
+    # project_key = "CASSANDRA"
+    project_key = "CLOUDSTACK"
+    # project_key = "OFBIZ"
+
     print "Starting analysis for project ", project_key, " ..."
 
     project_bugs = simdata.filter_by_project(enhanced_dataframe, project_key)
@@ -91,6 +116,10 @@ def main():
     priorities_in_range = issues_in_range[simdata.SIMPLE_PRIORITY_COLUMN]
     print "Simplified Priorities in Range: \n ", priorities_in_range.value_counts()
 
+    reporters_in_range = issues_in_range['Reported By']
+    print "Reporters in Range: \n ", reporters_in_range.describe()
+    print "Reporters in Range: \n ", reporters_in_range.value_counts()
+
     months_in_range = issues_in_range[simdata.CREATED_MONTH_COLUMN].unique()
 
     team_sizes = []
@@ -98,14 +127,18 @@ def main():
 
     completed_predicted = []
     completed_true = []
+
+    reporters_config = get_reporters_configuration(issues_in_range)
+    print "Number of reporters: ", len(reporters_config)
+
     for year_month in months_in_range:
         issues_for_month = issues_in_range[issues_in_range[simdata.CREATED_MONTH_COLUMN] == year_month]
 
         bug_resolvers = issues_for_month['JIRA Resolved By']
-        team_size = bug_resolvers.nunique()
+        dev_team_size = bug_resolvers.nunique()
         reports_per_month = len(issues_for_month.index)
 
-        team_sizes.append(team_size)
+        team_sizes.append(dev_team_size)
         period_reports.append(reports_per_month)
 
         year, month = year_month.split('-')
@@ -118,13 +151,17 @@ def main():
                                                          end_date)
         issues_resolved = len(resolved_in_month.index)
 
-        print "Period: ", year_month, " Developers:", team_size, " Reports: ", reports_per_month, " Resolved in Month: ", issues_resolved
+        bug_reporters = issues_for_month['Reported By']
+        test_team_size = bug_reporters.nunique()
+
+        print "Period: ", year_month, " Testers: ", test_team_size, " Developers:", dev_team_size, \
+            " Reports: ", reports_per_month, " Resolved in Month: ", issues_resolved
 
         simulation_time = 30 * 24
         alpha = 0.95
 
-        completed_reports = launch_simulation(team_capacity=team_size, report_number=reports_per_month,
-                                              inter_arrival_sample=interrival_times_range,
+        completed_reports = launch_simulation(team_capacity=dev_team_size, report_number=reports_per_month,
+                                              reporters_config=reporters_config,
                                               resolution_time_sample=resolution_times,
                                               priority_sample=priorities_in_range, max_time=simulation_time)
 
@@ -143,7 +180,11 @@ def main():
 
 
 if __name__ == "__main__":
+
+    start_time = time.time()
     try:
         main()
     finally:
         winsound.Beep(2500, 1000)
+
+    print "Execution time in seconds: ", (time.time() - start_time)

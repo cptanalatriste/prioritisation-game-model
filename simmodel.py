@@ -13,9 +13,10 @@ class TestingContext:
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, resolution_time_gen, priority_gen):
+    def __init__(self, resolution_time_gen, priority_gen, bug_level):
         self.resolution_time_gen = resolution_time_gen
         self.priority_gen = priority_gen
+        self.bug_level = bug_level
 
     def get_fix_effort(self):
         """
@@ -37,12 +38,10 @@ class BugReportSource(Process):
     Represents a Tester, who generates Bug Reports.
     """
 
-    def __init__(self, name, reports_produced, interarrival_time_gen, testing_context):
+    def __init__(self, reporter_config=None, testing_context=None):
         Process.__init__(self)
-        self.name = name
-        self.reports_produced = reports_produced
-
-        self.interarrival_time_gen = interarrival_time_gen
+        self.name = reporter_config['name']
+        self.interarrival_time_gen = reporter_config['interarrival_time_gen']
         self.testing_context = testing_context
 
     def start_reporting(self, developer_resource, resol_time_monitor):
@@ -52,8 +51,12 @@ class BugReportSource(Process):
         :param developer_resource: The Development Team resource.
         :return: None
         """
-        for key in range(self.reports_produced):
-            bug_report = BugReport(name="Report-" + str(key), reporter=self.name,
+        bug_level = self.testing_context.bug_level
+        while bug_level.amount > 0:
+            yield get, self, bug_level, 1
+
+            report_key = "Report-" + str(bug_level.amount)
+            bug_report = BugReport(name=report_key, reporter=self.name,
                                    fix_effort=self.testing_context.get_fix_effort(),
                                    priority=self.testing_context.get_priority())
 
@@ -71,6 +74,22 @@ class BugReportSource(Process):
         :return: Time to hold before next report.
         """
         return self.interarrival_time_gen.generate()
+
+
+class BugGenerator(Process):
+    """
+    A level for the number of bug reports for an specific period of time.
+    """
+
+    def __init__(self, name="bug-level", bug_level=None, report_number=None):
+        Process.__init__(self)
+        self.name = name
+        self.bug_level = bug_level
+        self.report_number = report_number
+
+    def generate(self):
+        print "Putting ", self.report_number, " bugs"
+        yield put, self, self.bug_level, self.report_number
 
 
 class BugReport(Process):
@@ -92,36 +111,42 @@ class BugReport(Process):
         """
         arrival_time = now()
         pending_bugs = len(developer_resource.waitQ)
-        # print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Priority: ", self.priority,\
+        # print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Priority: ", self.priority, \
         #     "Pending bugs: ", pending_bugs
 
         yield request, self, developer_resource, self.priority
 
-        # print now(), ": Report ", self.name, " ready for fixing after ", waiting_time, " waiting."
+        # print now(), ": Report ", self.name, " ready for fixing. "
 
         yield hold, self, self.fix_effort
         yield release, self, developer_resource
 
         resol_time = now() - arrival_time
         resol_time_monitor.observe(resol_time)
-        # print now(), ": Report ", self.name, " got fixed. "
+        # print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting."
 
 
-def run_model(team_capacity, report_number, interarrival_time_gen, resolution_time_gen, priority_gen, max_time):
+def run_model(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen, max_time):
     start_time = 0.0
 
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=False, monitored=True)
-    resol_time_monitor = Monitor()
+    bug_level = Level(capacity=sys.maxint, initialBuffered=report_number, monitored=True)
 
     initialize()
-    testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen)
-    bug_reporter = BugReportSource(name="a_tester", interarrival_time_gen=interarrival_time_gen,
-                                   testing_context=testing_context, reports_produced=report_number)
-    activate(bug_reporter,
-             bug_reporter.start_reporting(developer_resource=developer_resource,
-                                          resol_time_monitor=resol_time_monitor), at=start_time)
+    testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen,
+                                     bug_level=bug_level)
+
+    monitors = []
+    for reporter_config in reporters_config:
+        resol_time_monitor = Monitor()
+        bug_reporter = BugReportSource(reporter_config=reporter_config,
+                                       testing_context=testing_context)
+        activate(bug_reporter,
+                 bug_reporter.start_reporting(developer_resource=developer_resource,
+                                              resol_time_monitor=resol_time_monitor), at=start_time)
+        monitors.append(resol_time_monitor)
 
     simulate(until=max_time)
 
@@ -129,7 +154,7 @@ def run_model(team_capacity, report_number, interarrival_time_gen, resolution_ti
     # plt.plotStep(developer_resource.waitMon, color="red", width=2)
     # plt.mainloop()
 
-    return resol_time_monitor
+    return monitors
 
 
 def main():
