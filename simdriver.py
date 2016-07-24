@@ -77,10 +77,14 @@ def get_reporters_configuration(issues_in_range):
         inter_arrival_sample = simdata.get_interarrival_times(bug_reports)
         inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
 
-        print "Interrival-time for tester ", str(index + 1), " mean: ", np.mean(inter_arrival_sample), " std: ", np.std(
+        reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
+        if len(reporter_list) == 1:
+            reporter_name = reporter_list[0]
+
+        print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(inter_arrival_sample), " std: ", np.std(
             inter_arrival_sample), " testers ", len(reporter_list)
 
-        reporters_config.append({'name': "Consolidated Tester " + str(index + 1),
+        reporters_config.append({'name': reporter_name,
                                  'interarrival_time_gen': inter_arrival_time_gen,
                                  'reporter_list': reporter_list})
 
@@ -194,6 +198,25 @@ def analyse_results(reporters_config, simulation_results, project_key):
             " Mean Squared Error ", mse, " Mean Absolute Error ", msa
 
 
+def is_game_valid(reporters_config, issues_for_period):
+    """
+    Determines the conditions for the period to run start simulation.
+    :param reporters_config: Reporter configuration.
+    :param issues_for_period: Bug reports for the period.
+    :return: True if valid, false otherwise.
+    """
+    minimum_reports = 10
+
+    for reporter_config in reporters_config:
+        reporter_name = reporter_config['name']
+        reported_issues = simdata.filter_by_reporter(issues_for_period, reporter_config['reporter_list'])
+
+        if len(reported_issues.index) < minimum_reports:
+            return False
+
+    return True
+
+
 def simulate_project(project_key, enhanced_dataframe):
     """
     Launches simulation anallysis for an specific project.
@@ -229,40 +252,41 @@ def simulate_project(project_key, enhanced_dataframe):
 
         reports_per_month = len(issues_for_period.index)
 
-        year, period_value = period.split('-')
-        month = int(period_value) * 3 - 2
-        simulation_days = 90
-        start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
+        if is_game_valid(reporters_config, issues_for_period):
+            year, period_value = period.split('-')
+            month = int(period_value) * 3 - 2
+            simulation_days = 90
+            start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
 
-        margin = datetime.timedelta(days=simulation_days)
-        end_date = start_date + margin
+            margin = datetime.timedelta(days=simulation_days)
+            end_date = start_date + margin
 
-        resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False)
-        resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
-                                                          start_date,
-                                                          end_date)
+            resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False)
+            resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
+                                                              start_date,
+                                                              end_date)
 
-        bug_resolvers = resolved_in_period['JIRA Resolved By']
-        dev_team_size = bug_resolvers.nunique()
+            bug_resolvers = resolved_in_period['JIRA Resolved By']
+            dev_team_size = bug_resolvers.nunique()
 
-        issues_resolved = len(resolved_in_period.index)
+            issues_resolved = len(resolved_in_period.index)
 
-        bug_reporters = issues_for_period['Reported By']
-        test_team_size = bug_reporters.nunique()
+            bug_reporters = issues_for_period['Reported By']
+            test_team_size = bug_reporters.nunique()
 
-        print "Project ", project_key, " Period: ", period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
-            " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
+            print "Project ", project_key, " Period: ", period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
+                " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
 
-        simulation_time = simulation_days * 24
+            simulation_time = simulation_days * 24
 
-        completed_reports = launch_simulation(team_capacity=dev_team_size, report_number=reports_per_month,
-                                              reporters_config=reporters_config,
-                                              resolution_time_sample=resolution_times,
-                                              priority_sample=priorities_in_range, max_time=simulation_time)
+            completed_reports = launch_simulation(team_capacity=dev_team_size, report_number=reports_per_month,
+                                                  reporters_config=reporters_config,
+                                                  resolution_time_sample=resolution_times,
+                                                  priority_sample=priorities_in_range, max_time=simulation_time)
 
-        simulation_result = consolidate_results(period, issues_for_period, resolved_in_period, reporters_config,
-                                                completed_reports)
-        simulation_results.append(simulation_result)
+            simulation_result = consolidate_results(period, issues_for_period, resolved_in_period, reporters_config,
+                                                    completed_reports)
+            simulation_results.append(simulation_result)
 
     analyse_results(reporters_config, simulation_results, project_key)
 
@@ -275,7 +299,7 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     project_list = ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]
-    project_list = ["OFBIZ"]
+    # project_list = ["OFBIZ"]
 
     for project_key in project_list:
         simulate_project(project_key, enhanced_dataframe)
