@@ -6,7 +6,9 @@ import datetime
 import pandas as pd
 import pytz
 from scipy import stats
+from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import r2_score
+from sklearn.metrics import mean_squared_error
 
 import simdata
 import simutils
@@ -45,7 +47,9 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
                                                  priority_gen=priority_gen,
                                                  max_time=max_time)
 
-        completed_reports.append(np.sum([monitor.count() for monitor in resol_time_monitors]))
+        simulation_result = {reporter_name: monitor.count() for reporter_name, monitor in
+                             resol_time_monitors.iteritems()}
+        completed_reports.append(simulation_result)
 
     return completed_reports
 
@@ -73,22 +77,24 @@ def get_reporters_configuration(issues_in_range):
             inter_arrival_sample), " testers ", len(reporter_list)
 
         reporters_config.append({'name': "Consolidated Tester " + str(index + 1),
-                                 'interarrival_time_gen': inter_arrival_time_gen})
+                                 'interarrival_time_gen': inter_arrival_time_gen,
+                                 'reporter_list': reporter_list})
 
     return reporters_config
 
 
-def main():
-    print "Loading information from ", simdata.ALL_ISSUES_CSV
-    all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
+def get_bug_reports(project_key, enhanced_dataframe):
+    """
+    Returns the issues valid for simulation analysis. It includes:
 
-    print "Adding calculated fields..."
-    enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
+    - Filtered by project
+    - Only reports from top testers
+    - Only reports while priorities where corrected.
 
-    # project_key = "CASSANDRA"
-    # project_key = "CLOUDSTACK"
-    project_key = "OFBIZ"
-
+    :param project_key: Project identifier.
+    :param enhanced_dataframe: Bug report dataframe.
+    :return: Filtered dataframe
+    """
     print "Starting analysis for project ", project_key, " ..."
 
     project_bugs = simdata.filter_by_project(enhanced_dataframe, project_key)
@@ -114,6 +120,82 @@ def main():
     issues_in_range = simdata.filter_by_create_date(project_bugs, min_create_date, max_create_date)
     print "All issues in that range: ", len(issues_in_range.index)
 
+    return issues_in_range
+
+
+def consolidate_results(year_month, resolved_in_month, reporters_config, completed_reports):
+    """
+    It consolidates the results from the simulation with the information contained in the data.
+
+    :param year_month: Period identifier.
+    :param resolved_in_month: Issues resolved on the same period of report.
+    :param reporters_config:   Reporter configuration.
+    :param completed_reports: Simulation results.
+    :return:
+    """
+    simulation_result = {"period": year_month,
+                         "results_per_reporter": []}
+
+    for reporter_config in reporters_config:
+        reporter_name = reporter_config['name']
+        true_resolved = simdata.filter_by_reporter(resolved_in_month, reporter_config['reporter_list'])
+
+        resolved_on_simulation = [report[reporter_name] for report in completed_reports]
+        predicted_resolved = np.mean(resolved_on_simulation)
+
+        sample_mean, sample_std, sample_size = predicted_resolved, np.std(resolved_on_simulation), len(
+            resolved_on_simulation)
+        alpha = 0.95
+        confidence_interval = stats.norm.interval(alpha, loc=sample_mean, scale=sample_std / np.sqrt(sample_size))
+        print "Reporter ", reporter_name, "sample_mean ", sample_mean, " sample_std ", sample_std, " confidence interval: ", \
+            confidence_interval, " true_resolved ", len(true_resolved.index)
+
+        simulation_result["results_per_reporter"].append({"reporter_name": reporter_name,
+                                                          "true_resolved": len(true_resolved.index),
+                                                          "predicted_resolved": predicted_resolved})
+
+    return simulation_result
+
+
+def analyse_results(reporters_config, simulation_results):
+    """
+    Per each tester, it anaysis how close is simulation to real data.
+    :param reporters_config: Tester configuration.
+    :param simulation_results: Result from simulation.
+    :return: None
+    """
+    for reporter_config in reporters_config:
+        reporter_name = reporter_config['name']
+        completed_true = []
+        completed_predicted = []
+
+        for simulation_result in simulation_results:
+            completed_true.append([result['true_resolved'] for result in simulation_result["results_per_reporter"] if
+                                   result["reporter_name"] == reporter_name])
+            completed_predicted.append(
+                [result['predicted_resolved'] for result in simulation_result["results_per_reporter"] if
+                 result["reporter_name"] == reporter_name])
+        coefficient_of_determination = r2_score(completed_true, completed_predicted)
+        mse = mean_squared_error(completed_true, completed_predicted)
+        msa = mean_absolute_error(completed_true, completed_predicted)
+
+        print "Tester ", reporter_name, " coefficient_of_determination ", coefficient_of_determination, \
+            " Mean Squared Error ", mse, " Mean Absolute Error ", msa
+
+
+def main():
+    print "Loading information from ", simdata.ALL_ISSUES_CSV
+    all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
+
+    print "Adding calculated fields..."
+    enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
+
+    # project_key = "CASSANDRA"
+    project_key = "CLOUDSTACK"
+    # project_key = "OFBIZ"
+
+    issues_in_range = get_bug_reports(project_key, enhanced_dataframe)
+
     resolved_issues = simdata.filter_resolved(issues_in_range)
     resolution_times = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
     print "Resolution times in Range: \n", resolution_times.describe()
@@ -133,14 +215,10 @@ def main():
 
     team_sizes = []
     period_reports = []
-
-    completed_predicted = []
-    completed_true = []
-
     reporters_config = get_reporters_configuration(issues_in_range)
     print "Number of reporters: ", len(reporters_config)
 
-    overestimate, understimate, in_interval = 0, 0, 0
+    simulation_results = []
     for year_month in months_in_range:
         issues_for_month = issues_in_range[issues_in_range[simdata.CREATED_MONTH_COLUMN] == year_month]
 
@@ -169,34 +247,16 @@ def main():
             " Reports: ", reports_per_month, " Resolved in Month: ", issues_resolved
 
         simulation_time = 30 * 24
-        alpha = 0.95
 
         completed_reports = launch_simulation(team_capacity=dev_team_size, report_number=reports_per_month,
                                               reporters_config=reporters_config,
                                               resolution_time_sample=resolution_times,
                                               priority_sample=priorities_in_range, max_time=simulation_time)
 
-        sample_mean, sample_std, sample_size = np.mean(completed_reports), np.std(completed_reports), len(
-            completed_reports)
-        confidence_interval = stats.norm.interval(alpha, loc=sample_mean, scale=sample_std / np.sqrt(sample_size))
-        print "sample_size", sample_size, "sample_mean ", sample_mean, " sample_std ", sample_std, " confidence interval: ", \
-            confidence_interval
+        simulation_result = consolidate_results(year_month, resolved_in_month, reporters_config, completed_reports)
+        simulation_results.append(simulation_result)
 
-        completed_predicted.append(sample_mean)
-        completed_true.append(issues_resolved)
-
-        if confidence_interval[0] <= issues_resolved <= confidence_interval[1]:
-            in_interval += 1
-        elif issues_resolved < confidence_interval[0]:
-            overestimate += 1
-        elif issues_resolved > confidence_interval[1]:
-            understimate += 1
-
-    # simdata.launch_histogram(period_reports)
-
-    coefficient_of_determination = r2_score(completed_true, completed_predicted)
-    print "Simulation finished! coefficient_of_determination ", coefficient_of_determination
-    print "in_interval ", in_interval, " overestimate ", overestimate, " understimate ", understimate
+    analyse_results(reporters_config, simulation_results)
 
 
 if __name__ == "__main__":

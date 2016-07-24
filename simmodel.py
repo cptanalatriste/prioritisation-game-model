@@ -127,6 +127,16 @@ class BugReport(Process):
 
 
 def run_model(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen, max_time):
+    """
+    Triggers the simulation, according to the provided parameters.
+    :param team_capacity: Number of bug resolvers.
+    :param report_number: Total number of defects.
+    :param reporters_config: Configuration of the bug reporters.
+    :param resolution_time_gen: Variate generator for resolution time.
+    :param priority_gen: Variate generator for priorities.
+    :param max_time: Simulation time.
+    :return: Monitor for each bug reporter.
+    """
     start_time = 0.0
 
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
@@ -138,7 +148,7 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen,
                                      bug_level=bug_level)
 
-    monitors = []
+    monitors = {}
     for reporter_config in reporters_config:
         resol_time_monitor = Monitor()
         bug_reporter = BugReportSource(reporter_config=reporter_config,
@@ -146,14 +156,9 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
         activate(bug_reporter,
                  bug_reporter.start_reporting(developer_resource=developer_resource,
                                               resol_time_monitor=resol_time_monitor), at=start_time)
-        monitors.append(resol_time_monitor)
+        monitors[reporter_config['name']] = resol_time_monitor
 
     simulate(until=max_time)
-
-    # plt = SimPlot()
-    # plt.plotStep(developer_resource.waitMon, color="red", width=2)
-    # plt.mainloop()
-
     return monitors
 
 
