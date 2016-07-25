@@ -191,7 +191,7 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     return simulation_result
 
 
-def analyse_results(reporters_config, simulation_results, project_key, debug=True):
+def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=False):
     """
     Per each tester, it anaysis how close is simulation to real data.
     :param reporters_config: Tester configuration.
@@ -199,31 +199,32 @@ def analyse_results(reporters_config, simulation_results, project_key, debug=Tru
     :return: None
     """
 
-    for reporter_config in reporters_config:
-        reporter_name = reporter_config['name']
-        completed_true = []
-        completed_predicted = []
+    if reporters_config:
+        for reporter_config in reporters_config:
+            reporter_name = reporter_config['name']
+            completed_true = []
+            completed_predicted = []
 
-        for simulation_result in simulation_results:
-            reporter_true = [result['true_resolved'] for result in simulation_result["results_per_reporter"] if
-                             result["reporter_name"] == reporter_name][0]
-            completed_true.append(reporter_true)
+            for simulation_result in simulation_results:
+                reporter_true = [result['true_resolved'] for result in simulation_result["results_per_reporter"] if
+                                 result["reporter_name"] == reporter_name][0]
+                completed_true.append(reporter_true)
 
-            reporter_predicted = \
-                [result['predicted_resolved'] for result in simulation_result["results_per_reporter"] if
-                 result["reporter_name"] == reporter_name][0]
-            completed_predicted.append(reporter_predicted)
+                reporter_predicted = \
+                    [result['predicted_resolved'] for result in simulation_result["results_per_reporter"] if
+                     result["reporter_name"] == reporter_name][0]
+                completed_predicted.append(reporter_predicted)
 
-            if debug:
-                print "period: ", simulation_result[
-                    "period"], " reporter ", reporter_name, " predicted ", reporter_predicted, " true ", reporter_true
+                if debug:
+                    print "period: ", simulation_result[
+                        "period"], " reporter ", reporter_name, " predicted ", reporter_predicted, " true ", reporter_true
 
-        coefficient_of_determination = r2_score(completed_true, completed_predicted)
-        mse = mean_squared_error(completed_true, completed_predicted)
-        msa = mean_absolute_error(completed_true, completed_predicted)
+            coefficient_of_determination = r2_score(completed_true, completed_predicted)
+            mse = mean_squared_error(completed_true, completed_predicted)
+            msa = mean_absolute_error(completed_true, completed_predicted)
 
-        print "Project ", project_key, " Tester ", reporter_name, " coefficient_of_determination ", coefficient_of_determination, \
-            " Mean Squared Error ", mse, " Mean Absolute Error ", msa
+            print "Project ", project_key, " Tester ", reporter_name, " coefficient_of_determination ", coefficient_of_determination, \
+                " Mean Squared Error ", mse, " Mean Absolute Error ", msa
 
     total_completed = [result['true_resolved'] for result in simulation_results]
     total_predicted = [result['predicted_resolved'] for result in simulation_results]
@@ -248,76 +249,76 @@ def simulate_project(project_key, enhanced_dataframe):
     print "Original number of periods: ", len(period_in_range)
     period_in_range.sort()
 
-    training_issues = issues_in_range
-    reporters_config = get_reporters_configuration(training_issues)
-    print "Number of reporters: ", len(reporters_config)
+    simulation_results = []
 
     k_fold = KFold(len(period_in_range), n_folds=5)
     for train_index, test_index in k_fold:
         periods_train, periods_test = period_in_range[train_index], period_in_range[test_index]
-        print "periods_train ", periods_train, " periods_test ", periods_test
+        training_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_train)]
+        print "Issues in training: ", len(training_issues.index)
 
-    resolved_issues = simdata.filter_resolved(training_issues)
-    resolution_times = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
-    print "Resolution times in Range: \n", resolution_times.describe()
-    # simdata.launch_histogram(resolution_times)
+        reporters_config = get_reporters_configuration(training_issues)
+        print "Number of reporters: ", len(reporters_config)
 
-    interrival_times_range = simdata.get_interarrival_times(training_issues)
-    print "Inter-arrival times in Range: \n ", interrival_times_range.describe()
-    # simdata.launch_histogram(interrival_times_range)
+        resolved_issues = simdata.filter_resolved(training_issues)
+        resolution_times = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
+        print "Resolution times in Training Range: \n", resolution_times.describe()
 
-    priorities_in_range = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
-    print "Simplified Priorities in Range: \n ", priorities_in_range.value_counts()
+        interrival_times_range = simdata.get_interarrival_times(training_issues)
+        print "Inter-arrival times in Training Range: \n ", interrival_times_range.describe()
 
-    reporters_in_range = training_issues['Reported By']
-    print "Reporters in Range: \n ", reporters_in_range.describe()
+        priorities_in_range = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
+        print "Simplified Priorities in Training Range: \n ", priorities_in_range.value_counts()
 
-    simulation_results = []
+        reporters_in_range = training_issues['Reported By']
+        print "Reporters in Training Range: \n ", reporters_in_range.describe()
 
-    for period in period_in_range:
-        issues_for_period = training_issues[training_issues[simdata.PERIOD_COLUMN] == period]
+        test_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_test)]
+        print "Issues in test: ", len(test_issues.index)
 
-        reports_per_month = len(issues_for_period.index)
+        for test_period in periods_test:
+            issues_for_period = test_issues[test_issues[simdata.PERIOD_COLUMN] == test_period]
 
-        year, period_value = period.split('-')
-        month = int(period_value)
-        simulation_days = 30
-        start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
+            reports_per_month = len(issues_for_period.index)
 
-        margin = datetime.timedelta(days=simulation_days)
-        end_date = start_date + margin
+            year, period_value = test_period.split('-')
+            month = int(period_value)
+            simulation_days = 30
+            start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
 
-        resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False)
-        resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
-                                                          start_date,
-                                                          end_date)
+            margin = datetime.timedelta(days=simulation_days)
+            end_date = start_date + margin
 
-        bug_resolvers = resolved_in_period['JIRA Resolved By']
-        dev_team_size = bug_resolvers.nunique()
+            resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False)
+            resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
+                                                              start_date,
+                                                              end_date)
 
-        issues_resolved = len(resolved_in_period.index)
+            bug_resolvers = resolved_in_period['JIRA Resolved By']
+            dev_team_size = bug_resolvers.nunique()
 
-        bug_reporters = issues_for_period['Reported By']
-        test_team_size = bug_reporters.nunique()
+            issues_resolved = len(resolved_in_period.index)
 
-        print "Project ", project_key, " Period: ", period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
-            " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
+            bug_reporters = issues_for_period['Reported By']
+            test_team_size = bug_reporters.nunique()
 
-        simulation_time = simulation_days * 24
+            print "Project ", project_key, " Test Period: ", test_period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
+                " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
 
-        completed_reports = launch_simulation(team_capacity=dev_team_size, report_number=reports_per_month,
-                                              reporters_config=reporters_config,
-                                              resolution_time_sample=resolution_times,
-                                              priority_sample=priorities_in_range, max_time=simulation_time)
+            simulation_time = simulation_days * 24
 
-        simulation_result = consolidate_results(period, issues_for_period, resolved_in_period, reporters_config,
-                                                completed_reports)
-        simulation_results.append(simulation_result)
+            completed_reports = launch_simulation(team_capacity=dev_team_size, report_number=reports_per_month,
+                                                  reporters_config=reporters_config,
+                                                  resolution_time_sample=resolution_times,
+                                                  priority_sample=priorities_in_range, max_time=simulation_time)
+
+            simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
+                                                    reporters_config,
+                                                    completed_reports)
+            simulation_results.append(simulation_result)
 
     if len(simulation_results) > 0:
-        analyse_results(reporters_config, simulation_results, project_key)
-    else:
-        print "No valid periods for ", project_key
+        analyse_results(reporters_config=None, simulation_results=simulation_results, project_key=project_key)
 
 
 def main():
@@ -326,8 +327,8 @@ def main():
 
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
-    # project_lists = [["OFBIZ"], ["CASSANDRA"], ["CLOUDSTACK"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
-    project_lists = [["OFBIZ"]]
+    project_lists = [["OFBIZ"], ["CASSANDRA"], ["CLOUDSTACK"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
+    # project_lists = [["OFBIZ"]]
     for project_list in project_lists:
         simulate_project(project_list, enhanced_dataframe)
 
