@@ -3,9 +3,14 @@ This modules triggers the bug report simulation.
 """
 import time
 import datetime
-import pandas as pd
 import pytz
+
 from scipy import stats
+import numpy as np
+
+import pandas as pd
+
+from sklearn.cross_validation import KFold
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
@@ -13,7 +18,6 @@ from sklearn.metrics import mean_squared_error
 import simdata
 import simutils
 import simmodel
-import numpy as np
 
 import winsound  # vibhavcarlos
 
@@ -147,8 +151,17 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     :param completed_reports: Simulation results.
     :return:
     """
-    simulation_result = {"period": year_month,
-                         "results_per_reporter": []}
+    simulation_result = {"period": year_month, "results_per_reporter": [],
+                         "true_resolved": len(resolved_in_month.index)}
+
+    results = []
+    for report in completed_reports:
+        total_resolved = 0
+        for reporter_config in reporters_config:
+            total_resolved += report[reporter_config['name']]
+        results.append(total_resolved)
+
+    simulation_result["predicted_resolved"] = np.mean(results)
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
@@ -171,6 +184,9 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
         simulation_result["results_per_reporter"].append({"reporter_name": reporter_name,
                                                           "true_resolved": len(true_resolved.index),
                                                           "predicted_resolved": predicted_resolved})
+
+    if debug:
+        print "simulation_result ", simulation_result
 
     return simulation_result
 
@@ -209,24 +225,14 @@ def analyse_results(reporters_config, simulation_results, project_key, debug=Tru
         print "Project ", project_key, " Tester ", reporter_name, " coefficient_of_determination ", coefficient_of_determination, \
             " Mean Squared Error ", mse, " Mean Absolute Error ", msa
 
+    total_completed = [result['true_resolved'] for result in simulation_results]
+    total_predicted = [result['predicted_resolved'] for result in simulation_results]
 
-def is_game_valid(reporters_config, issues_for_period, minimum_reports):
-    """
-    Determines the conditions for the period to run start simulation.
-    :param minimum_reports: Minimum reports to be considered
-    :param reporters_config: Reporter configuration.
-    :param issues_for_period: Bug reports for the period.
-    :return: True if valid, false otherwise.
-    """
+    if debug:
+        print "total_completed ", total_completed
+        print "total_predicted ", total_predicted
 
-    for reporter_config in reporters_config:
-        reporter_name = reporter_config['name']
-        reported_issues = simdata.filter_by_reporter(issues_for_period, reporter_config['reporter_list'])
-
-        if len(reported_issues.index) < minimum_reports:
-            return False
-
-    return True
+    print "R-squared for total bug resolved in Project ", project_key, ": ", r2_score(total_completed, total_predicted)
 
 
 def simulate_project(project_key, enhanced_dataframe):
@@ -238,68 +244,75 @@ def simulate_project(project_key, enhanced_dataframe):
     """
     issues_in_range = get_bug_reports(project_key, enhanced_dataframe)
 
-    resolved_issues = simdata.filter_resolved(issues_in_range)
+    period_in_range = issues_in_range[simdata.PERIOD_COLUMN].unique()
+    print "Original number of periods: ", len(period_in_range)
+    period_in_range.sort()
+
+    training_issues = issues_in_range
+    reporters_config = get_reporters_configuration(training_issues)
+    print "Number of reporters: ", len(reporters_config)
+
+    k_fold = KFold(len(period_in_range), n_folds=5)
+    for train_index, test_index in k_fold:
+        periods_train, periods_test = period_in_range[train_index], period_in_range[test_index]
+        print "periods_train ", periods_train, " periods_test ", periods_test
+
+    resolved_issues = simdata.filter_resolved(training_issues)
     resolution_times = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
     print "Resolution times in Range: \n", resolution_times.describe()
     # simdata.launch_histogram(resolution_times)
 
-    interrival_times_range = simdata.get_interarrival_times(issues_in_range)
+    interrival_times_range = simdata.get_interarrival_times(training_issues)
     print "Inter-arrival times in Range: \n ", interrival_times_range.describe()
     # simdata.launch_histogram(interrival_times_range)
 
-    priorities_in_range = issues_in_range[simdata.SIMPLE_PRIORITY_COLUMN]
+    priorities_in_range = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
     print "Simplified Priorities in Range: \n ", priorities_in_range.value_counts()
 
-    reporters_in_range = issues_in_range['Reported By']
+    reporters_in_range = training_issues['Reported By']
     print "Reporters in Range: \n ", reporters_in_range.describe()
 
-    period_in_range = issues_in_range[simdata.PERIOD_COLUMN].unique()
-
-    reporters_config = get_reporters_configuration(issues_in_range)
-    print "Number of reporters: ", len(reporters_config)
-
     simulation_results = []
+
     for period in period_in_range:
-        issues_for_period = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN] == period]
+        issues_for_period = training_issues[training_issues[simdata.PERIOD_COLUMN] == period]
 
         reports_per_month = len(issues_for_period.index)
 
-        minimum_participation = 10
-        if is_game_valid(reporters_config, issues_for_period, minimum_participation):
-            year, period_value = period.split('-')
-            month = int(period_value) * 3 - 2
-            simulation_days = 90
-            start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
+        year, period_value = period.split('-')
+        month = int(period_value)
+        simulation_days = 30
+        start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
 
-            margin = datetime.timedelta(days=simulation_days)
-            end_date = start_date + margin
+        margin = datetime.timedelta(days=simulation_days)
+        end_date = start_date + margin
 
-            resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False)
-            resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
-                                                              start_date,
-                                                              end_date)
+        resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False)
+        resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
+                                                          start_date,
+                                                          end_date)
 
-            bug_resolvers = resolved_in_period['JIRA Resolved By']
-            dev_team_size = bug_resolvers.nunique()
+        bug_resolvers = resolved_in_period['JIRA Resolved By']
+        dev_team_size = bug_resolvers.nunique()
 
-            issues_resolved = len(resolved_in_period.index)
+        issues_resolved = len(resolved_in_period.index)
 
-            bug_reporters = issues_for_period['Reported By']
-            test_team_size = bug_reporters.nunique()
+        bug_reporters = issues_for_period['Reported By']
+        test_team_size = bug_reporters.nunique()
 
-            print "Project ", project_key, " Period: ", period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
-                " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
+        print "Project ", project_key, " Period: ", period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
+            " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
 
-            simulation_time = simulation_days * 24
+        simulation_time = simulation_days * 24
 
-            completed_reports = launch_simulation(team_capacity=dev_team_size, report_number=reports_per_month,
-                                                  reporters_config=reporters_config,
-                                                  resolution_time_sample=resolution_times,
-                                                  priority_sample=priorities_in_range, max_time=simulation_time)
+        completed_reports = launch_simulation(team_capacity=dev_team_size, report_number=reports_per_month,
+                                              reporters_config=reporters_config,
+                                              resolution_time_sample=resolution_times,
+                                              priority_sample=priorities_in_range, max_time=simulation_time)
 
-            simulation_result = consolidate_results(period, issues_for_period, resolved_in_period, reporters_config,
-                                                    completed_reports)
-            simulation_results.append(simulation_result)
+        simulation_result = consolidate_results(period, issues_for_period, resolved_in_period, reporters_config,
+                                                completed_reports)
+        simulation_results.append(simulation_result)
 
     if len(simulation_results) > 0:
         analyse_results(reporters_config, simulation_results, project_key)
@@ -313,7 +326,8 @@ def main():
 
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
-    project_lists = [["OFBIZ"], ["CASSANDRA"], ["CLOUDSTACK"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
+    # project_lists = [["OFBIZ"], ["CASSANDRA"], ["CLOUDSTACK"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
+    project_lists = [["OFBIZ"]]
     for project_list in project_lists:
         simulate_project(project_list, enhanced_dataframe)
 
