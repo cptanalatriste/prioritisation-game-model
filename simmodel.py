@@ -76,22 +76,6 @@ class BugReportSource(Process):
         return self.interarrival_time_gen.generate()
 
 
-class BugGenerator(Process):
-    """
-    A level for the number of bug reports for an specific period of time.
-    """
-
-    def __init__(self, name="bug-level", bug_level=None, report_number=None):
-        Process.__init__(self)
-        self.name = name
-        self.bug_level = bug_level
-        self.report_number = report_number
-
-    def generate(self):
-        print "Putting ", self.report_number, " bugs"
-        yield put, self, self.bug_level, self.report_number
-
-
 class BugReport(Process):
     """
     A project member whose main responsibility is bug reporting.

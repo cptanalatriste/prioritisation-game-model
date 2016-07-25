@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
     inflation_catalog = []
     for project_key, _ in top_projects.iteritems():
-        project_changed_issues = simdata.filter_by_project(issues_validated_priority, project_key)
+        project_changed_issues = simdata.filter_by_project(issues_validated_priority, [project_key])
         print "Validated priorities for project ", project_key, ": ", len(project_changed_issues.index)
 
         creation_dates = project_changed_issues[simdata.CREATED_DATE_COLUMN]

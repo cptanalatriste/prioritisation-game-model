@@ -36,11 +36,11 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
     priority_gen = simutils.DiscreteEmpiricalDistribution(priority_sample)
 
     # max_iterations = 1000
-    max_iterations = 100
+    max_iterations = 200
     completed_reports = []
 
-    for a_seed in range(max_iterations):
-        np.random.seed(a_seed)
+    for _ in range(max_iterations):
+        np.random.seed()
         resol_time_monitors = simmodel.run_model(team_capacity=team_capacity, report_number=report_number,
                                                  reporters_config=reporters_config,
                                                  resolution_time_gen=resolution_time_gen,
@@ -70,28 +70,30 @@ def get_reporters_configuration(issues_in_range):
     # second_class_testers = [index for index, value in issues_by_tester.iteritems() if value < threshold]
 
     reporters_config = []
-    for index, reporter_list in enumerate(
-            [[testers_in_order[0]], [testers_in_order[1]], [testers_in_order[2]], testers_in_order[3:]]):
-        # for index, reporter_list in enumerate([first_class_testers, second_class_testers]):
-        bug_reports = simdata.filter_by_reporter(issues_in_range, reporter_list)
-        inter_arrival_sample = simdata.get_interarrival_times(bug_reports)
-        inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
+    if len(testers_in_order) >= 4:
+        for index, reporter_list in enumerate(
+                [[testers_in_order[0]], [testers_in_order[1]], [testers_in_order[2]], testers_in_order[3:]]):
+            # for index, reporter_list in enumerate([first_class_testers, second_class_testers]):
+            bug_reports = simdata.filter_by_reporter(issues_in_range, reporter_list)
+            inter_arrival_sample = simdata.get_interarrival_times(bug_reports)
+            inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
 
-        reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
-        if len(reporter_list) == 1:
-            reporter_name = reporter_list[0]
+            reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
+            if len(reporter_list) == 1:
+                reporter_name = reporter_list[0]
 
-        print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(inter_arrival_sample), " std: ", np.std(
-            inter_arrival_sample), " testers ", len(reporter_list)
+            print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
+                inter_arrival_sample), " std: ", np.std(
+                inter_arrival_sample), " testers ", len(reporter_list)
 
-        reporters_config.append({'name': reporter_name,
-                                 'interarrival_time_gen': inter_arrival_time_gen,
-                                 'reporter_list': reporter_list})
+            reporters_config.append({'name': reporter_name,
+                                     'interarrival_time_gen': inter_arrival_time_gen,
+                                     'reporter_list': reporter_list})
 
     return reporters_config
 
 
-def get_bug_reports(project_key, enhanced_dataframe):
+def get_bug_reports(project_keys, enhanced_dataframe):
     """
     Returns the issues valid for simulation analysis. It includes:
 
@@ -103,15 +105,16 @@ def get_bug_reports(project_key, enhanced_dataframe):
     :param enhanced_dataframe: Bug report dataframe.
     :return: Filtered dataframe
     """
-    print "Starting analysis for project ", project_key, " ..."
+    print "Starting analysis for projects ", project_keys, " ..."
 
-    project_bugs = simdata.filter_by_project(enhanced_dataframe, project_key)
-    print "Total issues for project ", project_key, ": ", len(project_bugs.index)
+    project_bugs = simdata.filter_by_project(enhanced_dataframe, project_keys)
+    print "Total issues for projects ", project_keys, ": ", len(project_bugs.index)
 
     project_reporters = project_bugs[simdata.REPORTER_COLUMN].value_counts()
+    print "Total Reporters: ", len(project_reporters.index)
 
-    quantile = 0.9
-    tester_threshold = project_reporters.quantile(quantile)
+    quant = 0.9
+    tester_threshold = project_reporters.quantile(quant)
     print "Minimum reports to be included: ", tester_threshold
     top_testers = [index for index, value in project_reporters.iteritems() if value >= tester_threshold]
 
@@ -132,7 +135,7 @@ def get_bug_reports(project_key, enhanced_dataframe):
 
 
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_reports,
-                        debug=True):
+                        debug=False):
     """
     It consolidates the results from the simulation with the information contained in the data.
 
@@ -172,24 +175,33 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     return simulation_result
 
 
-def analyse_results(reporters_config, simulation_results, project_key):
+def analyse_results(reporters_config, simulation_results, project_key, debug=True):
     """
     Per each tester, it anaysis how close is simulation to real data.
     :param reporters_config: Tester configuration.
     :param simulation_results: Result from simulation.
     :return: None
     """
+
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
         completed_true = []
         completed_predicted = []
 
         for simulation_result in simulation_results:
-            completed_true.append([result['true_resolved'] for result in simulation_result["results_per_reporter"] if
-                                   result["reporter_name"] == reporter_name])
-            completed_predicted.append(
+            reporter_true = [result['true_resolved'] for result in simulation_result["results_per_reporter"] if
+                             result["reporter_name"] == reporter_name][0]
+            completed_true.append(reporter_true)
+
+            reporter_predicted = \
                 [result['predicted_resolved'] for result in simulation_result["results_per_reporter"] if
-                 result["reporter_name"] == reporter_name])
+                 result["reporter_name"] == reporter_name][0]
+            completed_predicted.append(reporter_predicted)
+
+            if debug:
+                print "period: ", simulation_result[
+                    "period"], " reporter ", reporter_name, " predicted ", reporter_predicted, " true ", reporter_true
+
         coefficient_of_determination = r2_score(completed_true, completed_predicted)
         mse = mean_squared_error(completed_true, completed_predicted)
         msa = mean_absolute_error(completed_true, completed_predicted)
@@ -198,14 +210,14 @@ def analyse_results(reporters_config, simulation_results, project_key):
             " Mean Squared Error ", mse, " Mean Absolute Error ", msa
 
 
-def is_game_valid(reporters_config, issues_for_period):
+def is_game_valid(reporters_config, issues_for_period, minimum_reports):
     """
     Determines the conditions for the period to run start simulation.
+    :param minimum_reports: Minimum reports to be considered
     :param reporters_config: Reporter configuration.
     :param issues_for_period: Bug reports for the period.
     :return: True if valid, false otherwise.
     """
-    minimum_reports = 10
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
@@ -252,7 +264,8 @@ def simulate_project(project_key, enhanced_dataframe):
 
         reports_per_month = len(issues_for_period.index)
 
-        if is_game_valid(reporters_config, issues_for_period):
+        minimum_participation = 10
+        if is_game_valid(reporters_config, issues_for_period, minimum_participation):
             year, period_value = period.split('-')
             month = int(period_value) * 3 - 2
             simulation_days = 90
@@ -288,7 +301,10 @@ def simulate_project(project_key, enhanced_dataframe):
                                                     completed_reports)
             simulation_results.append(simulation_result)
 
-    analyse_results(reporters_config, simulation_results, project_key)
+    if len(simulation_results) > 0:
+        analyse_results(reporters_config, simulation_results, project_key)
+    else:
+        print "No valid periods for ", project_key
 
 
 def main():
@@ -297,12 +313,9 @@ def main():
 
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
-
-    project_list = ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]
-    # project_list = ["OFBIZ"]
-
-    for project_key in project_list:
-        simulate_project(project_key, enhanced_dataframe)
+    project_lists = [["OFBIZ"], ["CASSANDRA"], ["CLOUDSTACK"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
+    for project_list in project_lists:
+        simulate_project(project_list, enhanced_dataframe)
 
 
 if __name__ == "__main__":
