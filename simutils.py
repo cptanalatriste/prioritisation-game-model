@@ -1,11 +1,12 @@
 """
 Utility types for supporting the simulation.
 """
+from collections import defaultdict
+
+import numpy as np
 
 from scipy.stats import uniform
 from scipy.stats import rv_discrete
-
-import numpy as np
 
 MINIMUM_OBSERVATIONS = 10
 
@@ -62,9 +63,9 @@ class DiscreteEmpiricalDistribution:
     def __init__(self, observations):
         values_with_probabilities = observations.value_counts(normalize=True)
         self.values = np.array([index for index, _ in values_with_probabilities.iteritems()])
+        self.probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
 
-        probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
-        self.disc_distribution = rv_discrete(values=(range(len(values_with_probabilities)), probabilities))
+        self.disc_distribution = rv_discrete(values=(range(len(values_with_probabilities)), self.probabilities))
 
     def generate(self, rand_uniform=None):
         """
@@ -75,3 +76,7 @@ class DiscreteEmpiricalDistribution:
         """
         variate_index = self.disc_distribution.rvs(size=1)
         return self.values[variate_index]
+
+    def get_probabilities(self):
+        probability_map = {value: self.probabilities[index] for index, value in enumerate(self.values)}
+        return defaultdict(float, probability_map)

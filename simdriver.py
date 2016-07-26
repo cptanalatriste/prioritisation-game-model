@@ -11,7 +11,10 @@ import matplotlib.pyplot as plt
 
 import pandas as pd
 
+from sklearn.cluster import KMeans
+
 from sklearn.cross_validation import KFold
+
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
@@ -56,7 +59,7 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
     return completed_reports
 
 
-def get_reporters_configuration(issues_in_range):
+def get_reporters_configuration(issues_in_range, debug=False):
     """
     Returns the reporting information required for the simulation to run.
     :param issues_in_range: Bug report data frame
@@ -73,53 +76,86 @@ def get_reporters_configuration(issues_in_range):
         bug_reports = simdata.filter_by_reporter(issues_in_range, reporter_list)
 
         reporter_participation = bug_reports[simdata.PERIOD_COLUMN].nunique()
-        # print "reporter_list ", reporter_list, "reporter_participation ", reporter_participation, " total_training_periods ", \
-        #     total_training_periods, "bug_reports[simdata.REPORTER_COLUMN].unique()", bug_reports[
-        #     simdata.PERIOD_COLUMN].unique(), " len(bug_reports.index) ", len(bug_reports.index)
+
         if reporter_participation >= total_training_periods / 3:
-            inter_arrival_sample = simdata.get_interarrival_times(bug_reports)
+            batches = simdata.get_report_batches(bug_reports)
+
+            arrival_times = [batch["batch_head"] for batch in batches]
+            inter_arrival_sample = simdata.get_interarrival_times(arrival_times)
+            batch_sizes_sample = [batch["batch_count"] for batch in batches]
 
             try:
                 inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
+                batch_size_gen = simutils.DiscreteEmpiricalDistribution(pd.Series(data=batch_sizes_sample))
 
                 reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
                 if len(reporter_list) == 1:
                     reporter_name = reporter_list[0]
 
-                print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
-                    inter_arrival_sample), " std: ", np.std(
-                    inter_arrival_sample), " testers ", len(reporter_list)
+                priority_distribution = simutils.DiscreteEmpiricalDistribution(
+                    bug_reports[simdata.SIMPLE_PRIORITY_COLUMN])
+                priority_map = priority_distribution.get_probabilities()
+
+                modified_priority = simdata.get_modified_priority_bugs(bug_reports)
+                with_modified_priority = len(modified_priority.index)
+
+                if debug:
+                    print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
+                        inter_arrival_sample), " std: ", np.std(
+                        inter_arrival_sample), "Batch-size", reporter_name, " mean: ", np.mean(
+                        batch_sizes_sample), " std: ", np.std(
+                        batch_sizes_sample), " priority_map ", priority_map, " with_modified_priority ", with_modified_priority
 
                 reporters_config.append({'name': reporter_name,
                                          'interarrival_time_gen': inter_arrival_time_gen,
-                                         'reporter_list': reporter_list})
+                                         'batch_size_gen': batch_size_gen,
+                                         'reporter_list': reporter_list,
+                                         'priority_map': priority_map,
+                                         'with_modified_priority': with_modified_priority})
             except ValueError as _:
                 print "Reporters ", reporter_list, " could not be added. Possible because insufficient samples."
 
     return reporters_config
 
 
-def get_bug_reports(project_keys, enhanced_dataframe):
-    """
-    Returns the issues valid for simulation analysis. It includes:
+def assign_strategies(reporters_config, training_issues):
+    reporter_records = [
+        [config['priority_map'][simdata.NON_SEVERE_PRIORITY], config['priority_map'][simdata.NORMAL_PRIORITY],
+         config['priority_map'][simdata.SEVERE_PRIORITY],
+         config['with_modified_priority']] for config in reporters_config]
 
-    - Filtered by project
-    - Only reports from top testers
-    - Only reports while priorities where corrected.
+    global_priority_map = simutils.DiscreteEmpiricalDistribution(
+        training_issues[simdata.SIMPLE_PRIORITY_COLUMN]).get_probabilities()
 
-    :param project_key: Project identifier.
-    :param enhanced_dataframe: Bug report dataframe.
-    :return: Filtered dataframe
-    """
-    print "Starting analysis for projects ", project_keys, " ..."
+    reporter_dataframe = pd.DataFrame(reporter_records)
+    correction_column = "Corrections"
+    reporter_dataframe.columns = ["Non-Severe", "Normal", "Severe", correction_column]
 
-    project_bugs = simdata.filter_by_project(enhanced_dataframe, project_keys)
-    print "Total issues for projects ", project_keys, ": ", len(project_bugs.index)
+    print "Starting clustering algorithms ..."
+    k_means = KMeans(n_clusters=2,
+                     init='random',
+                     max_iter=300,
+                     tol=1e-04,
+                     random_state=0)
 
-    project_reporters = project_bugs[simdata.REPORTER_COLUMN].value_counts()
-    print "Total Reporters: ", len(project_reporters.index)
+    predicted_clusters = k_means.fit_predict(reporter_dataframe)
+    main_cluster = k_means.predict(
+        [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
+         global_priority_map[simdata.SEVERE_PRIORITY], 0.0])
 
-    return project_bugs
+    strategy_column = 'strategy'
+    reporter_dataframe[strategy_column] = [
+        simmodel.NOT_INFLATE_STRATEGY if cluster == main_cluster else simmodel.INFLATE_STRATEGY for
+        cluster in
+        predicted_clusters]
+
+    for index, strategy in enumerate(reporter_dataframe[strategy_column].values):
+        reporters_config[index]['strategy'] = strategy
+
+    for strategy in [simmodel.NOT_INFLATE_STRATEGY, simmodel.INFLATE_STRATEGY]:
+        reporters_per_strategy = reporter_dataframe[reporter_dataframe[strategy_column] == strategy]
+        print "Strategy: ", strategy, " reporters: ", len(reporters_per_strategy.index), " avg corrections: ", \
+            reporters_per_strategy[correction_column].mean()
 
 
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_reports,
@@ -218,6 +254,8 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         print "total_predicted ", total_predicted
 
     print "R-squared for total bug resolved in Project ", project_key, ": ", r2_score(total_completed, total_predicted)
+    print "MSE for total bug resolved in Project ", project_key, ": ", mean_squared_error(total_completed,
+                                                                                          total_predicted)
 
     if plot:
         plt.scatter(total_predicted, total_completed)
@@ -246,9 +284,32 @@ def get_simulation_input(training_issues):
     return resolution_time_gen, priority_gen
 
 
+def get_bug_reports(project_keys, enhanced_dataframe):
+    """
+    Returns the issues valid for simulation analysis. It includes:
+
+    - Filtered by project
+    - Only reports from top testers
+    - Only reports while priorities where corrected.
+
+    :param project_keys: Project identifiers.
+    :param enhanced_dataframe: Bug report dataframe.
+    :return: Filtered dataframe
+    """
+    print "Starting analysis for projects ", project_keys, " ..."
+
+    project_bugs = simdata.filter_by_project(enhanced_dataframe, project_keys)
+    print "Total issues for projects ", project_keys, ": ", len(project_bugs.index)
+
+    project_reporters = project_bugs[simdata.REPORTER_COLUMN].value_counts()
+    print "Total Reporters: ", len(project_reporters.index)
+
+    return project_bugs
+
+
 def simulate_project(project_key, enhanced_dataframe):
     """
-    Launches simulation anallysis for an specific project.
+    Launches simulation analysis for an specific project.
     :param project_key: Project identifier.
     :param enhanced_dataframe: Dataframe with additional fields
     :return: None
@@ -269,6 +330,8 @@ def simulate_project(project_key, enhanced_dataframe):
 
         reporters_config = get_reporters_configuration(training_issues)
         print "Number of reporters: ", len(reporters_config)
+
+        assign_strategies(reporters_config, training_issues)
 
         engaged_testers = [reporter_config['name'] for reporter_config in reporters_config]
         training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)

@@ -21,6 +21,10 @@ REPORTER_COLUMN = 'Reported By'
 TIME_FACTOR = 60.0 * 60.0
 VALID_RESOLUTION_VALUES = ['Done', 'Implemented', 'Fixed']
 
+SEVERE_PRIORITY = 3
+NORMAL_PRIORITY = 2
+NON_SEVERE_PRIORITY = 1
+
 
 def launch_histogram(data_points):
     """
@@ -116,11 +120,11 @@ def enhace_report_dataframe(bug_reports):
     bug_reports[PERIOD_COLUMN] = bug_reports.apply(date_as_string, axis=1)
     bug_reports[RESOLUTION_TIME_COLUMN] = bug_reports.apply(get_resolution_time, axis=1)
 
-    simplified_priorities = {"Blocker": 3,
-                             "Critical": 3,
-                             "Major": 2,
-                             "Minor": 1,
-                             "Trivial": 1}
+    simplified_priorities = {"Blocker": SEVERE_PRIORITY,
+                             "Critical": SEVERE_PRIORITY,
+                             "Major": NORMAL_PRIORITY,
+                             "Minor": NON_SEVERE_PRIORITY,
+                             "Trivial": NON_SEVERE_PRIORITY}
     bug_reports[SIMPLE_PRIORITY_COLUMN] = bug_reports['Priority'].replace(simplified_priorities)
     return bug_reports
 
@@ -194,11 +198,12 @@ def get_modified_priority_bugs(bug_reports):
     return issues_validated_priority
 
 
-def get_interarrival_times(bug_reports):
-    report_dates = bug_reports[CREATED_DATE_COLUMN]
-    report_dates = report_dates.order()
-
-    arrival_times = report_dates.values
+def get_interarrival_times(arrival_times):
+    """
+    Given a list of report dates, it returns the list corresponding to the interrival times.
+    :param arrival_times: List of arrival times.
+    :return: List of inter-arrival times.
+    """
     interarrival_times = []
     for position, created_date in enumerate(arrival_times):
         if position > 0:
@@ -212,3 +217,31 @@ def get_interarrival_times(bug_reports):
             interarrival_times.append(time)
 
     return pd.Series(data=interarrival_times)
+
+
+def get_report_batches(bug_reports, window_size=1):
+    """
+    Return a list of bug report batches, according to a batch size.
+    :param bug_reports: Bug report dataframe.
+    :param window_size: Size of the window that represents a batch. In DAYS
+    :return: List containing batch start and batch count.
+    """
+    report_dates = bug_reports[CREATED_DATE_COLUMN]
+    report_dates = report_dates.order()
+
+    batches = []
+    for position, created_date in enumerate(report_dates.values):
+        if len(batches) == 0:
+            batches.append({"batch_head": created_date,
+                            "batch_count": 1})
+        else:
+            last_batch_head = batches[-1]["batch_head"]
+            distance = created_date - last_batch_head
+
+            if distance.days <= window_size:
+                batches[-1]["batch_count"] += 1
+            else:
+                batches.append({"batch_head": created_date,
+                                "batch_count": 1})
+
+    return batches

@@ -5,7 +5,12 @@ This module is a discrete event simulation model for the bug reporting process
 from SimPy.Simulation import *
 from SimPy.SimPlot import *
 
+import numpy as np
+
 CRITICAL_PRIORITY = 100
+
+NOT_INFLATE_STRATEGY = 'NOT_INFLATE'
+INFLATE_STRATEGY = 'INFLATE'
 
 
 class TestingContext:
@@ -30,7 +35,7 @@ class TestingContext:
         Returns the priority of the produced bug report.
         :return: The priority of the generate bug.
         """
-        return self.priority_gen.generate()
+        return self.priority_gen.generate()[0]
 
 
 class BugReportSource(Process):
@@ -42,6 +47,8 @@ class BugReportSource(Process):
         Process.__init__(self)
         self.name = reporter_config['name']
         self.interarrival_time_gen = reporter_config['interarrival_time_gen']
+        self.batch_size_gen = reporter_config['batch_size_gen']
+        self.strategy = reporter_config['strategy']
         self.testing_context = testing_context
 
     def start_reporting(self, developer_resource, resol_time_monitor):
@@ -52,21 +59,29 @@ class BugReportSource(Process):
         :return: None
         """
         bug_level = self.testing_context.bug_level
-        while bug_level.amount > 0:
-            yield get, self, bug_level, 1
+
+        batch_size = self.get_batch_size()
+        while bug_level.amount >= batch_size:
+            yield get, self, bug_level, batch_size
 
             report_key = "Report-" + str(bug_level.amount)
             bug_report = BugReport(name=report_key, reporter=self.name,
                                    fix_effort=self.testing_context.get_fix_effort(),
-                                   priority=self.testing_context.get_priority())
+                                   priority=self.get_report_priority())
 
             activate(bug_report,
                      bug_report.arrive(developer_resource=developer_resource,
                                        resol_time_monitor=resol_time_monitor))
 
             interarrival_time = self.get_interarrival_time()
-
             yield hold, self, interarrival_time
+
+            batch_size = self.get_batch_size()
+
+    def get_report_priority(self):
+        real_priority = self.testing_context.get_priority()
+        priority_for_report = real_priority
+        return priority_for_report
 
     def get_interarrival_time(self):
         """
@@ -74,6 +89,13 @@ class BugReportSource(Process):
         :return: Time to hold before next report.
         """
         return self.interarrival_time_gen.generate()
+
+    def get_batch_size(self):
+        """
+        Returns the number of bugs to be contained in the batch report.
+        :return: Number of bug reports.
+        """
+        return int(np.asscalar(self.batch_size_gen.generate()[0]))
 
 
 class BugReport(Process):
@@ -88,26 +110,31 @@ class BugReport(Process):
         self.fix_effort = fix_effort
         self.priority = priority
 
-    def arrive(self, developer_resource, resol_time_monitor):
+    def arrive(self, developer_resource, resol_time_monitor, debug=False):
         """
         The Process Execution Method for the Bug Reported process.
         :return:
         """
         arrival_time = now()
-        pending_bugs = len(developer_resource.waitQ)
-        # print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Priority: ", self.priority, \
-        #     "Pending bugs: ", pending_bugs
+
+        if debug:
+            pending_bugs = len(developer_resource.waitQ)
+            print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Priority: ", self.priority, \
+                "Pending bugs: ", pending_bugs
 
         yield request, self, developer_resource, self.priority
 
-        # print now(), ": Report ", self.name, " ready for fixing. "
+        if debug:
+            print now(), ": Report ", self.name, " ready for fixing. "
 
         yield hold, self, self.fix_effort
         yield release, self, developer_resource
 
         resol_time = now() - arrival_time
         resol_time_monitor.observe(resol_time)
-        # print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting."
+
+        if debug:
+            print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting."
 
 
 def run_model(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen, max_time):
