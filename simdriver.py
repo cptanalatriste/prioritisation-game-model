@@ -119,25 +119,7 @@ def get_bug_reports(project_keys, enhanced_dataframe):
     project_reporters = project_bugs[simdata.REPORTER_COLUMN].value_counts()
     print "Total Reporters: ", len(project_reporters.index)
 
-    # quant = 0.9
-    # tester_threshold = project_reporters.quantile(quant)
-    # print "Minimum reports to be included: ", tester_threshold
-    # top_testers = [index for index, value in project_reporters.iteritems() if value >= tester_threshold]
-    #
-    # project_bugs = simdata.filter_by_reporter(project_bugs, top_testers)
-    # print "Top-tester production for this project: ", len(project_bugs.index), " Testers: ", len(top_testers)
-
-    with_corrected_priority = simdata.get_modified_priority_bugs(project_bugs)
-    min_create_date = with_corrected_priority[simdata.CREATED_DATE_COLUMN].min()
-    max_create_date = with_corrected_priority[simdata.CREATED_DATE_COLUMN].max()
-
-    print "With corrected priorities: ", len(
-        with_corrected_priority.index), " between ", min_create_date, " and ", max_create_date
-
-    issues_in_range = simdata.filter_by_create_date(project_bugs, min_create_date, max_create_date)
-    print "All issues in that range: ", len(issues_in_range.index)
-
-    return issues_in_range
+    return project_bugs
 
 
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_reports,
@@ -243,6 +225,7 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         plt.ylabel("Actual Resolved")
         plt.plot([min(total_completed), max(total_completed)], [[min(total_completed)], [max(total_completed)]])
         plt.show()
+
 
 def get_simulation_input(training_issues):
     """
