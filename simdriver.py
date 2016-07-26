@@ -7,6 +7,7 @@ import pytz
 
 from scipy import stats
 import numpy as np
+import matplotlib.pyplot as plt
 
 import pandas as pd
 
@@ -19,10 +20,10 @@ import simdata
 import simutils
 import simmodel
 
-import winsound  # vibhavcarlos
+import winsound
 
 
-def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_sample, priority_sample,
+def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen,
                       max_time):
     """
     Triggers the simulation according a given configuration.
@@ -30,14 +31,11 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
     :param team_capacity: Number of developers in the team.
     :param report_number: Number of bugs for the period.
     :param reporters_config: Bug reporter configuration.
-    :param resolution_time_sample: Resolution time required by developers.
-    :param priority_sample: The priority contained on the bug reports.
+    :param resolution_time_gen: Resolution time required by developers.
+    :param priority_gen: The priority contained on the bug reports.
     :param max_time: Simulation time.
     :return: List containing the number of fixed reports.
     """
-
-    resolution_time_gen = simutils.ContinuousEmpiricalDistribution(resolution_time_sample)
-    priority_gen = simutils.DiscreteEmpiricalDistribution(priority_sample)
 
     # max_iterations = 1000
     max_iterations = 200
@@ -68,31 +66,35 @@ def get_reporters_configuration(issues_in_range):
     issues_by_tester = issues_in_range[simdata.REPORTER_COLUMN].value_counts()
     testers_in_order = [index for index, _ in issues_by_tester.iteritems()]
 
-    # threshold = issues_by_tester.quantile(0.90)
-    #
-    # first_class_testers = [index for index, value in issues_by_tester.iteritems() if value >= threshold]
-    # second_class_testers = [index for index, value in issues_by_tester.iteritems() if value < threshold]
-
     reporters_config = []
-    if len(testers_in_order) >= 4:
-        for index, reporter_list in enumerate(
-                [[testers_in_order[0]], [testers_in_order[1]], [testers_in_order[2]], testers_in_order[3:]]):
-            # for index, reporter_list in enumerate([first_class_testers, second_class_testers]):
-            bug_reports = simdata.filter_by_reporter(issues_in_range, reporter_list)
+    total_training_periods = issues_in_range[simdata.PERIOD_COLUMN].nunique()
+    for index, reporter_list in enumerate([[tester] for tester in testers_in_order]):
+        # for index, reporter_list in enumerate([first_class_testers, second_class_testers]):
+        bug_reports = simdata.filter_by_reporter(issues_in_range, reporter_list)
+
+        reporter_participation = bug_reports[simdata.PERIOD_COLUMN].nunique()
+        # print "reporter_list ", reporter_list, "reporter_participation ", reporter_participation, " total_training_periods ", \
+        #     total_training_periods, "bug_reports[simdata.REPORTER_COLUMN].unique()", bug_reports[
+        #     simdata.PERIOD_COLUMN].unique(), " len(bug_reports.index) ", len(bug_reports.index)
+        if reporter_participation >= total_training_periods / 3:
             inter_arrival_sample = simdata.get_interarrival_times(bug_reports)
-            inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
 
-            reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
-            if len(reporter_list) == 1:
-                reporter_name = reporter_list[0]
+            try:
+                inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
 
-            print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
-                inter_arrival_sample), " std: ", np.std(
-                inter_arrival_sample), " testers ", len(reporter_list)
+                reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
+                if len(reporter_list) == 1:
+                    reporter_name = reporter_list[0]
 
-            reporters_config.append({'name': reporter_name,
-                                     'interarrival_time_gen': inter_arrival_time_gen,
-                                     'reporter_list': reporter_list})
+                print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
+                    inter_arrival_sample), " std: ", np.std(
+                    inter_arrival_sample), " testers ", len(reporter_list)
+
+                reporters_config.append({'name': reporter_name,
+                                         'interarrival_time_gen': inter_arrival_time_gen,
+                                         'reporter_list': reporter_list})
+            except ValueError as _:
+                print "Reporters ", reporter_list, " could not be added. Possible because insufficient samples."
 
     return reporters_config
 
@@ -117,13 +119,13 @@ def get_bug_reports(project_keys, enhanced_dataframe):
     project_reporters = project_bugs[simdata.REPORTER_COLUMN].value_counts()
     print "Total Reporters: ", len(project_reporters.index)
 
-    quant = 0.9
-    tester_threshold = project_reporters.quantile(quant)
-    print "Minimum reports to be included: ", tester_threshold
-    top_testers = [index for index, value in project_reporters.iteritems() if value >= tester_threshold]
-
-    project_bugs = simdata.filter_by_reporter(project_bugs, top_testers)
-    print "Top-tester production for this project: ", len(project_bugs.index), " Testers: ", len(top_testers)
+    # quant = 0.9
+    # tester_threshold = project_reporters.quantile(quant)
+    # print "Minimum reports to be included: ", tester_threshold
+    # top_testers = [index for index, value in project_reporters.iteritems() if value >= tester_threshold]
+    #
+    # project_bugs = simdata.filter_by_reporter(project_bugs, top_testers)
+    # print "Top-tester production for this project: ", len(project_bugs.index), " Testers: ", len(top_testers)
 
     with_corrected_priority = simdata.get_modified_priority_bugs(project_bugs)
     min_create_date = with_corrected_priority[simdata.CREATED_DATE_COLUMN].min()
@@ -191,7 +193,7 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     return simulation_result
 
 
-def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=False):
+def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=False, plot=True):
     """
     Per each tester, it anaysis how close is simulation to real data.
     :param reporters_config: Tester configuration.
@@ -235,6 +237,31 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
 
     print "R-squared for total bug resolved in Project ", project_key, ": ", r2_score(total_completed, total_predicted)
 
+    if plot:
+        plt.scatter(total_predicted, total_completed)
+        plt.xlabel("Predicted Resolved")
+        plt.ylabel("Actual Resolved")
+        plt.plot([min(total_completed), max(total_completed)], [[min(total_completed)], [max(total_completed)]])
+        plt.show()
+
+def get_simulation_input(training_issues):
+    """
+    Extract the simulation paramaters from the training dataset.
+    :param training_issues: Training data set.
+    :return: Variate generator for resolution times, priorities and reporter inter-arrival time.
+    """
+    resolved_issues = simdata.filter_resolved(training_issues)
+    resolution_time_sample = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
+    print "Resolution times in Training Range: \n", resolution_time_sample.describe()
+
+    priority_sample = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
+    print "Simplified Priorities in Training Range: \n ", priority_sample.value_counts()
+
+    resolution_time_gen = simutils.ContinuousEmpiricalDistribution(resolution_time_sample)
+    priority_gen = simutils.DiscreteEmpiricalDistribution(priority_sample)
+
+    return resolution_time_gen, priority_gen
+
 
 def simulate_project(project_key, enhanced_dataframe):
     """
@@ -260,21 +287,16 @@ def simulate_project(project_key, enhanced_dataframe):
         reporters_config = get_reporters_configuration(training_issues)
         print "Number of reporters: ", len(reporters_config)
 
-        resolved_issues = simdata.filter_resolved(training_issues)
-        resolution_times = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
-        print "Resolution times in Training Range: \n", resolution_times.describe()
+        engaged_testers = [reporter_config['name'] for reporter_config in reporters_config]
+        training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
+        print "Issues in training after reporter filtering: ", len(training_issues.index)
 
-        interrival_times_range = simdata.get_interarrival_times(training_issues)
-        print "Inter-arrival times in Training Range: \n ", interrival_times_range.describe()
-
-        priorities_in_range = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
-        print "Simplified Priorities in Training Range: \n ", priorities_in_range.value_counts()
-
-        reporters_in_range = training_issues['Reported By']
-        print "Reporters in Training Range: \n ", reporters_in_range.describe()
+        resolution_time_gen, priority_gen = get_simulation_input(training_issues)
 
         test_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_test)]
         print "Issues in test: ", len(test_issues.index)
+        test_issues = simdata.filter_by_reporter(test_issues, engaged_testers)
+        print "Issues in test after reporter filtering: ", len(test_issues.index)
 
         for test_period in periods_test:
             issues_for_period = test_issues[test_issues[simdata.PERIOD_COLUMN] == test_period]
@@ -309,8 +331,8 @@ def simulate_project(project_key, enhanced_dataframe):
 
             completed_reports = launch_simulation(team_capacity=dev_team_size, report_number=reports_per_month,
                                                   reporters_config=reporters_config,
-                                                  resolution_time_sample=resolution_times,
-                                                  priority_sample=priorities_in_range, max_time=simulation_time)
+                                                  resolution_time_gen=resolution_time_gen,
+                                                  priority_gen=priority_gen, max_time=simulation_time)
 
             simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
                                                     reporters_config,
@@ -327,8 +349,8 @@ def main():
 
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
-    project_lists = [["OFBIZ"], ["CASSANDRA"], ["CLOUDSTACK"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
-    # project_lists = [["OFBIZ"]]
+    # project_lists = [["CASSANDRA"], ["CLOUDSTACK"], ["OFBIZ"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
+    project_lists = [enhanced_dataframe["Project Key"].unique()]
     for project_list in project_lists:
         simulate_project(project_list, enhanced_dataframe)
 
