@@ -60,12 +60,15 @@ class ContinuousEmpiricalDistribution:
 
 
 class DiscreteEmpiricalDistribution:
-    def __init__(self, observations):
-        values_with_probabilities = observations.value_counts(normalize=True)
-        self.values = np.array([index for index, _ in values_with_probabilities.iteritems()])
-        self.probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
+    def __init__(self, observations=None, values=None, probabilities=None):
+        if observations is not None:
+            values_with_probabilities = observations.value_counts(normalize=True)
+            values = np.array([index for index, _ in values_with_probabilities.iteritems()])
+            probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
 
-        self.disc_distribution = rv_discrete(values=(range(len(values_with_probabilities)), self.probabilities))
+        self.values = values
+        self.probabilities = probabilities
+        self.disc_distribution = rv_discrete(values=(range(len(values)), self.probabilities))
 
     def generate(self, rand_uniform=None):
         """

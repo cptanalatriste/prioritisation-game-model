@@ -7,6 +7,9 @@ from SimPy.SimPlot import *
 
 import numpy as np
 
+import simdata
+import simutils
+
 CRITICAL_PRIORITY = 100
 
 NOT_INFLATE_STRATEGY = 'NOT_INFLATE'
@@ -48,8 +51,11 @@ class BugReportSource(Process):
         self.name = reporter_config['name']
         self.interarrival_time_gen = reporter_config['interarrival_time_gen']
         self.batch_size_gen = reporter_config['batch_size_gen']
-        self.strategy = reporter_config['strategy']
         self.testing_context = testing_context
+
+        self.inflation_gen = None
+        if reporter_config['strategy'] == INFLATE_STRATEGY:
+            self.inflation_gen = simutils.DiscreteEmpiricalDistribution(values=[True, False], probabilities=[0.5, 0.5])
 
     def start_reporting(self, developer_resource, resol_time_monitor):
         """
@@ -65,9 +71,12 @@ class BugReportSource(Process):
             yield get, self, bug_level, batch_size
 
             report_key = "Report-" + str(bug_level.amount)
+
+            real_priority, report_priority = self.get_report_priority()
             bug_report = BugReport(name=report_key, reporter=self.name,
                                    fix_effort=self.testing_context.get_fix_effort(),
-                                   priority=self.get_report_priority())
+                                   report_priority=report_priority,
+                                   real_priority=real_priority)
 
             activate(bug_report,
                      bug_report.arrive(developer_resource=developer_resource,
@@ -81,7 +90,12 @@ class BugReportSource(Process):
     def get_report_priority(self):
         real_priority = self.testing_context.get_priority()
         priority_for_report = real_priority
-        return priority_for_report
+
+        if real_priority < simdata.SEVERE_PRIORITY and self.inflation_gen is not None:
+            if self.inflation_gen.generate():
+                priority_for_report += 1
+
+        return real_priority, priority_for_report
 
     def get_interarrival_time(self):
         """
@@ -103,12 +117,13 @@ class BugReport(Process):
     A project member whose main responsibility is bug reporting.
     """
 
-    def __init__(self, name, reporter, fix_effort, priority):
+    def __init__(self, name, reporter, fix_effort, report_priority, real_priority):
         Process.__init__(self)
         self.name = name
         self.reporter = reporter
         self.fix_effort = fix_effort
-        self.priority = priority
+        self.report_priority = report_priority
+        self.real_priority = real_priority
 
     def arrive(self, developer_resource, resol_time_monitor, debug=False):
         """
@@ -122,7 +137,7 @@ class BugReport(Process):
             print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Priority: ", self.priority, \
                 "Pending bugs: ", pending_bugs
 
-        yield request, self, developer_resource, self.priority
+        yield request, self, developer_resource, self.report_priority
 
         if debug:
             print now(), ": Report ", self.name, " ready for fixing. "

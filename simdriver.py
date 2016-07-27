@@ -86,14 +86,14 @@ def get_reporters_configuration(issues_in_range, debug=False):
 
             try:
                 inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
-                batch_size_gen = simutils.DiscreteEmpiricalDistribution(pd.Series(data=batch_sizes_sample))
+                batch_size_gen = simutils.DiscreteEmpiricalDistribution(observations=pd.Series(data=batch_sizes_sample))
 
                 reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
                 if len(reporter_list) == 1:
                     reporter_name = reporter_list[0]
 
                 priority_distribution = simutils.DiscreteEmpiricalDistribution(
-                    bug_reports[simdata.SIMPLE_PRIORITY_COLUMN])
+                    observations=bug_reports[simdata.SIMPLE_PRIORITY_COLUMN])
                 priority_map = priority_distribution.get_probabilities()
 
                 modified_priority = simdata.get_modified_priority_bugs(bug_reports)
@@ -125,7 +125,7 @@ def assign_strategies(reporters_config, training_issues):
          config['with_modified_priority']] for config in reporters_config]
 
     global_priority_map = simutils.DiscreteEmpiricalDistribution(
-        training_issues[simdata.SIMPLE_PRIORITY_COLUMN]).get_probabilities()
+        observations=training_issues[simdata.SIMPLE_PRIORITY_COLUMN]).get_probabilities()
 
     reporter_dataframe = pd.DataFrame(reporter_records)
     correction_column = "Corrections"
@@ -279,7 +279,7 @@ def get_simulation_input(training_issues):
     print "Simplified Priorities in Training Range: \n ", priority_sample.value_counts()
 
     resolution_time_gen = simutils.ContinuousEmpiricalDistribution(resolution_time_sample)
-    priority_gen = simutils.DiscreteEmpiricalDistribution(priority_sample)
+    priority_gen = simutils.DiscreteEmpiricalDistribution(observations=priority_sample)
 
     return resolution_time_gen, priority_gen
 
