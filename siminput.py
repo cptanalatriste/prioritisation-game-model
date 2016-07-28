@@ -14,21 +14,6 @@ from math import ceil
 
 # ALL_ISSUES_CSV = "C:\Users\Carlos G. Gavidia\git\github-data-miner\UNFILTERED\Release_Counter_UNFILTERED_SPARK.csv"
 
-
-def week_of_month(dt):
-    """ Returns the week of the month for the specified date.
-
-    From: http://stackoverflow.com/questions/3806473/python-week-number-of-the-month
-    """
-
-    first_day = dt.replace(day=1)
-
-    dom = dt.day
-    adjusted_dom = dom + first_day.weekday()
-
-    return int(ceil(adjusted_dom / 7.0))
-
-
 def date_as_string(report_series):
     """
     Returns a string representation of the created

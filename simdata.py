@@ -85,6 +85,20 @@ def parse_resolution_date(report_series):
     return None
 
 
+def week_of_month(dt):
+    """ Returns the week of the month for the specified date.
+
+    From: http://stackoverflow.com/questions/3806473/python-week-number-of-the-month
+    """
+
+    first_day = dt.replace(day=1)
+
+    dom = dt.day
+    adjusted_dom = dom + first_day.weekday()
+
+    return int(np.ceil(adjusted_dom / 14.0))
+
+
 def date_as_string(report_series):
     """
     Returns a string representation of the created
@@ -94,7 +108,7 @@ def date_as_string(report_series):
     parsed_date = parse_create_date(report_series)
     period_identifier = int(np.math.ceil(parsed_date.month / 1.))
 
-    return str(parsed_date.year) + "-" + str(period_identifier)
+    return str(parsed_date.year) + "-" + str(period_identifier) + "-" + str(week_of_month(parsed_date))
 
 
 def filter_by_reporter(bug_reports, reporters):

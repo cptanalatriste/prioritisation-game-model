@@ -25,6 +25,9 @@ class TestingContext:
         self.resolution_time_gen = resolution_time_gen
         self.priority_gen = priority_gen
         self.bug_level = bug_level
+        self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: Monitor(),
+                                  simdata.NORMAL_PRIORITY: Monitor(),
+                                  simdata.SEVERE_PRIORITY: Monitor()}
 
     def get_fix_effort(self):
         """
@@ -57,7 +60,7 @@ class BugReportSource(Process):
         if reporter_config['strategy'] == INFLATE_STRATEGY:
             self.inflation_gen = simutils.DiscreteEmpiricalDistribution(values=[True, False], probabilities=[0.5, 0.5])
 
-    def start_reporting(self, developer_resource, resol_time_monitor):
+    def start_reporting(self, developer_resource, reporter_monitor):
         """
         Activates a number of bug reports according to an inter-arrival time.
         :param resol_time_monitor: Monitor for the resolution time.
@@ -78,9 +81,10 @@ class BugReportSource(Process):
                                    report_priority=report_priority,
                                    real_priority=real_priority)
 
+            reported_priority_monitor = self.testing_context.priority_monitors[report_priority]
             activate(bug_report,
                      bug_report.arrive(developer_resource=developer_resource,
-                                       resol_time_monitor=resol_time_monitor))
+                                       resolution_monitors=[reporter_monitor, reported_priority_monitor]))
 
             interarrival_time = self.get_interarrival_time()
             yield hold, self, interarrival_time
@@ -90,10 +94,9 @@ class BugReportSource(Process):
     def get_report_priority(self):
         real_priority = self.testing_context.get_priority()
         priority_for_report = real_priority
-
-        if real_priority < simdata.SEVERE_PRIORITY and self.inflation_gen is not None:
-            if self.inflation_gen.generate():
-                priority_for_report += 1
+        # if real_priority < simdata.SEVERE_PRIORITY and self.inflation_gen is not None:
+        #     if self.inflation_gen.generate():
+        #         priority_for_report += 1
 
         return real_priority, priority_for_report
 
@@ -125,7 +128,7 @@ class BugReport(Process):
         self.report_priority = report_priority
         self.real_priority = real_priority
 
-    def arrive(self, developer_resource, resol_time_monitor, debug=False):
+    def arrive(self, developer_resource, resolution_monitors, debug=False):
         """
         The Process Execution Method for the Bug Reported process.
         :return:
@@ -146,7 +149,9 @@ class BugReport(Process):
         yield release, self, developer_resource
 
         resol_time = now() - arrival_time
-        resol_time_monitor.observe(resol_time)
+
+        for monitor in resolution_monitors:
+            monitor.observe(resol_time)
 
         if debug:
             print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting."
@@ -174,18 +179,18 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen,
                                      bug_level=bug_level)
 
-    monitors = {}
+    reporter_monitors = {}
     for reporter_config in reporters_config:
-        resol_time_monitor = Monitor()
+        reporter_monitor = Monitor()
         bug_reporter = BugReportSource(reporter_config=reporter_config,
                                        testing_context=testing_context)
         activate(bug_reporter,
                  bug_reporter.start_reporting(developer_resource=developer_resource,
-                                              resol_time_monitor=resol_time_monitor), at=start_time)
-        monitors[reporter_config['name']] = resol_time_monitor
+                                              reporter_monitor=reporter_monitor), at=start_time)
+        reporter_monitors[reporter_config['name']] = reporter_monitor
 
     simulate(until=max_time)
-    return monitors
+    return reporter_monitors, testing_context.priority_monitors
 
 
 def main():
