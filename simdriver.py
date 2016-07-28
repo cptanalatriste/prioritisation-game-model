@@ -11,18 +11,22 @@ import matplotlib.pyplot as plt
 
 import pandas as pd
 
+from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-
 from sklearn.cross_validation import KFold
 
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
+from sklearn.metrics import median_absolute_error
 
 import simdata
 import simutils
 import simmodel
 
 import winsound
+
+DEBUG = False
+PLOT = False
 
 
 def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen,
@@ -63,7 +67,7 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
     return completed_per_reporter, completed_per_priority
 
 
-def get_reporters_configuration(issues_in_range, debug=False):
+def get_reporters_configuration(issues_in_range, participation_coef, debug=DEBUG):
     """
     Returns the reporting information required for the simulation to run.
     :param issues_in_range: Bug report data frame
@@ -81,7 +85,7 @@ def get_reporters_configuration(issues_in_range, debug=False):
 
         reporter_participation = bug_reports[simdata.PERIOD_COLUMN].nunique()
 
-        if reporter_participation >= total_training_periods / 5:
+        if reporter_participation >= total_training_periods / participation_coef:
             batches = simdata.get_report_batches(bug_reports)
 
             arrival_times = [batch["batch_head"] for batch in batches]
@@ -122,7 +126,7 @@ def get_reporters_configuration(issues_in_range, debug=False):
     return reporters_config
 
 
-def assign_strategies(reporters_config, training_issues):
+def assign_strategies(reporters_config, training_issues, debug=DEBUG):
     """
     Assigns an inflation pattern to the reporter based on clustering.
     :param reporters_config: Reporter configuration.
@@ -137,10 +141,28 @@ def assign_strategies(reporters_config, training_issues):
     global_priority_map = simutils.DiscreteEmpiricalDistribution(
         observations=training_issues[simdata.SIMPLE_PRIORITY_COLUMN]).get_probabilities()
 
+    if debug:
+        print "global_priority_map: ", global_priority_map
+
     reporter_dataframe = pd.DataFrame(reporter_records)
     correction_column = "Corrections"
     non_severe_column = "Non-Severe"
-    reporter_dataframe.columns = [non_severe_column, "Normal", "Severe", correction_column]
+    severe_column = "Severe"
+    normal_column = "Normal"
+
+    reporter_dataframe.columns = [non_severe_column, normal_column, severe_column, correction_column]
+
+    scaler = StandardScaler()
+
+    # Removing scaling because of cluster quality.
+    # report_features = scaler.fit_transform(reporter_dataframe.values)
+    # global_features = scaler.transform(
+    #     [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
+    #      global_priority_map[simdata.SEVERE_PRIORITY], 0.0])
+
+    global_features = [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
+                       global_priority_map[simdata.SEVERE_PRIORITY], 0.0]
+    report_features = reporter_dataframe.values
 
     print "Starting clustering algorithms ..."
     k_means = KMeans(n_clusters=2,
@@ -149,10 +171,9 @@ def assign_strategies(reporters_config, training_issues):
                      tol=1e-04,
                      random_state=0)
 
-    predicted_clusters = k_means.fit_predict(reporter_dataframe)
-    main_cluster = k_means.predict(
-        [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
-         global_priority_map[simdata.SEVERE_PRIORITY], 0.0])
+    predicted_clusters = k_means.fit_predict(report_features)
+
+    main_cluster = k_means.predict(global_features)
 
     strategy_column = 'strategy'
     reporter_dataframe[strategy_column] = [
@@ -167,12 +188,13 @@ def assign_strategies(reporters_config, training_issues):
         reporters_per_strategy = reporter_dataframe[reporter_dataframe[strategy_column] == strategy]
         print "Strategy: ", strategy, " reporters: ", len(reporters_per_strategy.index), " avg corrections: ", \
             reporters_per_strategy[correction_column].mean(), " avg non-severe prob: ", reporters_per_strategy[
-            non_severe_column].mean()
+            non_severe_column].mean(), " avg normal prob: ", reporters_per_strategy[
+            normal_column].mean(), " avg severe prob: ", reporters_per_strategy[severe_column].mean()
 
 
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_per_reporter,
                         completed_per_priority,
-                        debug=False):
+                        debug=DEBUG):
     """
     It consolidates the results from the simulation with the information contained in the data.
 
@@ -196,14 +218,14 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
             total_resolved += report[reporter_config['name']]
         results.append(total_resolved)
 
-    simulation_result["predicted_resolved"] = np.mean(results)
+    simulation_result["predicted_resolved"] = np.median(results)
 
     # TODO: This reporter/priority logic can be refactored.
     for priority in [simdata.SEVERE_PRIORITY, simdata.NON_SEVERE_PRIORITY, simdata.NORMAL_PRIORITY]:
         resolved_per_priority = resolved_in_month[resolved_in_month[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
 
         resolved_on_simulation = [report[priority] for report in completed_per_priority]
-        predicted_resolved = np.mean(resolved_on_simulation)
+        predicted_resolved = np.median(resolved_on_simulation)
 
         simulation_result['results_per_priority'].append({'priority': priority,
                                                           'true_resolved': len(resolved_per_priority.index),
@@ -215,7 +237,7 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
         true_reported = simdata.filter_by_reporter(issues_for_period, reporter_config['reporter_list'])
 
         resolved_on_simulation = [report[reporter_name] for report in completed_per_reporter]
-        predicted_resolved = np.mean(resolved_on_simulation)
+        predicted_resolved = np.median(resolved_on_simulation)
 
         sample_median, sample_std, sample_size = predicted_resolved, np.std(resolved_on_simulation), len(
             resolved_on_simulation)
@@ -237,7 +259,7 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     return simulation_result
 
 
-def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=False, plot=True):
+def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=DEBUG, plot=PLOT):
     """
     Per each tester, it anaysis how close is simulation to real data.
     :param reporters_config: Tester configuration.
@@ -281,8 +303,11 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         print "total_predicted ", total_predicted
 
     total_mse = mean_squared_error(total_completed, total_predicted)
+    total_mar = mean_absolute_error(total_completed, total_predicted)
+    total_medar = median_absolute_error(total_completed, total_predicted)
+
     print "RMSE for total bug resolved in Project ", project_key, ": ", np.sqrt(
-        total_mse), " Mean Squared Error ", total_mse
+        total_mse), " Mean Squared Error ", total_mse, " Mean Absolute Error: ", total_mar, " Median Absolute Error: ", total_medar
 
     if plot:
         plot_correlation(total_predicted, total_completed, "Total Resolved")
@@ -337,7 +362,7 @@ def get_simulation_input(training_issues):
     :param training_issues: Training data set.
     :return: Variate generator for resolution times, priorities and reporter inter-arrival time.
     """
-    resolved_issues = simdata.filter_resolved(training_issues)
+    resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False)
     resolution_time_sample = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
     print "Resolution times in Training Range: \n", resolution_time_sample.describe()
 
@@ -367,13 +392,16 @@ def get_bug_reports(project_keys, enhanced_dataframe):
     project_bugs = simdata.filter_by_project(enhanced_dataframe, project_keys)
     print "Total issues for projects ", project_keys, ": ", len(project_bugs.index)
 
+    project_bugs = simdata.exclude_self_fixes(project_bugs)
+    print "After self-fix exclusion: ", project_keys, ": ", len(project_bugs.index)
+
     project_reporters = project_bugs[simdata.REPORTER_COLUMN].value_counts()
     print "Total Reporters: ", len(project_reporters.index)
 
     return project_bugs
 
 
-def simulate_project(project_key, enhanced_dataframe, debug=False):
+def simulate_project(project_key, enhanced_dataframe, debug=DEBUG):
     """
     Launches simulation analysis for an specific project.
     :param project_key: Project identifier.
@@ -394,7 +422,8 @@ def simulate_project(project_key, enhanced_dataframe, debug=False):
         training_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_train)]
         print "Issues in training: ", len(training_issues.index)
 
-        reporters_config = get_reporters_configuration(training_issues)
+        participation_coef = 3
+        reporters_config = get_reporters_configuration(training_issues, participation_coef)
         print "Number of reporters: ", len(reporters_config)
 
         assign_strategies(reporters_config, training_issues)
@@ -415,9 +444,12 @@ def simulate_project(project_key, enhanced_dataframe, debug=False):
 
             reports_per_month = len(issues_for_period.index)
 
-            year, month_string, week = test_period.split('-')
+            # year, month_string, week = test_period.split('-')
+            # Excluding week since to few reports get fixed.
+            year, month_string = test_period.split('-')
+
             month = int(month_string)
-            simulation_days = 7
+            simulation_days = 30
             start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
 
             margin = datetime.timedelta(days=simulation_days)

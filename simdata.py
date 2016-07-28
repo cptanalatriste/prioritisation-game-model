@@ -17,6 +17,7 @@ RESOLUTION_TIME_COLUMN = 'Resolution Time'
 SIMPLE_PRIORITY_COLUMN = 'Simplified Priority'
 
 REPORTER_COLUMN = 'Reported By'
+RESOLVER_COLUMN = 'JIRA Resolved By'
 
 TIME_FACTOR = 60.0 * 60.0
 VALID_RESOLUTION_VALUES = ['Done', 'Implemented', 'Fixed']
@@ -96,7 +97,8 @@ def week_of_month(dt):
     dom = dt.day
     adjusted_dom = dom + first_day.weekday()
 
-    return int(np.ceil(adjusted_dom / 14.0))
+    # return int(np.ceil(adjusted_dom / 14.0))
+    return 1 if dt.day <= 15 else 2
 
 
 def date_as_string(report_series):
@@ -108,7 +110,11 @@ def date_as_string(report_series):
     parsed_date = parse_create_date(report_series)
     period_identifier = int(np.math.ceil(parsed_date.month / 1.))
 
-    return str(parsed_date.year) + "-" + str(period_identifier) + "-" + str(week_of_month(parsed_date))
+    week = "-" + str(week_of_month(parsed_date))
+    # Excluding week: Too few reports get solved.
+    week = ""
+
+    return str(parsed_date.year) + "-" + str(period_identifier) + week
 
 
 def filter_by_reporter(bug_reports, reporters):
@@ -168,6 +174,19 @@ def filter_by_date_range(column_name, bug_reports, start_date, end_date):
 
     issues_for_analysis = bug_reports[date_filter]
     return issues_for_analysis
+
+
+def exclude_self_fixes(bug_reports):
+    """
+    Removes from the datasource the bug that were reported and fixed by the same person.
+    :param bug_reports: List of bug reports
+    :return: Bug reports without self-fixes.
+    """
+    third_party_resolver_filter = (~bug_reports[RESOLVER_COLUMN].isnull()) & \
+                                  (bug_reports[REPORTER_COLUMN] != bug_reports[RESOLVER_COLUMN])
+
+    clean_bug_reports = bug_reports[~third_party_resolver_filter]
+    return clean_bug_reports
 
 
 def filter_resolved(bug_reports, only_with_commits=True):
