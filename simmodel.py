@@ -73,20 +73,31 @@ class BugReportSource(Process):
         while bug_level.amount >= batch_size:
             yield get, self, bug_level, batch_size
 
-            report_key = "Report-" + str(bug_level.amount)
+            for _ in range(batch_size):
+                report_key = "Report-" + str(bug_level.amount)
+                real_priority, report_priority = self.get_report_priority()
+                fix_effort = self.testing_context.get_fix_effort()
 
-            real_priority, report_priority = self.get_report_priority()
-            bug_report = BugReport(name=report_key, reporter=self.name,
-                                   fix_effort=self.testing_context.get_fix_effort(),
-                                   report_priority=report_priority,
-                                   real_priority=real_priority)
+                # print "fix_effort ", fix_effort
+                # if fix_effort< 0:
+                #     print "self.testing_context.resolution_time_gen.observations ", self.testing_context.resolution_time_gen.observations
 
-            reported_priority_monitor = self.testing_context.priority_monitors[report_priority]
-            activate(bug_report,
-                     bug_report.arrive(developer_resource=developer_resource,
-                                       resolution_monitors=[reporter_monitor, reported_priority_monitor]))
+                bug_report = BugReport(name=report_key, reporter=self.name,
+                                       fix_effort=fix_effort,
+                                       report_priority=report_priority,
+                                       real_priority=real_priority)
+
+                reported_priority_monitor = self.testing_context.priority_monitors[report_priority]
+                activate(bug_report,
+                         bug_report.arrive(developer_resource=developer_resource,
+                                           resolution_monitors=[reporter_monitor, reported_priority_monitor]))
 
             interarrival_time = self.get_interarrival_time()
+
+            # print "interarrival_time ", interarrival_time
+            # if interarrival_time < 0:
+            #     print self.interarrival_time_gen.observations
+
             yield hold, self, interarrival_time
 
             batch_size = self.get_batch_size()

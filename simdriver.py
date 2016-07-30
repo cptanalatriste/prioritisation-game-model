@@ -67,62 +67,82 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
     return completed_per_reporter, completed_per_priority
 
 
-def get_reporters_configuration(issues_in_range, participation_coef, debug=DEBUG):
+def remove_drive_in_testers(reporters_config, range_in_std=2):
+    """
+    Removes drive-in testers, defined as the testers who's mean interrival time is larger than range_in_std standard deviations of the
+    overall average interarrival times.
+    :param reporters_config: Reporter configuration.
+    :param range_in_std: Number of standard deviations to be considered in range.
+    :return: Filtered list of reporters config.
+    """
+    mean_interrival_times = [np.mean(config['interarrival_time_gen'].observations) for config in reporters_config]
+    overall_std = np.std(mean_interrival_times)
+
+    engaged_testers = [config for config in reporters_config if
+                       abs(np.mean(config['interarrival_time_gen'].observations)) < range_in_std * overall_std]
+    return engaged_testers
+
+
+def get_reporters_configuration(max_chunk, training_dataset, debug=False):
     """
     Returns the reporting information required for the simulation to run.
     :param issues_in_range: Bug report data frame
     :return:
     """
 
-    issues_by_tester = issues_in_range[simdata.REPORTER_COLUMN].value_counts()
+    issues_by_tester = training_dataset[simdata.REPORTER_COLUMN].value_counts()
     testers_in_order = [index for index, _ in issues_by_tester.iteritems()]
+    print "Reporters in training dataset: ", len(testers_in_order)
 
     reporters_config = []
-    total_training_periods = issues_in_range[simdata.PERIOD_COLUMN].nunique()
+    year, month = max_chunk[0].split("-")
+    period_start = datetime.datetime(year=int(year), month=int(month), day=1, tzinfo=pytz.utc)
+
     for index, reporter_list in enumerate([[tester] for tester in testers_in_order]):
-        # for index, reporter_list in enumerate([first_class_testers, second_class_testers]):
-        bug_reports = simdata.filter_by_reporter(issues_in_range, reporter_list)
+        bug_reports = simdata.filter_by_reporter(training_dataset, reporter_list)
 
-        reporter_participation = bug_reports[simdata.PERIOD_COLUMN].nunique()
+        training_periods = bug_reports[simdata.PERIOD_COLUMN]
+        bug_reports_for_batch = bug_reports[training_periods.isin(max_chunk)]
+        batches = simdata.get_report_batches(bug_reports_for_batch)
 
-        if reporter_participation >= total_training_periods / participation_coef:
-            batches = simdata.get_report_batches(bug_reports)
+        arrival_times = [batch["batch_head"] for batch in batches]
 
-            arrival_times = [batch["batch_head"] for batch in batches]
-            inter_arrival_sample = simdata.get_interarrival_times(arrival_times)
-            batch_sizes_sample = [batch["batch_count"] for batch in batches]
+        inter_arrival_sample = simdata.get_interarrival_times(arrival_times, period_start)
+        batch_sizes_sample = [batch["batch_count"] for batch in batches]
 
-            try:
-                inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
-                batch_size_gen = simutils.DiscreteEmpiricalDistribution(observations=pd.Series(data=batch_sizes_sample))
+        try:
+            inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(inter_arrival_sample)
+            batch_size_gen = simutils.DiscreteEmpiricalDistribution(observations=pd.Series(data=batch_sizes_sample))
 
-                reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
-                if len(reporter_list) == 1:
-                    reporter_name = reporter_list[0]
+            reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
+            if len(reporter_list) == 1:
+                reporter_name = reporter_list[0]
 
-                priority_distribution = simutils.DiscreteEmpiricalDistribution(
-                    observations=bug_reports[simdata.SIMPLE_PRIORITY_COLUMN])
-                priority_map = priority_distribution.get_probabilities()
+            priority_distribution = simutils.DiscreteEmpiricalDistribution(
+                observations=bug_reports[simdata.SIMPLE_PRIORITY_COLUMN])
+            priority_map = priority_distribution.get_probabilities()
 
-                modified_priority = simdata.get_modified_priority_bugs(bug_reports)
-                with_modified_priority = len(modified_priority.index)
+            modified_priority = simdata.get_modified_priority_bugs(bug_reports)
+            with_modified_priority = len(modified_priority.index)
 
-                if debug:
-                    print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
-                        inter_arrival_sample), " std: ", np.std(
-                        inter_arrival_sample), "Batch-size", reporter_name, " mean: ", np.mean(
-                        batch_sizes_sample), " std: ", np.std(
-                        batch_sizes_sample), " priority_map ", priority_map, " with_modified_priority ", with_modified_priority
+            if debug:
+                print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
+                    inter_arrival_sample), " std: ", np.std(
+                    inter_arrival_sample), "Batch-size", reporter_name, " mean: ", np.mean(
+                    batch_sizes_sample), " std: ", np.std(
+                    batch_sizes_sample), " priority_map ", priority_map, " with_modified_priority ", with_modified_priority
 
-                reporters_config.append({'name': reporter_name,
-                                         'interarrival_time_gen': inter_arrival_time_gen,
-                                         'batch_size_gen': batch_size_gen,
-                                         'reporter_list': reporter_list,
-                                         'priority_map': priority_map,
-                                         'with_modified_priority': with_modified_priority})
-            except ValueError as _:
+            reporters_config.append({'name': reporter_name,
+                                     'interarrival_time_gen': inter_arrival_time_gen,
+                                     'batch_size_gen': batch_size_gen,
+                                     'reporter_list': reporter_list,
+                                     'priority_map': priority_map,
+                                     'with_modified_priority': with_modified_priority})
+        except ValueError as _:
+            if debug:
                 print "Reporters ", reporter_list, " could not be added. Possible because insufficient samples."
 
+    reporters_config = remove_drive_in_testers(reporters_config)
     return reporters_config
 
 
@@ -194,7 +214,7 @@ def assign_strategies(reporters_config, training_issues, debug=DEBUG):
 
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_per_reporter,
                         completed_per_priority,
-                        debug=DEBUG):
+                        debug=False):
     """
     It consolidates the results from the simulation with the information contained in the data.
 
@@ -259,6 +279,46 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     return simulation_result
 
 
+def magnitude_relative_error(estimate, actual, balanced=False):
+    """
+    Normalizes the difference between actual and predicted values.
+    :param estimate:Estimated by the model.
+    :param actual: Real value in data.
+    :return: MRE
+    """
+
+    if not balanced:
+        denominator = actual
+    else:
+        denominator = min(estimate, actual)
+
+    if denominator == 0:
+        # 1 is our normalizing value
+        # Source: http://math.stackexchange.com/questions/677852/how-to-calculate-relative-error-when-true-value-is-zero
+        denominator = 1
+
+    mre = abs(estimate - actual) / float(denominator)
+    return mre
+
+
+def mean_magnitude_relative_error(total_completed, total_predicted, balanced=False):
+    """
+    The mean of absolute percentage errors.
+    :param total_completed: List of real values.
+    :param total_predicted: List of predictions.
+    :return: MMRE
+    """
+    return 100 * np.mean(
+        [magnitude_relative_error(estimate, actual, balanced)
+         for estimate, actual in zip(total_completed, total_predicted)])
+
+
+def median_magnitude_relative_error(total_completed, total_predicted):
+    return 100 * np.median(
+        [magnitude_relative_error(estimate, actual)
+         for estimate, actual in zip(total_completed, total_predicted)])
+
+
 def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=DEBUG, plot=PLOT):
     """
     Per each tester, it anaysis how close is simulation to real data.
@@ -305,9 +365,13 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
     total_mse = mean_squared_error(total_completed, total_predicted)
     total_mar = mean_absolute_error(total_completed, total_predicted)
     total_medar = median_absolute_error(total_completed, total_predicted)
+    total_mmre = mean_magnitude_relative_error(total_completed, total_predicted, balanced=False)
+    total_bmmre = mean_magnitude_relative_error(total_completed, total_predicted, balanced=True)
+    total_mdmre = median_magnitude_relative_error(total_completed, total_predicted)
 
     print "RMSE for total bug resolved in Project ", project_key, ": ", np.sqrt(
-        total_mse), " Mean Squared Error ", total_mse, " Mean Absolute Error: ", total_mar, " Median Absolute Error: ", total_medar
+        total_mse), " Mean Squared Error ", total_mse, " Mean Absolute Error: ", total_mar, " Median Absolute Error: ", \
+        total_medar, " Mean Magnitude Relative Error ", total_mmre, " Balanced MMRE ", total_bmmre, "Median Magnitude Relative Error ", total_mdmre
 
     if plot:
         plot_correlation(total_predicted, total_completed, "Total Resolved")
@@ -362,8 +426,10 @@ def get_simulation_input(training_issues):
     :param training_issues: Training data set.
     :return: Variate generator for resolution times, priorities and reporter inter-arrival time.
     """
-    resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False)
+    resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False,
+                                              only_valid_resolution=False)
     resolution_time_sample = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
+
     print "Resolution times in Training Range: \n", resolution_time_sample.describe()
 
     priority_sample = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
@@ -401,6 +467,39 @@ def get_bug_reports(project_keys, enhanced_dataframe):
     return project_bugs
 
 
+def get_continuous_chunks(periods_train):
+    inflection_points = []
+
+    last_period = None
+    for index, period in enumerate(periods_train):
+        if last_period:
+            year, month = period.split("-")
+            year, month = int(year), int(month)
+
+            previous_year, previous_month = last_period.split("-")
+            previous_year, previous_month = int(previous_year), int(previous_month)
+
+            same_year = (year == previous_year) and (month - previous_month == 1)
+            different_year = (year - previous_year == 1) and (previous_month == 12) and (month == 1)
+
+            if not same_year and not different_year:
+                inflection_points.append(index)
+                last_period = None
+            else:
+                last_period = period
+        else:
+            last_period = period
+
+    chunks = []
+    chunk_start = 0
+    for point in inflection_points:
+        chunks.append(periods_train[chunk_start: point])
+        chunk_start = point
+
+    chunks.append(periods_train[chunk_start:])
+    return chunks
+
+
 def simulate_project(project_key, enhanced_dataframe, debug=DEBUG):
     """
     Launches simulation analysis for an specific project.
@@ -417,14 +516,18 @@ def simulate_project(project_key, enhanced_dataframe, debug=DEBUG):
     simulation_results = []
 
     k_fold = KFold(len(period_in_range), n_folds=5)
+
     for train_index, test_index in k_fold:
         periods_train, periods_test = period_in_range[train_index], period_in_range[test_index]
+
+        continuous_chunks = get_continuous_chunks(periods_train)
+        max_chunk = max(continuous_chunks, key=len)
+
         training_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_train)]
         print "Issues in training: ", len(training_issues.index)
 
-        participation_coef = 3
-        reporters_config = get_reporters_configuration(training_issues, participation_coef)
-        print "Number of reporters: ", len(reporters_config)
+        reporters_config = get_reporters_configuration(max_chunk, training_issues)
+        print "Number of reporters after drive-by filtering: ", len(reporters_config)
 
         assign_strategies(reporters_config, training_issues)
 
@@ -455,7 +558,8 @@ def simulate_project(project_key, enhanced_dataframe, debug=DEBUG):
             margin = datetime.timedelta(days=simulation_days)
             end_date = start_date + margin
 
-            resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False)
+            resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False,
+                                                      only_valid_resolution=False)
             resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
                                                               start_date,
                                                               end_date)
@@ -498,6 +602,7 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
     # project_lists = [["CASSANDRA"], ["CLOUDSTACK"], ["OFBIZ"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
     project_lists = [enhanced_dataframe["Project Key"].unique()]
+    # project_lists = [[project] for project in enhanced_dataframe["Project Key"].unique()]
     for project_list in project_lists:
         simulate_project(project_list, enhanced_dataframe)
 

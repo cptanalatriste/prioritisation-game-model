@@ -8,7 +8,7 @@ import numpy as np
 from scipy.stats import uniform
 from scipy.stats import rv_discrete
 
-MINIMUM_OBSERVATIONS = 10
+MINIMUM_OBSERVATIONS = 3
 
 
 class ContinuousEmpiricalDistribution:
@@ -16,9 +16,10 @@ class ContinuousEmpiricalDistribution:
         if len(observations) < MINIMUM_OBSERVATIONS:
             raise ValueError("Only " + str(len(observations)) + " were provided.")
 
-        self.sorted_observations = sorted(set(observations))
+        self.observations = observations
+        self.sorted_observations = sorted(set(self.observations))
 
-        items = float(len(observations))
+        items = float(len(self.observations))
         self.empirical_cdf = [sum(1 for item in observations if item <= observation) / items
                               for observation in self.sorted_observations]
 

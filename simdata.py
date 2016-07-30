@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
+import pytz
 
 ALL_ISSUES_CSV = "C:\Users\Carlos G. Gavidia\git\github-data-miner\UNFILTERED\Release_Counter_UNFILTERED.csv"
 
@@ -56,7 +57,8 @@ def get_resolution_time(report_series):
         first_contact = dateutil.parser.parse(first_contact_str)
         resolution_date = dateutil.parser.parse(resolution_date_str)
 
-        return (resolution_date - first_contact).total_seconds() / TIME_FACTOR
+        if first_contact < resolution_date:
+            return (resolution_date - first_contact).total_seconds() / TIME_FACTOR
 
     return None
 
@@ -108,13 +110,12 @@ def date_as_string(report_series):
     :return:
     """
     parsed_date = parse_create_date(report_series)
-    period_identifier = int(np.math.ceil(parsed_date.month / 1.))
+    period_identifier = str(parsed_date.month)
 
-    week = "-" + str(week_of_month(parsed_date))
-    # Excluding week: Too few reports get solved.
-    week = ""
+    if len(period_identifier) == 1:
+        period_identifier = "0" + period_identifier
 
-    return str(parsed_date.year) + "-" + str(period_identifier) + week
+    return str(parsed_date.year) + "-" + str(period_identifier)
 
 
 def filter_by_reporter(bug_reports, reporters):
@@ -189,14 +190,16 @@ def exclude_self_fixes(bug_reports):
     return clean_bug_reports
 
 
-def filter_resolved(bug_reports, only_with_commits=True):
+def filter_resolved(bug_reports, only_with_commits=True, only_valid_resolution=True):
     """
     Return the issues that are Closed/Resolved with a valid resolution and with commits in Git.
     :param bug_reports: Original dataframe
     :return: Only resolved issues.
     """
     resolved_issues = bug_reports[bug_reports['Status'].isin(['Closed', 'Resolved'])]
-    resolved_issues = resolved_issues[resolved_issues['Resolution'].isin(VALID_RESOLUTION_VALUES)]
+
+    if only_valid_resolution:
+        resolved_issues = resolved_issues[resolved_issues['Resolution'].isin(VALID_RESOLUTION_VALUES)]
 
     if only_with_commits:
         resolved_issues = resolved_issues[resolved_issues['Commits'] > 0]
@@ -231,7 +234,21 @@ def get_modified_priority_bugs(bug_reports):
     return issues_validated_priority
 
 
-def get_interarrival_times(arrival_times):
+def get_distance_in_hours(distance):
+    """
+    Transforms a time delta to date
+    :param param: Time delta.
+    :return: Time delta equivalent in days.
+    """
+    if isinstance(distance, datetime.timedelta):
+        time = distance.total_seconds() / TIME_FACTOR
+    else:
+        time = distance / np.timedelta64(1, 's') / TIME_FACTOR
+
+    return time
+
+
+def get_interarrival_times(arrival_times, period_start):
     """
     Given a list of report dates, it returns the list corresponding to the interrival times.
     :param arrival_times: List of arrival times.
@@ -241,13 +258,13 @@ def get_interarrival_times(arrival_times):
     for position, created_date in enumerate(arrival_times):
         if position > 0:
             distance = created_date - arrival_times[position - 1]
+            interarrival_times.append(get_distance_in_hours(distance))
+        else:
+            if isinstance(created_date, np.datetime64):
+                created_date = datetime.datetime.utcfromtimestamp(created_date.tolist() / 1e9)
+                created_date = pytz.utc.localize(created_date)
 
-            if isinstance(distance, datetime.timedelta):
-                time = distance.total_seconds() / TIME_FACTOR
-            else:
-                time = distance / np.timedelta64(1, 's') / TIME_FACTOR
-
-            interarrival_times.append(time)
+            interarrival_times.append(get_distance_in_hours(created_date - period_start))
 
     return pd.Series(data=interarrival_times)
 
@@ -259,6 +276,7 @@ def get_report_batches(bug_reports, window_size=1):
     :param window_size: Size of the window that represents a batch. In DAYS
     :return: List containing batch start and batch count.
     """
+
     report_dates = bug_reports[CREATED_DATE_COLUMN]
     report_dates = report_dates.order()
 
@@ -271,7 +289,13 @@ def get_report_batches(bug_reports, window_size=1):
             last_batch_head = batches[-1]["batch_head"]
             distance = created_date - last_batch_head
 
-            if distance.days <= window_size:
+            if hasattr(distance, 'days'):
+                distance_in_days = distance.days
+            else:
+                distance_in_days = distance.astype('timedelta64[D]')
+                distance_in_days = distance_in_days / np.timedelta64(1, 'D')
+
+            if distance_in_days <= window_size:
                 batches[-1]["batch_count"] += 1
             else:
                 batches.append({"batch_head": created_date,
