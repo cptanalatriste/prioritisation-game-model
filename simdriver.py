@@ -27,7 +27,7 @@ PLOT = False
 
 
 def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen,
-                      max_time):
+                      max_time, max_iterations):
     """
     Triggers the simulation according a given configuration.
 
@@ -40,8 +40,6 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
     :return: List containing the number of fixed reports.
     """
 
-    # max_iterations = 1000
-    max_iterations = 200
     completed_per_reporter = []
     completed_per_priority = []
 
@@ -248,8 +246,7 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         total_mse), " Mean Squared Error ", total_mse, " Mean Absolute Error: ", total_mar, " Median Absolute Error: ", \
         total_medar, " Mean Magnitude Relative Error ", total_mmre, " Balanced MMRE ", total_bmmre, "Median Magnitude Relative Error ", total_mdmre
 
-    if plot:
-        simutils.plot_correlation(total_predicted, total_completed, "Total Resolved")
+    simutils.plot_correlation(total_predicted, total_completed, "_".join(project_key) + "-Total Resolved", plot)
 
     for priority in [simdata.NON_SEVERE_PRIORITY, simdata.SEVERE_PRIORITY, simdata.NORMAL_PRIORITY]:
         completed_true = []
@@ -274,8 +271,8 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
             print "priority ", priority, " completed_true ", completed_true
             print "priority ", priority, " completed_predicted ", completed_predicted
 
-        if plot:
-            simutils.plot_correlation(completed_predicted, completed_true, "Priority " + str(priority))
+        simutils.plot_correlation(completed_predicted, completed_true,
+                                  "-".join(project_key) + "-Priority " + str(priority), plot)
 
 
 def get_simulation_input(training_issues):
@@ -289,11 +286,13 @@ def get_simulation_input(training_issues):
     resolution_time_sample = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
 
     print "Resolution times in Training Range: \n", resolution_time_sample.describe()
+    resolution_time_gen = None
+    if len(resolution_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
+        resolution_time_gen = simutils.ContinuousEmpiricalDistribution(resolution_time_sample)
 
     priority_sample = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
     print "Simplified Priorities in Training Range: \n ", priority_sample.value_counts()
 
-    resolution_time_gen = simutils.ContinuousEmpiricalDistribution(resolution_time_sample)
     priority_gen = simutils.DiscreteEmpiricalDistribution(observations=priority_sample)
 
     return resolution_time_gen, priority_gen
@@ -358,7 +357,7 @@ def get_continuous_chunks(periods_train):
     return chunks
 
 
-def simulate_project(project_key, enhanced_dataframe, debug=True):
+def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max_iterations=1000):
     """
     Launches simulation analysis for an specific project.
     :param project_key: Project identifier.
@@ -373,7 +372,7 @@ def simulate_project(project_key, enhanced_dataframe, debug=True):
 
     simulation_results = []
 
-    k_fold = KFold(len(period_in_range), n_folds=5)
+    k_fold = KFold(len(period_in_range), n_folds=n_folds)
 
     for train_index, test_index in k_fold:
         periods_train, periods_test = period_in_range[train_index], period_in_range[test_index]
@@ -394,6 +393,9 @@ def simulate_project(project_key, enhanced_dataframe, debug=True):
         print "Issues in training after reporter filtering: ", len(training_issues.index)
 
         resolution_time_gen, priority_gen = get_simulation_input(training_issues)
+        if resolution_time_gen is None:
+            print "Not enough resolution time info! ", project_key
+            return
 
         test_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_test)]
         print "Issues in test: ", len(test_issues.index)
@@ -441,7 +443,8 @@ def simulate_project(project_key, enhanced_dataframe, debug=True):
                                                                                reporters_config=reporters_config,
                                                                                resolution_time_gen=resolution_time_gen,
                                                                                priority_gen=priority_gen,
-                                                                               max_time=simulation_time)
+                                                                               max_time=simulation_time,
+                                                                               max_iterations=max_iterations)
 
             simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
                                                     reporters_config,
@@ -462,7 +465,9 @@ def main():
     project_lists = [enhanced_dataframe["Project Key"].unique()]
     # project_lists = [[project] for project in enhanced_dataframe["Project Key"].unique()]
     for project_list in project_lists:
-        simulate_project(project_list, enhanced_dataframe)
+        n_folds = 3
+        max_iterations = 100
+        simulate_project(project_list, enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
 
 
 if __name__ == "__main__":

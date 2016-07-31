@@ -255,6 +255,7 @@ def get_interarrival_times(arrival_times, period_start):
     :return: List of inter-arrival times.
     """
     interarrival_times = []
+
     for position, created_date in enumerate(arrival_times):
         if position > 0:
             distance = created_date - arrival_times[position - 1]
@@ -264,7 +265,10 @@ def get_interarrival_times(arrival_times, period_start):
                 created_date = datetime.datetime.utcfromtimestamp(created_date.tolist() / 1e9)
                 created_date = pytz.utc.localize(created_date)
 
-            interarrival_times.append(get_distance_in_hours(created_date - period_start))
+            distance = get_distance_in_hours(created_date - period_start)
+
+            if distance > 0:
+                interarrival_times.append(distance)
 
     return pd.Series(data=interarrival_times)
 

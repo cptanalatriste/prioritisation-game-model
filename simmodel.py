@@ -94,9 +94,10 @@ class BugReportSource(Process):
 
             interarrival_time = self.get_interarrival_time()
 
-            # print "interarrival_time ", interarrival_time
             # if interarrival_time < 0:
-            #     print self.interarrival_time_gen.observations
+            #     print "interarrival_time ", interarrival_time
+            #     print "self.name ", self.name
+            #     print "self.interarrival_time_gen.observations ", self.interarrival_time_gen.observations
 
             yield hold, self, interarrival_time
 

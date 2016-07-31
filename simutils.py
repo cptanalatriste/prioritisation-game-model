@@ -232,7 +232,7 @@ def median_magnitude_relative_error(total_completed, total_predicted):
          for estimate, actual in zip(total_completed, total_predicted)])
 
 
-def plot_correlation(total_predicted, total_completed, title):
+def plot_correlation(total_predicted, total_completed, title, plot):
     """
     A scatter plot for seeing how correlation goes.
     :param total_predicted: List of predicted values.
@@ -246,4 +246,8 @@ def plot_correlation(total_predicted, total_completed, title):
     plt.xlabel("Predicted Resolved")
     plt.ylabel("Actual Resolved")
     plt.plot([min(total_completed), max(total_completed)], [[min(total_completed)], [max(total_completed)]])
-    plt.show()
+
+    if plot:
+        plt.show()
+    else:
+        plt.savefig(title + ".png")
