@@ -26,45 +26,12 @@ DEBUG = False
 PLOT = False
 
 
-def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen,
-                      max_time, max_iterations):
-    """
-    Triggers the simulation according a given configuration.
-
-    :param team_capacity: Number of developers in the team.
-    :param report_number: Number of bugs for the period.
-    :param reporters_config: Bug reporter configuration.
-    :param resolution_time_gen: Resolution time required by developers.
-    :param priority_gen: The priority contained on the bug reports.
-    :param max_time: Simulation time.
-    :return: List containing the number of fixed reports.
-    """
-
-    completed_per_reporter = []
-    completed_per_priority = []
-
-    for _ in range(max_iterations):
-        np.random.seed()
-        reporter_monitors, priority_monitors = simmodel.run_model(team_capacity=team_capacity,
-                                                                  report_number=report_number,
-                                                                  reporters_config=reporters_config,
-                                                                  resolution_time_gen=resolution_time_gen,
-                                                                  priority_gen=priority_gen,
-                                                                  max_time=max_time)
-
-        result_per_reporter = {reporter_name: monitor.count() for reporter_name, monitor in
-                               reporter_monitors.iteritems()}
-        completed_per_reporter.append(result_per_reporter)
-
-        result_per_priority = {priority: monitor.count() for priority, monitor in priority_monitors.iteritems()}
-        completed_per_priority.append(result_per_priority)
-
-    return completed_per_reporter, completed_per_priority
-
-
 def get_reporters_configuration(max_chunk, training_dataset, debug=False):
     """
     Returns the reporting information required for the simulation to run.
+
+    Includes drive-in tester removal.
+
     :param issues_in_range: Bug report data frame
     :return:
     """
@@ -298,13 +265,12 @@ def get_simulation_input(training_issues):
     return resolution_time_gen, priority_gen
 
 
-def get_bug_reports(project_keys, enhanced_dataframe):
+def get_valid_reports(project_keys, enhanced_dataframe):
     """
     Returns the issues valid for simulation analysis. It includes:
 
     - Filtered by project
-    - Only reports from top testers
-    - Only reports while priorities where corrected.
+    - Excluding self-fixes
 
     :param project_keys: Project identifiers.
     :param enhanced_dataframe: Bug report dataframe.
@@ -357,6 +323,32 @@ def get_continuous_chunks(periods_train):
     return chunks
 
 
+def get_dev_team_production(test_period, issues_for_period, simulation_days):
+    """
+    Returns the production of the development team for a specific period.
+    :return: Developer Team Size and Developer Team Production.
+    """
+    year, month_string = test_period.split('-')
+
+    month = int(month_string)
+    start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
+
+    margin = datetime.timedelta(days=simulation_days)
+    end_date = start_date + margin
+
+    resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False,
+                                              only_valid_resolution=False)
+    resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
+                                                      start_date,
+                                                      end_date)
+
+    bug_resolvers = resolved_in_period['JIRA Resolved By']
+    dev_team_size = bug_resolvers.nunique()
+    issues_resolved = len(resolved_in_period.index)
+
+    return dev_team_size, issues_resolved, resolved_in_period
+
+
 def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max_iterations=1000):
     """
     Launches simulation analysis for an specific project.
@@ -364,7 +356,7 @@ def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max
     :param enhanced_dataframe: Dataframe with additional fields
     :return: None
     """
-    issues_in_range = get_bug_reports(project_key, enhanced_dataframe)
+    issues_in_range = get_valid_reports(project_key, enhanced_dataframe)
 
     period_in_range = issues_in_range[simdata.PERIOD_COLUMN].unique()
     print "Original number of periods: ", len(period_in_range)
@@ -405,29 +397,11 @@ def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max
         for test_period in periods_test:
             issues_for_period = test_issues[test_issues[simdata.PERIOD_COLUMN] == test_period]
 
+            simulation_days = 30
             reports_per_month = len(issues_for_period.index)
 
-            # year, month_string, week = test_period.split('-')
-            # Excluding week since to few reports get fixed.
-            year, month_string = test_period.split('-')
-
-            month = int(month_string)
-            simulation_days = 30
-            start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
-
-            margin = datetime.timedelta(days=simulation_days)
-            end_date = start_date + margin
-
-            resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False,
-                                                      only_valid_resolution=False)
-            resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
-                                                              start_date,
-                                                              end_date)
-
-            bug_resolvers = resolved_in_period['JIRA Resolved By']
-            dev_team_size = bug_resolvers.nunique()
-
-            issues_resolved = len(resolved_in_period.index)
+            dev_team_size, issues_resolved, resolved_in_period = get_dev_team_production(test_period, issues_for_period,
+                                                                                         simulation_days)
 
             bug_reporters = issues_for_period['Reported By']
             test_team_size = bug_reporters.nunique()
@@ -438,13 +412,13 @@ def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max
 
             simulation_time = simulation_days * 24
 
-            completed_per_reporter, completed_per_priority = launch_simulation(team_capacity=dev_team_size,
-                                                                               report_number=reports_per_month,
-                                                                               reporters_config=reporters_config,
-                                                                               resolution_time_gen=resolution_time_gen,
-                                                                               priority_gen=priority_gen,
-                                                                               max_time=simulation_time,
-                                                                               max_iterations=max_iterations)
+            completed_per_reporter, completed_per_priority = simutils.launch_simulation(team_capacity=dev_team_size,
+                                                                                        report_number=reports_per_month,
+                                                                                        reporters_config=reporters_config,
+                                                                                        resolution_time_gen=resolution_time_gen,
+                                                                                        priority_gen=priority_gen,
+                                                                                        max_time=simulation_time,
+                                                                                        max_iterations=max_iterations)
 
             simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
                                                     reporters_config,
@@ -464,6 +438,7 @@ def main():
     # project_lists = [["CASSANDRA"], ["CLOUDSTACK"], ["OFBIZ"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
     project_lists = [enhanced_dataframe["Project Key"].unique()]
     # project_lists = [[project] for project in enhanced_dataframe["Project Key"].unique()]
+    project_lists = [["MESOS"]]
     for project_list in project_lists:
         n_folds = 3
         max_iterations = 100

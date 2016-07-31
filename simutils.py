@@ -250,4 +250,42 @@ def plot_correlation(total_predicted, total_completed, title, plot):
     if plot:
         plt.show()
     else:
-        plt.savefig(title + ".png")
+        plt.savefig("img/" + title + ".png")
+
+
+def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen,
+                      max_time, max_iterations):
+    """
+    Triggers the simulation according a given configuration.
+
+    :param max_iterations: Maximum number of simulation executions.
+    :param team_capacity: Number of developers in the team.
+    :param report_number: Number of bugs for the period.
+    :param reporters_config: Bug reporter configuration.
+    :param resolution_time_gen: Resolution time required by developers.
+    :param priority_gen: The priority contained on the bug reports.
+    :param max_time: Simulation time.
+    :return: List containing the number of fixed reports.
+    """
+
+    completed_per_reporter = []
+    completed_per_priority = []
+
+    for _ in range(max_iterations):
+        np.random.seed()
+        reporter_monitors, priority_monitors = simmodel.run_model(team_capacity=team_capacity,
+                                                                  report_number=report_number,
+                                                                  reporters_config=reporters_config,
+                                                                  resolution_time_gen=resolution_time_gen,
+                                                                  priority_gen=priority_gen,
+                                                                  max_time=max_time)
+
+        result_per_reporter = {reporter_name: reporter_info['resolved_monitor'].count() for reporter_name, reporter_info
+                               in
+                               reporter_monitors.iteritems()}
+        completed_per_reporter.append(result_per_reporter)
+
+        result_per_priority = {priority: monitor.count() for priority, monitor in priority_monitors.iteritems()}
+        completed_per_priority.append(result_per_priority)
+
+    return completed_per_reporter, completed_per_priority

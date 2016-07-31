@@ -57,8 +57,13 @@ class BugReportSource(Process):
         self.testing_context = testing_context
 
         self.inflation_gen = None
-        if reporter_config['strategy'] == INFLATE_STRATEGY:
+        strategy_key = 'strategy'
+        if strategy_key in reporter_config and reporter_config[strategy_key] == INFLATE_STRATEGY:
             self.inflation_gen = simutils.DiscreteEmpiricalDistribution(values=[True, False], probabilities=[0.5, 0.5])
+
+        self.priority_counters = {simdata.NON_SEVERE_PRIORITY: 0,
+                                  simdata.NORMAL_PRIORITY: 0,
+                                  simdata.SEVERE_PRIORITY: 0}
 
     def start_reporting(self, developer_resource, reporter_monitor):
         """
@@ -92,13 +97,9 @@ class BugReportSource(Process):
                          bug_report.arrive(developer_resource=developer_resource,
                                            resolution_monitors=[reporter_monitor, reported_priority_monitor]))
 
+                self.priority_counters[real_priority] += 1
+
             interarrival_time = self.get_interarrival_time()
-
-            # if interarrival_time < 0:
-            #     print "interarrival_time ", interarrival_time
-            #     print "self.name ", self.name
-            #     print "self.interarrival_time_gen.observations ", self.interarrival_time_gen.observations
-
             yield hold, self, interarrival_time
 
             batch_size = self.get_batch_size()
@@ -199,7 +200,8 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
         activate(bug_reporter,
                  bug_reporter.start_reporting(developer_resource=developer_resource,
                                               reporter_monitor=reporter_monitor), at=start_time)
-        reporter_monitors[reporter_config['name']] = reporter_monitor
+        reporter_monitors[reporter_config['name']] = {"resolved_monitor": reporter_monitor,
+                                                      "priority_counters": bug_reporter.priority_counters}
 
     simulate(until=max_time)
     return reporter_monitors, testing_context.priority_monitors
