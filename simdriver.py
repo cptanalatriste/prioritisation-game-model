@@ -18,7 +18,6 @@ from sklearn.metrics import median_absolute_error
 
 import simdata
 import simutils
-import simmodel
 
 import winsound
 
@@ -412,13 +411,14 @@ def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max
 
             simulation_time = simulation_days * 24
 
-            completed_per_reporter, completed_per_priority = simutils.launch_simulation(team_capacity=dev_team_size,
-                                                                                        report_number=reports_per_month,
-                                                                                        reporters_config=reporters_config,
-                                                                                        resolution_time_gen=resolution_time_gen,
-                                                                                        priority_gen=priority_gen,
-                                                                                        max_time=simulation_time,
-                                                                                        max_iterations=max_iterations)
+            completed_per_reporter, completed_per_priority, _, _ = simutils.launch_simulation(
+                team_capacity=dev_team_size,
+                report_number=reports_per_month,
+                reporters_config=reporters_config,
+                resolution_time_gen=resolution_time_gen,
+                priority_gen=priority_gen,
+                max_time=simulation_time,
+                max_iterations=max_iterations)
 
             simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
                                                     reporters_config,

@@ -270,6 +270,8 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
 
     completed_per_reporter = []
     completed_per_priority = []
+    bugs_per_reporter = []
+    reports_per_reporter = []
 
     for _ in range(max_iterations):
         np.random.seed()
@@ -288,4 +290,14 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
         result_per_priority = {priority: monitor.count() for priority, monitor in priority_monitors.iteritems()}
         completed_per_priority.append(result_per_priority)
 
-    return completed_per_reporter, completed_per_priority
+        found_per_reporter = {reporter_name: reporter_info['priority_counters'] for reporter_name, reporter_info
+                              in
+                              reporter_monitors.iteritems()}
+        bugs_per_reporter.append(found_per_reporter)
+
+        reported_per_reporter = {reporter_name: reporter_info['report_counters'] for reporter_name, reporter_info
+                                 in
+                                 reporter_monitors.iteritems()}
+        reports_per_reporter.append(reported_per_reporter)
+
+    return completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter

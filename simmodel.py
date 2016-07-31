@@ -14,6 +14,7 @@ CRITICAL_PRIORITY = 100
 
 NOT_INFLATE_STRATEGY = 'NOT_INFLATE'
 INFLATE_STRATEGY = 'INFLATE'
+SIMPLE_INFLATE_STRATEGY = 'SIMPLE_INFLATE'
 
 
 class TestingContext:
@@ -58,12 +59,18 @@ class BugReportSource(Process):
 
         self.inflation_gen = None
         strategy_key = 'strategy'
-        if strategy_key in reporter_config and reporter_config[strategy_key] == INFLATE_STRATEGY:
-            self.inflation_gen = simutils.DiscreteEmpiricalDistribution(values=[True, False], probabilities=[0.5, 0.5])
+        if strategy_key in reporter_config:
+            self.strategy = reporter_config[strategy_key]
+            if self.strategy == INFLATE_STRATEGY:
+                self.inflation_gen = simutils.DiscreteEmpiricalDistribution(values=[True, False],
+                                                                            probabilities=[0.5, 0.5])
 
         self.priority_counters = {simdata.NON_SEVERE_PRIORITY: 0,
                                   simdata.NORMAL_PRIORITY: 0,
                                   simdata.SEVERE_PRIORITY: 0}
+        self.report_counters = {simdata.NON_SEVERE_PRIORITY: 0,
+                                simdata.NORMAL_PRIORITY: 0,
+                                simdata.SEVERE_PRIORITY: 0}
 
     def start_reporting(self, developer_resource, reporter_monitor):
         """
@@ -98,6 +105,7 @@ class BugReportSource(Process):
                                            resolution_monitors=[reporter_monitor, reported_priority_monitor]))
 
                 self.priority_counters[real_priority] += 1
+                self.report_counters[report_priority] += 1
 
             interarrival_time = self.get_interarrival_time()
             yield hold, self, interarrival_time
@@ -107,9 +115,13 @@ class BugReportSource(Process):
     def get_report_priority(self):
         real_priority = self.testing_context.get_priority()
         priority_for_report = real_priority
-        # if real_priority < simdata.SEVERE_PRIORITY and self.inflation_gen is not None:
-        #     if self.inflation_gen.generate():
-        #         priority_for_report += 1
+
+        if real_priority < simdata.SEVERE_PRIORITY:
+            if self.inflation_gen is not None and self.inflation_gen.generate():
+                priority_for_report += 1
+
+            if self.strategy == SIMPLE_INFLATE_STRATEGY:
+                priority_for_report += 1
 
         return real_priority, priority_for_report
 
@@ -201,7 +213,8 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
                  bug_reporter.start_reporting(developer_resource=developer_resource,
                                               reporter_monitor=reporter_monitor), at=start_time)
         reporter_monitors[reporter_config['name']] = {"resolved_monitor": reporter_monitor,
-                                                      "priority_counters": bug_reporter.priority_counters}
+                                                      "priority_counters": bug_reporter.priority_counters,
+                                                      "report_counters": bug_reporter.report_counters}
 
     simulate(until=max_time)
     return reporter_monitors, testing_context.priority_monitors
