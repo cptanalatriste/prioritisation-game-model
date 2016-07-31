@@ -5,8 +5,18 @@ from collections import defaultdict
 
 import numpy as np
 
+import pandas as pd
+
 from scipy.stats import uniform
 from scipy.stats import rv_discrete
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+import matplotlib.pyplot as plt
+
+import simdata
+import simmodel
 
 MINIMUM_OBSERVATIONS = 3
 
@@ -84,3 +94,156 @@ class DiscreteEmpiricalDistribution:
     def get_probabilities(self):
         probability_map = {value: self.probabilities[index] for index, value in enumerate(self.values)}
         return defaultdict(float, probability_map)
+
+
+def remove_drive_in_testers(reporters_config, range_in_std=2):
+    """
+    Removes drive-in testers, defined as the testers who's mean interrival time is larger than range_in_std standard deviations of the
+    overall average interarrival times.
+    :param reporters_config: Reporter configuration.
+    :param range_in_std: Number of standard deviations to be considered in range.
+    :return: Filtered list of reporters config.
+    """
+    # reporter_metrics = [np.mean(config['interarrival_time_gen'].observations) for config in reporters_config]
+    reporter_metrics = [len(config['interarrival_time_gen'].observations) for config in reporters_config]
+
+    overall_mean = np.mean(reporter_metrics)
+    overall_std = np.std(reporter_metrics)
+
+    # engaged_testers = [config for config in reporters_config if
+    #                    abs(overall_mean - np.mean(
+    #                        config['interarrival_time_gen'].observations)) < range_in_std * overall_std]
+
+    engaged_testers = [config for config in reporters_config if
+                       abs(overall_mean - len(
+                           config['interarrival_time_gen'].observations)) < range_in_std * overall_std]
+
+    return engaged_testers
+
+
+def assign_strategies(reporters_config, training_issues, debug=False):
+    """
+    Assigns an inflation pattern to the reporter based on clustering.
+    :param reporters_config: Reporter configuration.
+    :param training_issues: Training dataset.
+    :return: Reporting Configuration including inflation pattern.
+    """
+    reporter_records = [
+        [config['priority_map'][simdata.NON_SEVERE_PRIORITY], config['priority_map'][simdata.NORMAL_PRIORITY],
+         config['priority_map'][simdata.SEVERE_PRIORITY],
+         config['with_modified_priority']] for config in reporters_config]
+
+    global_priority_map = DiscreteEmpiricalDistribution(
+        observations=training_issues[simdata.SIMPLE_PRIORITY_COLUMN]).get_probabilities()
+
+    if debug:
+        print "global_priority_map: ", global_priority_map
+
+    reporter_dataframe = pd.DataFrame(reporter_records)
+    correction_column = "Corrections"
+    non_severe_column = "Non-Severe"
+    severe_column = "Severe"
+    normal_column = "Normal"
+
+    reporter_dataframe.columns = [non_severe_column, normal_column, severe_column, correction_column]
+
+    # Removing scaling because of cluster quality.
+    # scaler = StandardScaler()
+    # report_features = scaler.fit_transform(reporter_dataframe.values)
+    # global_features = scaler.transform(
+    #     [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
+    #      global_priority_map[simdata.SEVERE_PRIORITY], 0.0])
+
+    global_features = [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
+                       global_priority_map[simdata.SEVERE_PRIORITY], 0.0]
+    report_features = reporter_dataframe.values
+
+    print "Starting clustering algorithms ..."
+    k_means = KMeans(n_clusters=2,
+                     init='random',
+                     max_iter=300,
+                     tol=1e-04,
+                     random_state=0)
+
+    predicted_clusters = k_means.fit_predict(report_features)
+
+    main_cluster = k_means.predict(global_features)
+
+    strategy_column = 'strategy'
+    reporter_dataframe[strategy_column] = [
+        simmodel.NOT_INFLATE_STRATEGY if cluster == main_cluster else simmodel.INFLATE_STRATEGY for
+        cluster in
+        predicted_clusters]
+
+    for index, strategy in enumerate(reporter_dataframe[strategy_column].values):
+        reporters_config[index]['strategy'] = strategy
+
+    for strategy in [simmodel.NOT_INFLATE_STRATEGY, simmodel.INFLATE_STRATEGY]:
+        reporters_per_strategy = reporter_dataframe[reporter_dataframe[strategy_column] == strategy]
+        print "Strategy: ", strategy, " reporters: ", len(reporters_per_strategy.index), " avg corrections: ", \
+            reporters_per_strategy[correction_column].mean(), " avg non-severe prob: ", reporters_per_strategy[
+            non_severe_column].mean(), " avg normal prob: ", reporters_per_strategy[
+            normal_column].mean(), " avg severe prob: ", reporters_per_strategy[severe_column].mean()
+
+
+def magnitude_relative_error(estimate, actual, balanced=False):
+    """
+    Normalizes the difference between actual and predicted values.
+    :param estimate:Estimated by the model.
+    :param actual: Real value in data.
+    :return: MRE
+    """
+
+    if not balanced:
+        denominator = actual
+    else:
+        denominator = min(estimate, actual)
+
+    if denominator == 0:
+        # 1 is our normalizing value
+        # Source: http://math.stackexchange.com/questions/677852/how-to-calculate-relative-error-when-true-value-is-zero
+        denominator = 1
+
+    mre = abs(estimate - actual) / float(denominator)
+    return mre
+
+
+def mean_magnitude_relative_error(total_completed, total_predicted, balanced=False):
+    """
+    The mean of absolute percentage errors.
+    :param total_completed: List of real values.
+    :param total_predicted: List of predictions.
+    :return: MMRE
+    """
+    return 100 * np.mean(
+        [magnitude_relative_error(estimate, actual, balanced)
+         for estimate, actual in zip(total_completed, total_predicted)])
+
+
+def median_magnitude_relative_error(total_completed, total_predicted):
+    """
+    The median of absolute percentage errors.
+    :param total_completed: List of real values.
+    :param total_predicted: List of predictions.
+    :return: MdMRE
+    """
+    return 100 * np.median(
+        [magnitude_relative_error(estimate, actual)
+         for estimate, actual in zip(total_completed, total_predicted)])
+
+
+def plot_correlation(total_predicted, total_completed, title):
+    """
+    A scatter plot for seeing how correlation goes.
+    :param total_predicted: List of predicted values.
+    :param total_completed: List of real values.
+    :return:
+    """
+    plt.clf()
+
+    plt.scatter(total_predicted, total_completed)
+    plt.title(title)
+    plt.xlabel("Predicted Resolved")
+    plt.ylabel("Actual Resolved")
+    plt.plot([min(total_completed), max(total_completed)], [[min(total_completed)], [max(total_completed)]])
+    plt.show()

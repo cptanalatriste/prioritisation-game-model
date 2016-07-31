@@ -7,12 +7,9 @@ import pytz
 
 from scipy import stats
 import numpy as np
-import matplotlib.pyplot as plt
 
 import pandas as pd
 
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
 from sklearn.cross_validation import KFold
 
 from sklearn.metrics import mean_absolute_error
@@ -65,22 +62,6 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
         completed_per_priority.append(result_per_priority)
 
     return completed_per_reporter, completed_per_priority
-
-
-def remove_drive_in_testers(reporters_config, range_in_std=2):
-    """
-    Removes drive-in testers, defined as the testers who's mean interrival time is larger than range_in_std standard deviations of the
-    overall average interarrival times.
-    :param reporters_config: Reporter configuration.
-    :param range_in_std: Number of standard deviations to be considered in range.
-    :return: Filtered list of reporters config.
-    """
-    mean_interrival_times = [np.mean(config['interarrival_time_gen'].observations) for config in reporters_config]
-    overall_std = np.std(mean_interrival_times)
-
-    engaged_testers = [config for config in reporters_config if
-                       abs(np.mean(config['interarrival_time_gen'].observations)) < range_in_std * overall_std]
-    return engaged_testers
 
 
 def get_reporters_configuration(max_chunk, training_dataset, debug=False):
@@ -142,74 +123,8 @@ def get_reporters_configuration(max_chunk, training_dataset, debug=False):
             if debug:
                 print "Reporters ", reporter_list, " could not be added. Possible because insufficient samples."
 
-    reporters_config = remove_drive_in_testers(reporters_config)
+    reporters_config = simutils.remove_drive_in_testers(reporters_config)
     return reporters_config
-
-
-def assign_strategies(reporters_config, training_issues, debug=DEBUG):
-    """
-    Assigns an inflation pattern to the reporter based on clustering.
-    :param reporters_config: Reporter configuration.
-    :param training_issues: Training dataset.
-    :return: Reporting Configuration including inflation pattern.
-    """
-    reporter_records = [
-        [config['priority_map'][simdata.NON_SEVERE_PRIORITY], config['priority_map'][simdata.NORMAL_PRIORITY],
-         config['priority_map'][simdata.SEVERE_PRIORITY],
-         config['with_modified_priority']] for config in reporters_config]
-
-    global_priority_map = simutils.DiscreteEmpiricalDistribution(
-        observations=training_issues[simdata.SIMPLE_PRIORITY_COLUMN]).get_probabilities()
-
-    if debug:
-        print "global_priority_map: ", global_priority_map
-
-    reporter_dataframe = pd.DataFrame(reporter_records)
-    correction_column = "Corrections"
-    non_severe_column = "Non-Severe"
-    severe_column = "Severe"
-    normal_column = "Normal"
-
-    reporter_dataframe.columns = [non_severe_column, normal_column, severe_column, correction_column]
-
-    scaler = StandardScaler()
-
-    # Removing scaling because of cluster quality.
-    # report_features = scaler.fit_transform(reporter_dataframe.values)
-    # global_features = scaler.transform(
-    #     [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
-    #      global_priority_map[simdata.SEVERE_PRIORITY], 0.0])
-
-    global_features = [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
-                       global_priority_map[simdata.SEVERE_PRIORITY], 0.0]
-    report_features = reporter_dataframe.values
-
-    print "Starting clustering algorithms ..."
-    k_means = KMeans(n_clusters=2,
-                     init='random',
-                     max_iter=300,
-                     tol=1e-04,
-                     random_state=0)
-
-    predicted_clusters = k_means.fit_predict(report_features)
-
-    main_cluster = k_means.predict(global_features)
-
-    strategy_column = 'strategy'
-    reporter_dataframe[strategy_column] = [
-        simmodel.NOT_INFLATE_STRATEGY if cluster == main_cluster else simmodel.INFLATE_STRATEGY for
-        cluster in
-        predicted_clusters]
-
-    for index, strategy in enumerate(reporter_dataframe[strategy_column].values):
-        reporters_config[index]['strategy'] = strategy
-
-    for strategy in [simmodel.NOT_INFLATE_STRATEGY, simmodel.INFLATE_STRATEGY]:
-        reporters_per_strategy = reporter_dataframe[reporter_dataframe[strategy_column] == strategy]
-        print "Strategy: ", strategy, " reporters: ", len(reporters_per_strategy.index), " avg corrections: ", \
-            reporters_per_strategy[correction_column].mean(), " avg non-severe prob: ", reporters_per_strategy[
-            non_severe_column].mean(), " avg normal prob: ", reporters_per_strategy[
-            normal_column].mean(), " avg severe prob: ", reporters_per_strategy[severe_column].mean()
 
 
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_per_reporter,
@@ -279,46 +194,6 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     return simulation_result
 
 
-def magnitude_relative_error(estimate, actual, balanced=False):
-    """
-    Normalizes the difference between actual and predicted values.
-    :param estimate:Estimated by the model.
-    :param actual: Real value in data.
-    :return: MRE
-    """
-
-    if not balanced:
-        denominator = actual
-    else:
-        denominator = min(estimate, actual)
-
-    if denominator == 0:
-        # 1 is our normalizing value
-        # Source: http://math.stackexchange.com/questions/677852/how-to-calculate-relative-error-when-true-value-is-zero
-        denominator = 1
-
-    mre = abs(estimate - actual) / float(denominator)
-    return mre
-
-
-def mean_magnitude_relative_error(total_completed, total_predicted, balanced=False):
-    """
-    The mean of absolute percentage errors.
-    :param total_completed: List of real values.
-    :param total_predicted: List of predictions.
-    :return: MMRE
-    """
-    return 100 * np.mean(
-        [magnitude_relative_error(estimate, actual, balanced)
-         for estimate, actual in zip(total_completed, total_predicted)])
-
-
-def median_magnitude_relative_error(total_completed, total_predicted):
-    return 100 * np.median(
-        [magnitude_relative_error(estimate, actual)
-         for estimate, actual in zip(total_completed, total_predicted)])
-
-
 def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=DEBUG, plot=PLOT):
     """
     Per each tester, it anaysis how close is simulation to real data.
@@ -365,16 +240,16 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
     total_mse = mean_squared_error(total_completed, total_predicted)
     total_mar = mean_absolute_error(total_completed, total_predicted)
     total_medar = median_absolute_error(total_completed, total_predicted)
-    total_mmre = mean_magnitude_relative_error(total_completed, total_predicted, balanced=False)
-    total_bmmre = mean_magnitude_relative_error(total_completed, total_predicted, balanced=True)
-    total_mdmre = median_magnitude_relative_error(total_completed, total_predicted)
+    total_mmre = simutils.mean_magnitude_relative_error(total_completed, total_predicted, balanced=False)
+    total_bmmre = simutils.mean_magnitude_relative_error(total_completed, total_predicted, balanced=True)
+    total_mdmre = simutils.median_magnitude_relative_error(total_completed, total_predicted)
 
     print "RMSE for total bug resolved in Project ", project_key, ": ", np.sqrt(
         total_mse), " Mean Squared Error ", total_mse, " Mean Absolute Error: ", total_mar, " Median Absolute Error: ", \
         total_medar, " Mean Magnitude Relative Error ", total_mmre, " Balanced MMRE ", total_bmmre, "Median Magnitude Relative Error ", total_mdmre
 
     if plot:
-        plot_correlation(total_predicted, total_completed, "Total Resolved")
+        simutils.plot_correlation(total_predicted, total_completed, "Total Resolved")
 
     for priority in [simdata.NON_SEVERE_PRIORITY, simdata.SEVERE_PRIORITY, simdata.NORMAL_PRIORITY]:
         completed_true = []
@@ -400,24 +275,7 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
             print "priority ", priority, " completed_predicted ", completed_predicted
 
         if plot:
-            plot_correlation(completed_predicted, completed_true, "Priority " + str(priority))
-
-
-def plot_correlation(total_predicted, total_completed, title):
-    """
-    A scatter plot for seeing how correlation goes.
-    :param total_predicted: List of predicted values.
-    :param total_completed: List of real values.
-    :return:
-    """
-    plt.clf()
-
-    plt.scatter(total_predicted, total_completed)
-    plt.title(title)
-    plt.xlabel("Predicted Resolved")
-    plt.ylabel("Actual Resolved")
-    plt.plot([min(total_completed), max(total_completed)], [[min(total_completed)], [max(total_completed)]])
-    plt.show()
+            simutils.plot_correlation(completed_predicted, completed_true, "Priority " + str(priority))
 
 
 def get_simulation_input(training_issues):
@@ -500,7 +358,7 @@ def get_continuous_chunks(periods_train):
     return chunks
 
 
-def simulate_project(project_key, enhanced_dataframe, debug=DEBUG):
+def simulate_project(project_key, enhanced_dataframe, debug=True):
     """
     Launches simulation analysis for an specific project.
     :param project_key: Project identifier.
@@ -529,7 +387,7 @@ def simulate_project(project_key, enhanced_dataframe, debug=DEBUG):
         reporters_config = get_reporters_configuration(max_chunk, training_issues)
         print "Number of reporters after drive-by filtering: ", len(reporters_config)
 
-        assign_strategies(reporters_config, training_issues)
+        simutils.assign_strategies(reporters_config, training_issues)
 
         engaged_testers = [reporter_config['name'] for reporter_config in reporters_config]
         training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
