@@ -16,16 +16,21 @@ NOT_INFLATE_STRATEGY = 'NOT_INFLATE'
 INFLATE_STRATEGY = 'INFLATE'
 SIMPLE_INFLATE_STRATEGY = 'SIMPLE_INFLATE'
 
+INITIAL_REPUTATION = 10
+
 
 class TestingContext:
     """
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, resolution_time_gen, priority_gen, bug_level):
+    def __init__(self, resolution_time_gen, priority_gen, bug_level, default_review_time, throttling):
         self.resolution_time_gen = resolution_time_gen
         self.priority_gen = priority_gen
         self.bug_level = bug_level
+        self.default_review_time = default_review_time
+        self.throttling = throttling
+
         self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: Monitor(),
                                   simdata.NORMAL_PRIORITY: Monitor(),
                                   simdata.SEVERE_PRIORITY: Monitor()}
@@ -44,6 +49,13 @@ class TestingContext:
         """
         return self.priority_gen.generate()[0]
 
+    def get_review_time(self):
+        """
+        Returns the review time required by the gatekeeper to correct the priority.
+        :return:
+        """
+        return self.default_review_time
+
 
 class BugReportSource(Process):
     """
@@ -56,6 +68,7 @@ class BugReportSource(Process):
         self.interarrival_time_gen = reporter_config['interarrival_time_gen']
         self.batch_size_gen = reporter_config['batch_size_gen']
         self.testing_context = testing_context
+        self.reporter_reputation = INITIAL_REPUTATION
 
         self.inflation_gen = None
         strategy_key = 'strategy'
@@ -72,7 +85,7 @@ class BugReportSource(Process):
                                 simdata.NORMAL_PRIORITY: 0,
                                 simdata.SEVERE_PRIORITY: 0}
 
-    def start_reporting(self, developer_resource, reporter_monitor):
+    def start_reporting(self, developer_resource, gatekeeper_resource, reporter_monitor):
         """
         Activates a number of bug reports according to an inter-arrival time.
         :param resol_time_monitor: Monitor for the resolution time.
@@ -89,19 +102,24 @@ class BugReportSource(Process):
                 report_key = "Report-" + str(bug_level.amount)
                 real_priority, report_priority = self.get_report_priority()
                 fix_effort = self.testing_context.get_fix_effort()
+                review_time = self.testing_context.get_review_time()
+                throttling = self.testing_context.throttling
 
                 # print "fix_effort ", fix_effort
                 # if fix_effort< 0:
                 #     print "self.testing_context.resolution_time_gen.observations ", self.testing_context.resolution_time_gen.observations
 
-                bug_report = BugReport(name=report_key, reporter=self.name,
+                bug_report = BugReport(name=report_key, reporter=self,
                                        fix_effort=fix_effort,
                                        report_priority=report_priority,
-                                       real_priority=real_priority)
+                                       real_priority=real_priority,
+                                       review_time=review_time,
+                                       throttling=throttling)
 
                 reported_priority_monitor = self.testing_context.priority_monitors[report_priority]
                 activate(bug_report,
                          bug_report.arrive(developer_resource=developer_resource,
+                                           gatekeeper_resource=gatekeeper_resource,
                                            resolution_monitors=[reporter_monitor, reported_priority_monitor]))
 
                 self.priority_counters[real_priority] += 1
@@ -145,15 +163,17 @@ class BugReport(Process):
     A project member whose main responsibility is bug reporting.
     """
 
-    def __init__(self, name, reporter, fix_effort, report_priority, real_priority):
+    def __init__(self, name, reporter, fix_effort, report_priority, real_priority, review_time, throttling):
         Process.__init__(self)
         self.name = name
         self.reporter = reporter
         self.fix_effort = fix_effort
         self.report_priority = report_priority
         self.real_priority = real_priority
+        self.review_time = review_time
+        self.throttling = throttling
 
-    def arrive(self, developer_resource, resolution_monitors, debug=False):
+    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, debug=False):
         """
         The Process Execution Method for the Bug Reported process.
         :return:
@@ -164,6 +184,21 @@ class BugReport(Process):
             pending_bugs = len(developer_resource.waitQ)
             print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Priority: ", self.priority, \
                 "Pending bugs: ", pending_bugs
+
+        if gatekeeper_resource:
+            # print "Requesting gatekeeper ", now(), "priority ", self.reporter.reporter_reputation
+
+            yield request, self, gatekeeper_resource, self.reporter.reporter_reputation
+            yield hold, self, self.review_time
+
+            # print "Gatekeeper finished review", now()
+            if self.report_priority != self.real_priority and self.throttling:
+                self.reporter.reporter_reputation -= 1
+                # print "Inflation detected! Applying throttling ", self.reporter.reporter_reputation
+
+            self.report_priority = self.real_priority
+            yield release, self, gatekeeper_resource
+            # print "Gatekeeper released!", now()
 
         yield request, self, developer_resource, self.report_priority
 
@@ -182,7 +217,8 @@ class BugReport(Process):
             print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting."
 
 
-def run_model(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen, max_time):
+def run_model(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen, max_time,
+              gatekeeper_config=False):
     """
     Triggers the simulation, according to the provided parameters.
     :param team_capacity: Number of bug resolvers.
@@ -195,6 +231,16 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
     """
     start_time = 0.0
 
+    gatekeeper_resource = None
+    default_review_time = None
+    throttling = False
+    if gatekeeper_config:
+        default_review_time = gatekeeper_config['review_time']
+        throttling = gatekeeper_config['throttling']
+        gatekeeper_resource = Resource(capacity=gatekeeper_config['capacity'], name="gatekeeper_team",
+                                       unitName="gatekeeper", qType=PriorityQ,
+                                       preemptable=False, monitored=True)
+
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=False, monitored=True)
@@ -202,7 +248,8 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
 
     initialize()
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen,
-                                     bug_level=bug_level)
+                                     bug_level=bug_level, default_review_time=default_review_time,
+                                     throttling=throttling)
 
     reporter_monitors = {}
     for reporter_config in reporters_config:
@@ -211,6 +258,7 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
                                        testing_context=testing_context)
         activate(bug_reporter,
                  bug_reporter.start_reporting(developer_resource=developer_resource,
+                                              gatekeeper_resource=gatekeeper_resource,
                                               reporter_monitor=reporter_monitor), at=start_time)
         reporter_monitors[reporter_config['name']] = {"resolved_monitor": reporter_monitor,
                                                       "priority_counters": bug_reporter.priority_counters,
