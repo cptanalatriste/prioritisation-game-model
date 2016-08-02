@@ -63,8 +63,7 @@ class BugReportSource(Process):
     """
 
     def __init__(self, reporter_config=None, testing_context=None):
-        Process.__init__(self)
-        self.name = reporter_config['name']
+        Process.__init__(self, reporter_config['name'])
         self.interarrival_time_gen = reporter_config['interarrival_time_gen']
         self.batch_size_gen = reporter_config['batch_size_gen']
         self.testing_context = testing_context
@@ -164,8 +163,7 @@ class BugReport(Process):
     """
 
     def __init__(self, name, reporter, fix_effort, report_priority, real_priority, review_time, throttling):
-        Process.__init__(self)
-        self.name = name
+        Process.__init__(self, name)
         self.reporter = reporter
         self.fix_effort = fix_effort
         self.report_priority = report_priority
@@ -200,7 +198,8 @@ class BugReport(Process):
             yield release, self, gatekeeper_resource
             # print "Gatekeeper released!", now()
 
-        yield request, self, developer_resource, self.report_priority
+        # print "Requesting developer resource: ", self.report_priority
+        yield request, self, developer_resource, int(self.report_priority)
 
         if debug:
             print now(), ": Report ", self.name, " ready for fixing. "
@@ -239,11 +238,15 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
         throttling = gatekeeper_config['throttling']
         gatekeeper_resource = Resource(capacity=gatekeeper_config['capacity'], name="gatekeeper_team",
                                        unitName="gatekeeper", qType=PriorityQ,
-                                       preemptable=False, monitored=True)
+                                       preemptable=False)
 
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
+    preemptable = False
+    # Trying preemptable dev queue
+    preemptable = False
+
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
-                                  preemptable=False, monitored=True)
+                                  preemptable=preemptable)
     bug_level = Level(capacity=sys.maxint, initialBuffered=report_number, monitored=True)
 
     initialize()
@@ -264,7 +267,8 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
                                                       "priority_counters": bug_reporter.priority_counters,
                                                       "report_counters": bug_reporter.report_counters}
 
-    simulate(until=max_time)
+    simulation_result = simulate(until=max_time)
+    # print "simulation_result ", simulation_result
     return reporter_monitors, testing_context.priority_monitors
 
 

@@ -28,7 +28,7 @@ NORMAL_PRIORITY = 2
 NON_SEVERE_PRIORITY = 1
 
 
-def launch_histogram(data_points):
+def launch_histogram(data_points, config=None):
     """
     Launches an histogram of the data points passed as parameter.
     :param data_points: List of data points
@@ -36,9 +36,22 @@ def launch_histogram(data_points):
     """
     histogram, bin_edges = np.histogram(data_points, bins="auto")
 
+    file_name = None
+    print "bin_edges ", bin_edges
+
+    if config:
+        plt.title(config['title'])
+        plt.xlabel(config['xlabel'])
+        plt.ylabel(config['ylabel'])
+        file_name = config['file_name']
+
     plt.bar(bin_edges[:-1], histogram, width=(bin_edges[1] - bin_edges[0]))
     plt.xlim(min(bin_edges), max(bin_edges))
-    plt.show()
+
+    if file_name:
+        plt.savefig("img/" + file_name)
+    else:
+        plt.show()
 
 
 def get_resolution_time(report_series):

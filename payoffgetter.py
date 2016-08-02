@@ -56,7 +56,8 @@ def consolidate_results(period, reporter_configuration, completed_per_reporter, 
             simulation_results.append({"period": period,
                                        "run": run,
                                        "reporter_name": reporter_name,
-                                       'reporter_team': reporter_team,
+                                       "reporter_team": reporter_team,
+                                       "reported": severe_reported + non_severe_reported + normal_reported,
                                        "reported_completed": reported_completed,
                                        "severe_found": severe_found,
                                        "non_severe_found": non_severe_found,
@@ -127,6 +128,8 @@ def get_team_metrics(file_prefix, game_period, overall_dataframe, optimal_thresh
             team_run_reports = reports_in_run[reports_in_run['reporter_team'] == team]
 
             team_resolved = team_run_reports['reported_completed'].sum()
+            team_reported = team_run_reports['reported'].sum()
+
             team_normal_found = team_run_reports['normal_found'].sum()
             team_severe_found = team_run_reports['reported_completed'].sum()
             team_nonsevere_found = team_run_reports['severe_found'].sum()
@@ -138,13 +141,16 @@ def get_team_metrics(file_prefix, game_period, overall_dataframe, optimal_thresh
                 batch_quality = "SUB_OPTIMAL"
 
             team_results[team] = {"team_resolved": team_resolved,
+                                  "team_reported": team_reported,
                                   "batch_quality": batch_quality}
 
         consolidated_result.append({"run": run,
                                     "team_1_quality": team_results[FIRST_TEAM]['batch_quality'],
                                     "team_1_results": team_results[FIRST_TEAM]['team_resolved'],
+                                    "team_1_reports": team_results[FIRST_TEAM]['team_reported'],
                                     "team_2_quality": team_results[SECOND_TEAM]['batch_quality'],
                                     "team_2_results": team_results[SECOND_TEAM]['team_resolved'],
+                                    "team_2_reports": team_results[SECOND_TEAM]['team_reported'],
                                     "scenario": team_results[FIRST_TEAM]['batch_quality'] + "-" +
                                                 team_results[SECOND_TEAM]['batch_quality']
                                     })
@@ -156,13 +162,23 @@ def get_team_metrics(file_prefix, game_period, overall_dataframe, optimal_thresh
     for scenario, frecuency in scenarios.iteritems():
         scenario_reports = consolidated_dataframe[consolidated_dataframe["scenario"] == scenario]
 
-        team_1_resolved = scenario_reports["team_1_results"].median()
-        team_2_resolved = scenario_reports["team_2_results"].median()
+        team_1_results = scenario_reports["team_1_results"]
+        team_2_results = scenario_reports["team_2_results"]
+
+        team_1_resolved = team_1_results.median()
+        team_2_resolved = team_2_results.median()
+
+        team_1_reports = scenario_reports["team_1_reports"]
+        team_2_reports = scenario_reports["team_2_reports"]
+
+        dev_fix_ratio = (team_1_results.sum() + team_2_results.sum()) / float(
+            team_1_reports.sum() + team_2_reports.sum())
 
         print "scenario: ", scenario, "profile ", file_prefix, " frecuency: ", frecuency, "counts: ", len(
-            scenario_reports.index), "team_1_resolved ", team_1_resolved, " team_2_resolved ", team_2_resolved
+            scenario_reports.index), "team_1_resolved ", team_1_resolved, " team_2_resolved ", team_2_resolved, \
+            " dev_fix_ratio ", dev_fix_ratio
 
-    consolidated_dataframe.to_csv(file_prefix + "_consolidated_result.csv", index=False)
+    consolidated_dataframe.to_csv("csv/" + file_prefix + "_consolidated_result.csv", index=False)
 
 
 def main(file_prefix, strategy_map, enhanced_dataframe, project_keys):
@@ -177,6 +193,10 @@ def main(file_prefix, strategy_map, enhanced_dataframe, project_keys):
 
     assign_team(reporter_configuration[: split_point], FIRST_TEAM, strategy_map)
     assign_team(reporter_configuration[split_point:], SECOND_TEAM, strategy_map)
+
+    engaged_testers = [reporter_config['name'] for reporter_config in reporter_configuration]
+    valid_reports = simdata.filter_by_reporter(valid_reports, engaged_testers)
+    print "Issues in training after reporter filtering: ", len(valid_reports.index)
 
     max_iterations = 10000
     simulation_days = 30
@@ -202,6 +222,13 @@ def main(file_prefix, strategy_map, enhanced_dataframe, project_keys):
         gatekeeper_config = {'review_time': 2,
                              'capacity': 1,
                              'throttling': True}
+
+        gatekeeper_config = False
+        #
+        # gatekeeper_config = {'review_time': 2,
+        #                      'capacity': 1,
+        #                      'throttling': False}
+
         completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter = simutils.launch_simulation(
             team_capacity=dev_team_size,
             report_number=reports_per_month,
@@ -217,7 +244,7 @@ def main(file_prefix, strategy_map, enhanced_dataframe, project_keys):
         overall_results.extend(results)
 
     overall_dataframe = pd.DataFrame(overall_results)
-    overall_dataframe.to_csv(file_prefix + '_simulation_results.csv', index=False)
+    overall_dataframe.to_csv("csv/" + file_prefix + '_simulation_results.csv', index=False)
 
     optimal_threshold = overall_dataframe["avg_priority_found"].mean()
     print "Mean Batch Priority: ", optimal_threshold

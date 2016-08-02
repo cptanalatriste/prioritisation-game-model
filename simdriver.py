@@ -16,6 +16,7 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import median_absolute_error
 
+import defaultabuse
 import simdata
 import simutils
 
@@ -102,7 +103,8 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     :param issues_for_period: Issues reported on the same period of report.
     :param resolved_in_month: Issues resolved on the same period of report.
     :param reporters_config:   Reporter configuration.
-    :param completed_reports: Simulation results.
+    :param completed_per_reporter: Simulation results per reporter.
+    :param completed_per_priority: Simulation results per priority.
     :return:
     """
     simulation_result = {"period": year_month,
@@ -122,13 +124,15 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     # TODO: This reporter/priority logic can be refactored.
     for priority in [simdata.SEVERE_PRIORITY, simdata.NON_SEVERE_PRIORITY, simdata.NORMAL_PRIORITY]:
         resolved_per_priority = resolved_in_month[resolved_in_month[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+        reported_per_priority = issues_for_period[issues_for_period[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
 
         resolved_on_simulation = [report[priority] for report in completed_per_priority]
         predicted_resolved = np.median(resolved_on_simulation)
 
         simulation_result['results_per_priority'].append({'priority': priority,
                                                           'true_resolved': len(resolved_per_priority.index),
-                                                          "predicted_resolved": predicted_resolved})
+                                                          'true_reported': len(reported_per_priority.index),
+                                                          'predicted_resolved': predicted_resolved})
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
@@ -158,7 +162,26 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     return simulation_result
 
 
-def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=DEBUG, plot=PLOT):
+def collect_metrics(true_values, predicted_values):
+    """
+    Returns a list of regression quality metrics.
+    :param true_values: The list containing the true values.
+    :param predicted_values:  The list containing the predicted values.
+    :return: List of metrics.
+    """
+
+    mse = mean_squared_error(true_values, predicted_values)
+    rmse = np.sqrt(mse)
+    mar = mean_absolute_error(true_values, predicted_values)
+    medar = median_absolute_error(true_values, predicted_values)
+    mmre = simutils.mean_magnitude_relative_error(true_values, predicted_values, balanced=False)
+    bmmre = simutils.mean_magnitude_relative_error(true_values, predicted_values, balanced=True)
+    mdmre = simutils.median_magnitude_relative_error(true_values, predicted_values)
+
+    return mse, rmse, mar, medar, mmre, bmmre, mdmre
+
+
+def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=True, plot=PLOT):
     """
     Per each tester, it anaysis how close is simulation to real data.
     :param reporters_config: Tester configuration.
@@ -201,16 +224,9 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         print "total_completed ", total_completed
         print "total_predicted ", total_predicted
 
-    total_mse = mean_squared_error(total_completed, total_predicted)
-    total_mar = mean_absolute_error(total_completed, total_predicted)
-    total_medar = median_absolute_error(total_completed, total_predicted)
-    total_mmre = simutils.mean_magnitude_relative_error(total_completed, total_predicted, balanced=False)
-    total_bmmre = simutils.mean_magnitude_relative_error(total_completed, total_predicted, balanced=True)
-    total_mdmre = simutils.median_magnitude_relative_error(total_completed, total_predicted)
-
-    print "RMSE for total bug resolved in Project ", project_key, ": ", np.sqrt(
-        total_mse), " Mean Squared Error ", total_mse, " Mean Absolute Error: ", total_mar, " Median Absolute Error: ", \
-        total_medar, " Mean Magnitude Relative Error ", total_mmre, " Balanced MMRE ", total_bmmre, "Median Magnitude Relative Error ", total_mdmre
+    mse, rmse, mar, medar, mmre, bmmre, mdmre = collect_metrics(total_completed, total_predicted)
+    print "RMSE for total bug resolved in Project ", project_key, ": ", rmse, " Mean Squared Error ", mse, " Mean Absolute Error: ", \
+        mar, " Median Absolute Error: ", medar, " Mean Magnitude Relative Error ", mmre, " Balanced MMRE ", bmmre, "Median Magnitude Relative Error ", mdmre
 
     simutils.plot_correlation(total_predicted, total_completed, "_".join(project_key) + "-Total Resolved", plot)
 
@@ -228,10 +244,11 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
                                   result['priority'] == priority][0]
             completed_predicted.append(priority_predicted)
 
-        mse = mean_squared_error(completed_true, completed_predicted)
-        rmse = np.sqrt(mse)
+        mse, rmse, mar, medar, mmre, bmmre, mdmre = collect_metrics(completed_true, completed_predicted)
 
-        print "Project ", project_key, " Priority ", priority, " RMSE ", rmse, " Mean Squared Error ", mse
+        print "Project ", project_key, " Priority ", priority, " RMSE ", rmse, " Mean Squared Error ", mse, \
+            " Mean Absolute Error: ", mar, " Median Absolute Error: ", medar, " Mean Magnitude Relative Error ", mmre, \
+            " Balanced MMRE ", bmmre, "Median Magnitude Relative Error ", mdmre
 
         if debug:
             print "priority ", priority, " completed_true ", completed_true
@@ -348,6 +365,23 @@ def get_dev_team_production(test_period, issues_for_period, simulation_days):
     return dev_team_size, issues_resolved, resolved_in_period
 
 
+def is_valid_period(issues_for_period, resolved_in_period):
+    """
+    Determines the rule for launching the simulation for that period.
+
+    :param issues_for_period: Total issues in the period.
+    :param resolved_in_period: Resolved issues in the period.
+    :return: True if valid for simulation. False otherwise.
+    """
+    reports_per_month = len(issues_for_period.index)
+    issues_resolved = len(resolved_in_period.index)
+
+    fix_ratio = issues_resolved / float(reports_per_month)
+    threshold = 0.8
+
+    return fix_ratio < threshold
+
+
 def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max_iterations=1000):
     """
     Launches simulation analysis for an specific project.
@@ -409,24 +443,47 @@ def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max
                 print "Project ", project_key, " Test Period: ", test_period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
                     " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
 
-            simulation_time = simulation_days * 24
+            if is_valid_period(issues_for_period, resolved_in_period):
+                simulation_time = simulation_days * 24
 
-            completed_per_reporter, completed_per_priority, _, _ = simutils.launch_simulation(
-                team_capacity=dev_team_size,
-                report_number=reports_per_month,
-                reporters_config=reporters_config,
-                resolution_time_gen=resolution_time_gen,
-                priority_gen=priority_gen,
-                max_time=simulation_time,
-                max_iterations=max_iterations)
+                completed_per_reporter, completed_per_priority, _, _ = simutils.launch_simulation(
+                    team_capacity=dev_team_size,
+                    report_number=reports_per_month,
+                    reporters_config=reporters_config,
+                    resolution_time_gen=resolution_time_gen,
+                    priority_gen=priority_gen,
+                    max_time=simulation_time,
+                    max_iterations=max_iterations)
 
-            simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
-                                                    reporters_config,
-                                                    completed_per_reporter, completed_per_priority)
-            simulation_results.append(simulation_result)
+                simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
+                                                        reporters_config,
+                                                        completed_per_reporter, completed_per_priority)
+
+                if debug:
+                    print "simulation_result ", simulation_result
+
+                simulation_results.append(simulation_result)
+            else:
+                print "PERIOD EXCLUDED!!! "
 
     if len(simulation_results) > 0:
         analyse_results(reporters_config=None, simulation_results=simulation_results, project_key=project_key)
+
+
+def get_valid_projects(enhanced_dataframe):
+    """
+    Selects the projects that will be considered in analysis.
+    :param enhanced_dataframe: Bug Report dataframe.
+    :return: Project key list.
+    """
+
+    project_dataframe = defaultabuse.get_default_usage_data(enhanced_dataframe)
+
+    threshold = 0.3
+    using_priorities = project_dataframe[project_dataframe['non_default_ratio'] >= threshold]
+    project_keys = using_priorities['project_key'].unique()
+
+    return project_keys
 
 
 def main():
@@ -435,10 +492,13 @@ def main():
 
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
-    # project_lists = [["CASSANDRA"], ["CLOUDSTACK"], ["OFBIZ"], ["CLOUDSTACK", "OFBIZ", "CASSANDRA"]]
-    project_lists = [enhanced_dataframe["Project Key"].unique()]
+    project_lists = [["CLOUDSTACK", "OFBIZ", "CASSANDRA", "MAHOUT", "SPARK", "ISIS"]]
+    # project_lists = [enhanced_dataframe["Project Key"].unique()]
     # project_lists = [[project] for project in enhanced_dataframe["Project Key"].unique()]
-    project_lists = [["MESOS"]]
+    # project_lists = [["MESOS"]]
+
+    project_lists = [get_valid_projects(enhanced_dataframe)]
+
     for project_list in project_lists:
         n_folds = 3
         max_iterations = 100
