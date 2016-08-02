@@ -93,7 +93,7 @@ def get_reporters_configuration(max_chunk, training_dataset, debug=False):
 
 
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_per_reporter,
-                        completed_per_priority,
+                        completed_per_priority, reports_per_priority,
                         debug=False):
     """
     It consolidates the results from the simulation with the information contained in the data.
@@ -129,10 +129,14 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
         resolved_on_simulation = [report[priority] for report in completed_per_priority]
         predicted_resolved = np.median(resolved_on_simulation)
 
+        reported_on_simulation = [report[priority] for report in reports_per_priority]
+        predicted_reported = np.median(reported_on_simulation)
+
         simulation_result['results_per_priority'].append({'priority': priority,
                                                           'true_resolved': len(resolved_per_priority.index),
                                                           'true_reported': len(reported_per_priority.index),
-                                                          'predicted_resolved': predicted_resolved})
+                                                          'predicted_resolved': predicted_resolved,
+                                                          'predicted_reported': predicted_reported})
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
@@ -234,15 +238,29 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         completed_true = []
         completed_predicted = []
 
-        for simulation_result in simulation_results:
-            priority_true = [result['true_resolved'] for result in simulation_result['results_per_priority'] if
-                             result['priority'] == priority][0]
-            completed_true.append(priority_true)
+        reported_true = []
+        reported_predicted = []
 
-            priority_predicted = [result['predicted_resolved'] for result in simulation_result['results_per_priority']
-                                  if
-                                  result['priority'] == priority][0]
-            completed_predicted.append(priority_predicted)
+        for simulation_result in simulation_results:
+            priority_resolved_true = [result['true_resolved'] for result in simulation_result['results_per_priority'] if
+                                      result['priority'] == priority][0]
+            completed_true.append(priority_resolved_true)
+
+            priority_resolved_predicted = \
+                [result['predicted_resolved'] for result in simulation_result['results_per_priority']
+                 if
+                 result['priority'] == priority][0]
+            completed_predicted.append(priority_resolved_predicted)
+
+            priority_reported_true = [result['true_reported'] for result in simulation_result['results_per_priority'] if
+                                      result['priority'] == priority][0]
+            reported_true.append(priority_reported_true)
+
+            priority_reported_predicted = \
+                [result['predicted_reported'] for result in simulation_result['results_per_priority']
+                 if
+                 result['priority'] == priority][0]
+            reported_predicted.append(priority_reported_predicted)
 
         mse, rmse, mar, medar, mmre, bmmre, mdmre = collect_metrics(completed_true, completed_predicted)
 
@@ -251,8 +269,10 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
             " Balanced MMRE ", bmmre, "Median Magnitude Relative Error ", mdmre
 
         if debug:
-            print "priority ", priority, " completed_true ", completed_true
-            print "priority ", priority, " completed_predicted ", completed_predicted
+            print " completed_true ", completed_true
+            print " completed_predicted ", completed_predicted
+            print " reported_true ", reported_true
+            print " reported_predicted ", reported_predicted
 
         simutils.plot_correlation(completed_predicted, completed_true,
                                   "-".join(project_key) + "-Priority " + str(priority), plot)
@@ -446,7 +466,7 @@ def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max
             if is_valid_period(issues_for_period, resolved_in_period):
                 simulation_time = simulation_days * 24
 
-                completed_per_reporter, completed_per_priority, _, _ = simutils.launch_simulation(
+                completed_per_reporter, completed_per_priority, _, _, reports_per_priority = simutils.launch_simulation(
                     team_capacity=dev_team_size,
                     report_number=reports_per_month,
                     reporters_config=reporters_config,
@@ -457,7 +477,8 @@ def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max
 
                 simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
                                                         reporters_config,
-                                                        completed_per_reporter, completed_per_priority)
+                                                        completed_per_reporter, completed_per_priority,
+                                                        reports_per_priority)
 
                 if debug:
                     print "simulation_result ", simulation_result

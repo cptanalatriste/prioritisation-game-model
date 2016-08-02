@@ -229,7 +229,7 @@ def main(file_prefix, strategy_map, enhanced_dataframe, project_keys):
         #                      'capacity': 1,
         #                      'throttling': False}
 
-        completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter = simutils.launch_simulation(
+        completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, reports_per_priority = simutils.launch_simulation(
             team_capacity=dev_team_size,
             report_number=reports_per_month,
             reporters_config=reporter_configuration,
@@ -240,7 +240,7 @@ def main(file_prefix, strategy_map, enhanced_dataframe, project_keys):
             gatekeeper_config=gatekeeper_config)
 
         results = consolidate_results(period, reporter_configuration, completed_per_reporter, bugs_per_reporter,
-                                      reports_per_reporter)
+                                      reports_per_reporter, reports_per_priority)
         overall_results.extend(results)
 
     overall_dataframe = pd.DataFrame(overall_results)

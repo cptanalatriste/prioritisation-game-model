@@ -31,9 +31,12 @@ class TestingContext:
         self.default_review_time = default_review_time
         self.throttling = throttling
 
-        self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: Monitor(),
-                                  simdata.NORMAL_PRIORITY: Monitor(),
-                                  simdata.SEVERE_PRIORITY: Monitor()}
+        self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {'completed': Monitor(),
+                                                                'reported': 0},
+                                  simdata.NORMAL_PRIORITY: {'completed': Monitor(),
+                                                            'reported': 0},
+                                  simdata.SEVERE_PRIORITY: {'completed': Monitor(),
+                                                            'reported': 0}}
 
     def get_fix_effort(self):
         """
@@ -115,14 +118,16 @@ class BugReportSource(Process):
                                        review_time=review_time,
                                        throttling=throttling)
 
-                reported_priority_monitor = self.testing_context.priority_monitors[report_priority]
+                reported_priority_monitor = self.testing_context.priority_monitors[report_priority]['completed']
                 activate(bug_report,
                          bug_report.arrive(developer_resource=developer_resource,
                                            gatekeeper_resource=gatekeeper_resource,
                                            resolution_monitors=[reporter_monitor, reported_priority_monitor]))
 
                 self.priority_counters[real_priority] += 1
+
                 self.report_counters[report_priority] += 1
+                self.testing_context.priority_monitors[report_priority]['reported'] += 1
 
             interarrival_time = self.get_interarrival_time()
             yield hold, self, interarrival_time
