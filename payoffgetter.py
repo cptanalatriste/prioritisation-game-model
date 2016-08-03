@@ -212,7 +212,7 @@ def main(file_prefix, strategy_map, enhanced_dataframe, project_keys):
         issues_for_period = valid_reports[valid_reports[simdata.PERIOD_COLUMN] == period]
         reports_per_month = len(issues_for_period.index)
 
-        resolution_time_gen, priority_gen = simdriver.get_simulation_input(valid_reports)
+        resolution_time_gen, priority_gen = simdriver.get_simulation_input(project_keys, valid_reports)
         dev_team_size, issues_resolved, resolved_in_period = simdriver.get_dev_team_production(period,
                                                                                                issues_for_period,
                                                                                                simulation_days)

@@ -63,7 +63,8 @@ def get_resolution_time(report_series):
     :return: Fix effort in days.
     """
 
-    first_contact_str = report_series['JIRA Resolver In Progress']
+    # first_contact_str = report_series['JIRA Resolver In Progress']
+    first_contact_str = report_series['Creation Date']
     resolution_date_str = report_series['JIRA Resolved Date']
 
     if isinstance(first_contact_str, basestring) and isinstance(resolution_date_str, basestring):

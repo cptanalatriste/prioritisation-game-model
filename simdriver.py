@@ -298,7 +298,7 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
                                   "-".join(project_key) + "-Priority " + str(priority), plot)
 
 
-def get_simulation_input(training_issues, fold=1):
+def get_simulation_input(project_key="", training_issues=None, fold=1):
     """
     Extract the simulation paramaters from the training dataset.
     :param training_issues: Training data set.
@@ -314,7 +314,8 @@ def get_simulation_input(training_issues, fold=1):
     simdata.launch_histogram(resolution_time_sample, config={"title": "Resolution Time in Hours",
                                                              "xlabel": "Resolution Time",
                                                              "ylabel": "Counts",
-                                                             "file_name": "RESOL_TIME_HIST_FOLD_" + str(fold)})
+                                                             "file_name": project_key + "_RESOL_TIME_HIST_FOLD_" + str(
+                                                                 fold)})
     siminput.launch_input_analysis(resolution_time_sample, "RESOL_TIME_" + str(fold), show_data_plot=False)
 
     if len(resolution_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
@@ -468,7 +469,7 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, ma
         training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
         print "Issues in training after reporter filtering: ", len(training_issues.index)
 
-        resolution_time_gen, priority_gen = get_simulation_input(training_issues, fold=fold)
+        resolution_time_gen, priority_gen = get_simulation_input("_".join(project_key), training_issues, fold=fold)
         if resolution_time_gen is None:
             print "Not enough resolution time info! ", project_key
             return
@@ -490,9 +491,8 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, ma
             bug_reporters = issues_for_period['Reported By']
             test_team_size = bug_reporters.nunique()
 
-            if debug:
-                print "Project ", project_key, " Test Period: ", test_period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
-                    " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
+            print "Project ", project_key, " Test Period: ", test_period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
+                " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
 
             if is_valid_period(issues_for_period, resolved_in_period):
                 simulation_time = simulation_days * 24
@@ -561,7 +561,6 @@ def main():
         n_folds = 3
         max_iterations = 100
         simulate_project([project_list], enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
-
 
 
 if __name__ == "__main__":
