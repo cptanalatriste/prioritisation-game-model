@@ -37,8 +37,8 @@ def launch_histogram(data_points, config=None):
     histogram, bin_edges = np.histogram(data_points, bins="auto")
 
     file_name = None
-    print "bin_edges ", bin_edges
 
+    plt.clf()
     if config:
         plt.title(config['title'])
         plt.xlabel(config['xlabel'])
@@ -197,7 +197,7 @@ def exclude_self_fixes(bug_reports):
     :return: Bug reports without self-fixes.
     """
     third_party_resolver_filter = (~bug_reports[RESOLVER_COLUMN].isnull()) & \
-                                  (bug_reports[REPORTER_COLUMN] != bug_reports[RESOLVER_COLUMN])
+                                  (bug_reports[REPORTER_COLUMN] == bug_reports[RESOLVER_COLUMN])
 
     clean_bug_reports = bug_reports[~third_party_resolver_filter]
     return clean_bug_reports

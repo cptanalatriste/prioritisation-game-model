@@ -19,6 +19,7 @@ from sklearn.metrics import median_absolute_error
 import defaultabuse
 import simdata
 import simutils
+import siminput
 
 import winsound
 
@@ -112,6 +113,11 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
                          "results_per_priority": [],
                          "true_resolved": len(resolved_in_month.index)}
 
+    # print "Period: ", year_month, "Issues reported: ", len(issues_for_period.index), " Detail: ", issues_for_period[
+    #     "Issue Key"].values
+    # print "Period: ", year_month, "Issues resolved: ", len(resolved_in_month.index), " Detail: ", resolved_in_month[
+    #     "Issue Key"].values
+
     results = []
     for report in completed_per_reporter:
         total_resolved = 0
@@ -185,7 +191,7 @@ def collect_metrics(true_values, predicted_values):
     return mse, rmse, mar, medar, mmre, bmmre, mdmre
 
 
-def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=True, plot=PLOT):
+def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=False, plot=PLOT):
     """
     Per each tester, it anaysis how close is simulation to real data.
     :param reporters_config: Tester configuration.
@@ -241,7 +247,11 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         reported_true = []
         reported_predicted = []
 
+        periods = []
+
         for simulation_result in simulation_results:
+            periods.append(simulation_result['period'])
+
             priority_resolved_true = [result['true_resolved'] for result in simulation_result['results_per_priority'] if
                                       result['priority'] == priority][0]
             completed_true.append(priority_resolved_true)
@@ -264,6 +274,16 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
 
         mse, rmse, mar, medar, mmre, bmmre, mdmre = collect_metrics(completed_true, completed_predicted)
 
+        priority_dataframe = pd.DataFrame({
+            "completed_true": completed_true,
+            "completed_predicted": completed_predicted,
+            "reported_true": reported_true,
+            "reported_predicted": reported_predicted,
+            "periods": periods
+        })
+
+        priority_dataframe.to_csv("csv/" + "_".join(project_key) + "_Priority_" + str(priority) + ".csv", index=False)
+
         print "Project ", project_key, " Priority ", priority, " RMSE ", rmse, " Mean Squared Error ", mse, \
             " Mean Absolute Error: ", mar, " Median Absolute Error: ", medar, " Mean Magnitude Relative Error ", mmre, \
             " Balanced MMRE ", bmmre, "Median Magnitude Relative Error ", mdmre
@@ -278,7 +298,7 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
                                   "-".join(project_key) + "-Priority " + str(priority), plot)
 
 
-def get_simulation_input(training_issues):
+def get_simulation_input(training_issues, fold=1):
     """
     Extract the simulation paramaters from the training dataset.
     :param training_issues: Training data set.
@@ -290,6 +310,13 @@ def get_simulation_input(training_issues):
 
     print "Resolution times in Training Range: \n", resolution_time_sample.describe()
     resolution_time_gen = None
+
+    simdata.launch_histogram(resolution_time_sample, config={"title": "Resolution Time in Hours",
+                                                             "xlabel": "Resolution Time",
+                                                             "ylabel": "Counts",
+                                                             "file_name": "RESOL_TIME_HIST_FOLD_" + str(fold)})
+    siminput.launch_input_analysis(resolution_time_sample, "RESOL_TIME_" + str(fold), show_data_plot=False)
+
     if len(resolution_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
         resolution_time_gen = simutils.ContinuousEmpiricalDistribution(resolution_time_sample)
 
@@ -396,13 +423,15 @@ def is_valid_period(issues_for_period, resolved_in_period):
     reports_per_month = len(issues_for_period.index)
     issues_resolved = len(resolved_in_period.index)
 
-    fix_ratio = issues_resolved / float(reports_per_month)
+    fix_ratio = 0.0
+    if reports_per_month > 0:
+        issues_resolved / float(reports_per_month)
     threshold = 0.8
 
     return fix_ratio < threshold
 
 
-def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max_iterations=1000):
+def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, max_iterations=1000):
     """
     Launches simulation analysis for an specific project.
     :param project_key: Project identifier.
@@ -419,7 +448,9 @@ def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max
 
     k_fold = KFold(len(period_in_range), n_folds=n_folds)
 
-    for train_index, test_index in k_fold:
+    for fold, (train_index, test_index) in enumerate(k_fold):
+        print "Fold number: ", fold
+
         periods_train, periods_test = period_in_range[train_index], period_in_range[test_index]
 
         continuous_chunks = get_continuous_chunks(periods_train)
@@ -437,7 +468,7 @@ def simulate_project(project_key, enhanced_dataframe, debug=True, n_folds=5, max
         training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
         print "Issues in training after reporter filtering: ", len(training_issues.index)
 
-        resolution_time_gen, priority_gen = get_simulation_input(training_issues)
+        resolution_time_gen, priority_gen = get_simulation_input(training_issues, fold=fold)
         if resolution_time_gen is None:
             print "Not enough resolution time info! ", project_key
             return
@@ -518,12 +549,19 @@ def main():
     # project_lists = [[project] for project in enhanced_dataframe["Project Key"].unique()]
     # project_lists = [["MESOS"]]
 
-    project_lists = [get_valid_projects(enhanced_dataframe)]
+    # project_lists = [get_valid_projects(enhanced_dataframe)]
+    #
+    # for project_list in project_lists:
+    #     n_folds = 3
+    #     max_iterations = 100
+    #     simulate_project(project_list, enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
 
-    for project_list in project_lists:
+
+    for project_list in get_valid_projects(enhanced_dataframe):
         n_folds = 3
         max_iterations = 100
-        simulate_project(project_list, enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
+        simulate_project([project_list], enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
+
 
 
 if __name__ == "__main__":

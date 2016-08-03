@@ -77,7 +77,7 @@ def apply_kolmogorov_smirnov(dist_name, cdf_function, data_series):
         print "Kolmogorov-Smirnov Test for ", dist_name, ": d ", d, " p_value: ", p_value
 
 
-def plot_probability_distribution(dist_name, distribution, data_series, xmin, xmax):
+def fit_probability_distribution(dist_name, distribution, data_series, xmin, xmax):
     """
     Plots and fitted distribution using the maximum likelihood estimation. Also, before that the Kolmogorov-Smirnov test is
     performed.
@@ -123,11 +123,12 @@ def plot_probability_distribution(dist_name, distribution, data_series, xmin, xm
     plt.plot(counts, label=dist_name)
 
 
-def launch_input_analysis(data_series, show_data_plot=True):
+def launch_input_analysis(data_series, desc="default", show_data_plot=True):
     """
     The input analysis includes the following activities: Show data statistics, plot an histogram of the data points,
     fit theoretical distributions, start a ks-test of the fitted distribution, plot the theoretical distributions.
 
+    :param desc: Series description, for file generation analysis.
     :param data_series: Data points.
     :param show_data_plot: True for showing the plot, false otherwise.
     :return: None.
@@ -137,18 +138,22 @@ def launch_input_analysis(data_series, show_data_plot=True):
     xmin = None
     xmax = None
 
+    plt.clf()
     plot_empirical_data(data_series)
-    # plot_probability_distribution("uniform", stats.uniform, data_series, xmin, xmax)
-    # plot_probability_distribution("triang", stats.triang, data_series, xmin, xmax)
-    # plot_probability_distribution("norm", stats.norm, data_series, xmin, xmax)
-    # plot_probability_distribution("gamma", stats.gamma, data_series, xmin, xmax)
-    # plot_probability_distribution("lognorm", stats.lognorm, data_series, xmin, xmax)
-    plot_probability_distribution("expon", stats.expon, data_series, xmin, xmax)
+    fit_probability_distribution("uniform", stats.uniform, data_series, xmin, xmax)
+    fit_probability_distribution("triang", stats.triang, data_series, xmin, xmax)
+    fit_probability_distribution("norm", stats.norm, data_series, xmin, xmax)
+    fit_probability_distribution("gamma", stats.gamma, data_series, xmin, xmax)
+    fit_probability_distribution("lognorm", stats.lognorm, data_series, xmin, xmax)
+    fit_probability_distribution("expon", stats.expon, data_series, xmin, xmax)
+    fit_probability_distribution("powerlaw", stats.powerlaw, data_series, xmin, xmax)
+
+    plt.legend(loc='upper right')
 
     if show_data_plot:
-        # plt.xlim(xmin, xmax)
-        plt.legend(loc='upper right')
         plt.show()
+    else:
+        plt.savefig("img/" + desc + ".png")
 
 
 def get_discrete_distribution(data_series):
