@@ -24,10 +24,11 @@ class TestingContext:
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, resolution_time_gen, priority_gen, bug_level, default_review_time, throttling):
+    def __init__(self, resolution_time_gen, priority_gen, bug_level, default_review_time, throttling, devtime_level):
         self.resolution_time_gen = resolution_time_gen
         self.priority_gen = priority_gen
         self.bug_level = bug_level
+        self.devtime_level = devtime_level
         self.default_review_time = default_review_time
         self.throttling = throttling
 
@@ -38,12 +39,12 @@ class TestingContext:
                                   simdata.SEVERE_PRIORITY: {'completed': Monitor(),
                                                             'reported': 0}}
 
-    def get_fix_effort(self):
+    def get_fix_effort(self, report_priority):
         """
         Return the time required for a bug to be fixed.
         :return: Effort required to fix a bug.
         """
-        return self.resolution_time_gen.generate()
+        return self.resolution_time_gen[int(report_priority)].generate().item()
 
     def get_priority(self):
         """
@@ -94,16 +95,19 @@ class BugReportSource(Process):
         :param developer_resource: The Development Team resource.
         :return: None
         """
+        interarrival_time = self.get_interarrival_time()
+        yield hold, self, interarrival_time
+
         bug_level = self.testing_context.bug_level
 
         batch_size = self.get_batch_size()
         while bug_level.amount >= batch_size:
             yield get, self, bug_level, batch_size
 
-            for _ in range(batch_size):
-                report_key = "Report-" + str(bug_level.amount)
+            for index in range(batch_size):
+                report_key = self.name + "-batch-" + str(bug_level.amount) + "-bug" + str(index)
                 real_priority, report_priority = self.get_report_priority()
-                fix_effort = self.testing_context.get_fix_effort()
+                fix_effort = self.testing_context.get_fix_effort(real_priority)
                 review_time = self.testing_context.get_review_time()
                 throttling = self.testing_context.throttling
 
@@ -119,10 +123,13 @@ class BugReportSource(Process):
                                        throttling=throttling)
 
                 reported_priority_monitor = self.testing_context.priority_monitors[report_priority]['completed']
+
+                devtime_level = self.testing_context.devtime_level
                 activate(bug_report,
                          bug_report.arrive(developer_resource=developer_resource,
                                            gatekeeper_resource=gatekeeper_resource,
-                                           resolution_monitors=[reporter_monitor, reported_priority_monitor]))
+                                           resolution_monitors=[reporter_monitor, reported_priority_monitor],
+                                           devtime_level=devtime_level))
 
                 self.priority_counters[real_priority] += 1
 
@@ -176,7 +183,7 @@ class BugReport(Process):
         self.review_time = review_time
         self.throttling = throttling
 
-    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, debug=False):
+    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, devtime_level, debug=False):
         """
         The Process Execution Method for the Bug Reported process.
         :return:
@@ -185,8 +192,8 @@ class BugReport(Process):
 
         if debug:
             pending_bugs = len(developer_resource.waitQ)
-            print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Priority: ", self.priority, \
-                "Pending bugs: ", pending_bugs
+            print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Reported Priority: ", \
+                self.report_priority, "Pending bugs: ", pending_bugs
 
         if gatekeeper_resource:
             # print "Requesting gatekeeper ", now(), "priority ", self.reporter.reporter_reputation
@@ -209,19 +216,32 @@ class BugReport(Process):
         if debug:
             print now(), ": Report ", self.name, " ready for fixing. "
 
-        yield hold, self, self.fix_effort
-        yield release, self, developer_resource
+        if devtime_level.amount <= 0:
+            if debug:
+                print "No more developer time available."
 
-        resol_time = now() - arrival_time
+            yield release, self, developer_resource
+        elif self.fix_effort <= devtime_level.amount:
+            yield get, self, devtime_level, self.fix_effort
+            yield hold, self, self.fix_effort
+            yield release, self, developer_resource
 
-        for monitor in resolution_monitors:
-            monitor.observe(resol_time)
+            resol_time = now() - arrival_time
 
-        if debug:
-            print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting."
+            for monitor in resolution_monitors:
+                monitor.observe(resol_time)
+
+            if debug:
+                print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting. Fix effort: ", \
+                    self.fix_effort, " Available Dev Time: ", devtime_level.amount
+        else:
+            # yield get, self, devtime_level, devtime_level.amount
+            # yield hold, self, devtime_level.amount
+            yield release, self, developer_resource
 
 
 def run_model(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen, max_time,
+              dev_team_bandwith,
               gatekeeper_config=False):
     """
     Triggers the simulation, according to the provided parameters.
@@ -253,11 +273,12 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
     bug_level = Level(capacity=sys.maxint, initialBuffered=report_number, monitored=True)
+    devtime_level = Level(capacity=sys.maxint, initialBuffered=dev_team_bandwith, monitored=True)
 
     initialize()
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen,
                                      bug_level=bug_level, default_review_time=default_review_time,
-                                     throttling=throttling)
+                                     throttling=throttling, devtime_level=devtime_level)
 
     reporter_monitors = {}
     for reporter_config in reporters_config:

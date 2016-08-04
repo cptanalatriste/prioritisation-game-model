@@ -304,29 +304,37 @@ def get_simulation_input(project_key="", training_issues=None, fold=1):
     :param training_issues: Training data set.
     :return: Variate generator for resolution times, priorities and reporter inter-arrival time.
     """
-    resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False,
-                                              only_valid_resolution=False)
-    resolution_time_sample = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
-
-    print "Resolution times in Training Range: \n", resolution_time_sample.describe()
-    resolution_time_gen = None
-
-    simdata.launch_histogram(resolution_time_sample, config={"title": "Resolution Time in Hours",
-                                                             "xlabel": "Resolution Time",
-                                                             "ylabel": "Counts",
-                                                             "file_name": project_key + "_RESOL_TIME_HIST_FOLD_" + str(
-                                                                 fold)})
-    siminput.launch_input_analysis(resolution_time_sample, "RESOL_TIME_" + str(fold), show_data_plot=False)
-
-    if len(resolution_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
-        resolution_time_gen = simutils.ContinuousEmpiricalDistribution(resolution_time_sample)
 
     priority_sample = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
     print "Simplified Priorities in Training Range: \n ", priority_sample.value_counts()
 
     priority_gen = simutils.DiscreteEmpiricalDistribution(observations=priority_sample)
 
-    return resolution_time_gen, priority_gen
+    resolution_per_priority = {}
+    all_resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False,
+                                                  only_valid_resolution=False)
+    for priority in priority_sample.unique():
+        if not np.isnan(priority):
+            priority_resolved = all_resolved_issues[all_resolved_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+            resolution_time_sample = priority_resolved[simdata.RESOLUTION_TIME_COLUMN].dropna()
+
+            print "Resolution times in Training Range for Priority", priority, ": \n"
+            resolution_time_sample.describe()
+            resolution_time_gen = None
+
+            simdata.launch_histogram(resolution_time_sample, config={"title": "Resolution Time in Hours",
+                                                                     "xlabel": "Resolution Time",
+                                                                     "ylabel": "Counts",
+                                                                     "file_name": "Priority_" + str(
+                                                                         priority) + "_" + project_key + "_RESOL_TIME_HIST_FOLD_" + str(
+                                                                         fold) + ".png"})
+            siminput.launch_input_analysis(resolution_time_sample, "RESOL_TIME_" + str(fold), show_data_plot=False)
+
+            if len(resolution_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
+                resolution_time_gen = simutils.ContinuousEmpiricalDistribution(resolution_time_sample)
+                resolution_per_priority[priority] = resolution_time_gen
+
+    return resolution_per_priority, priority_gen
 
 
 def get_valid_reports(project_keys, enhanced_dataframe):
@@ -409,8 +417,9 @@ def get_dev_team_production(test_period, issues_for_period, simulation_days):
     bug_resolvers = resolved_in_period['JIRA Resolved By']
     dev_team_size = bug_resolvers.nunique()
     issues_resolved = len(resolved_in_period.index)
+    dev_team_bandwith = resolved_in_period[simdata.RESOLUTION_TIME_COLUMN].sum()
 
-    return dev_team_size, issues_resolved, resolved_in_period
+    return dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith
 
 
 def is_valid_period(issues_for_period, resolved_in_period):
@@ -430,6 +439,92 @@ def is_valid_period(issues_for_period, resolved_in_period):
     threshold = 0.8
 
     return fix_ratio < threshold
+
+
+def train_test_simulation(project_key, issues_in_range, max_iterations, periods_train, periods_test, fold=0,
+                          debug=False):
+    """
+
+    Train the simulation model on a dataset and test it in another dataset.
+
+    :param fold: Identifier of the train-test period.
+    :param max_iterations: Iterations for the simulation.
+    :param issues_in_range: Bug report dataframe.
+    :param project_key:List of projects key.
+    :param periods_train:Periods for training.
+    :param periods_test: Periods for testing.
+    :return: Consolidated simulation results.
+    """
+
+    simulation_results = []
+
+    continuous_chunks = get_continuous_chunks(periods_train)
+    max_chunk = max(continuous_chunks, key=len)
+
+    training_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_train)]
+    print "Issues in training: ", len(training_issues.index)
+
+    reporters_config = get_reporters_configuration(max_chunk, training_issues)
+    print "Number of reporters after drive-by filtering: ", len(reporters_config)
+
+    simutils.assign_strategies(reporters_config, training_issues)
+
+    engaged_testers = [reporter_config['name'] for reporter_config in reporters_config]
+    training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
+    print "Issues in training after reporter filtering: ", len(training_issues.index)
+
+    resolution_time_gen, priority_gen = get_simulation_input("_".join(project_key), training_issues, fold=fold)
+    if resolution_time_gen is None:
+        print "Not enough resolution time info! ", project_key
+        return
+
+    test_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_test)]
+    print "Issues in test: ", len(test_issues.index)
+    test_issues = simdata.filter_by_reporter(test_issues, engaged_testers)
+    print "Issues in test after reporter filtering: ", len(test_issues.index)
+
+    for test_period in periods_test:
+        issues_for_period = test_issues[test_issues[simdata.PERIOD_COLUMN] == test_period]
+
+        simulation_days = 30
+        reports_per_month = len(issues_for_period.index)
+
+        dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(test_period,
+                                                                                                        issues_for_period,
+                                                                                                        simulation_days)
+
+        bug_reporters = issues_for_period['Reported By']
+        test_team_size = bug_reporters.nunique()
+
+        print "Project ", project_key, " Test Period: ", test_period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
+            " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
+
+        if is_valid_period(issues_for_period, resolved_in_period):
+            simulation_time = simulation_days * 24
+
+            completed_per_reporter, completed_per_priority, _, _, reports_per_priority = simutils.launch_simulation(
+                team_capacity=dev_team_size,
+                report_number=reports_per_month,
+                reporters_config=reporters_config,
+                resolution_time_gen=resolution_time_gen,
+                priority_gen=priority_gen,
+                max_time=simulation_time,
+                max_iterations=max_iterations,
+                dev_team_bandwith=dev_team_bandwith)
+
+            simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
+                                                    reporters_config,
+                                                    completed_per_reporter, completed_per_priority,
+                                                    reports_per_priority)
+
+            if debug:
+                print "simulation_result ", simulation_result
+
+            simulation_results.append(simulation_result)
+        else:
+            print "PERIOD EXCLUDED!!! "
+
+    return simulation_results
 
 
 def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, max_iterations=1000):
@@ -454,69 +549,9 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, ma
 
         periods_train, periods_test = period_in_range[train_index], period_in_range[test_index]
 
-        continuous_chunks = get_continuous_chunks(periods_train)
-        max_chunk = max(continuous_chunks, key=len)
-
-        training_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_train)]
-        print "Issues in training: ", len(training_issues.index)
-
-        reporters_config = get_reporters_configuration(max_chunk, training_issues)
-        print "Number of reporters after drive-by filtering: ", len(reporters_config)
-
-        simutils.assign_strategies(reporters_config, training_issues)
-
-        engaged_testers = [reporter_config['name'] for reporter_config in reporters_config]
-        training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
-        print "Issues in training after reporter filtering: ", len(training_issues.index)
-
-        resolution_time_gen, priority_gen = get_simulation_input("_".join(project_key), training_issues, fold=fold)
-        if resolution_time_gen is None:
-            print "Not enough resolution time info! ", project_key
-            return
-
-        test_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_test)]
-        print "Issues in test: ", len(test_issues.index)
-        test_issues = simdata.filter_by_reporter(test_issues, engaged_testers)
-        print "Issues in test after reporter filtering: ", len(test_issues.index)
-
-        for test_period in periods_test:
-            issues_for_period = test_issues[test_issues[simdata.PERIOD_COLUMN] == test_period]
-
-            simulation_days = 30
-            reports_per_month = len(issues_for_period.index)
-
-            dev_team_size, issues_resolved, resolved_in_period = get_dev_team_production(test_period, issues_for_period,
-                                                                                         simulation_days)
-
-            bug_reporters = issues_for_period['Reported By']
-            test_team_size = bug_reporters.nunique()
-
-            print "Project ", project_key, " Test Period: ", test_period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
-                " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved
-
-            if is_valid_period(issues_for_period, resolved_in_period):
-                simulation_time = simulation_days * 24
-
-                completed_per_reporter, completed_per_priority, _, _, reports_per_priority = simutils.launch_simulation(
-                    team_capacity=dev_team_size,
-                    report_number=reports_per_month,
-                    reporters_config=reporters_config,
-                    resolution_time_gen=resolution_time_gen,
-                    priority_gen=priority_gen,
-                    max_time=simulation_time,
-                    max_iterations=max_iterations)
-
-                simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
-                                                        reporters_config,
-                                                        completed_per_reporter, completed_per_priority,
-                                                        reports_per_priority)
-
-                if debug:
-                    print "simulation_result ", simulation_result
-
-                simulation_results.append(simulation_result)
-            else:
-                print "PERIOD EXCLUDED!!! "
+        fold_results = train_test_simulation(project_key, issues_in_range, max_iterations, periods_train, periods_test,
+                                             fold=fold)
+        simulation_results.extend(fold_results)
 
     if len(simulation_results) > 0:
         analyse_results(reporters_config=None, simulation_results=simulation_results, project_key=project_key)
@@ -548,19 +583,19 @@ def main():
     # project_lists = [enhanced_dataframe["Project Key"].unique()]
     # project_lists = [[project] for project in enhanced_dataframe["Project Key"].unique()]
     # project_lists = [["MESOS"]]
-
-    # project_lists = [get_valid_projects(enhanced_dataframe)]
     #
-    # for project_list in project_lists:
-    #     n_folds = 3
-    #     max_iterations = 100
-    #     simulate_project(project_list, enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
+    project_lists = [get_valid_projects(enhanced_dataframe)]
 
-
-    for project_list in get_valid_projects(enhanced_dataframe):
+    for project_list in project_lists:
         n_folds = 3
         max_iterations = 100
-        simulate_project([project_list], enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
+        simulate_project(project_list, enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
+
+
+        # for project_list in get_valid_projects(enhanced_dataframe):
+        #     n_folds = 3
+        #     max_iterations = 100
+        #     simulate_project([project_list], enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
 
 
 if __name__ == "__main__":
