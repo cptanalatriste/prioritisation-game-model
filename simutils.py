@@ -4,6 +4,7 @@ Utility types for supporting the simulation.
 from collections import defaultdict
 
 import numpy as np
+import sys
 
 import pandas as pd
 
@@ -100,7 +101,7 @@ class DiscreteEmpiricalDistribution:
         return defaultdict(float, probability_map)
 
 
-def remove_drive_in_testers(reporters_config, range_in_std=2):
+def remove_drive_in_testers(reporters_config, min_reports):
     """
     Removes drive-in testers, defined as the testers who's mean interrival time is larger than range_in_std standard deviations of the
     overall average interarrival times.
@@ -113,14 +114,13 @@ def remove_drive_in_testers(reporters_config, range_in_std=2):
 
     overall_mean = np.mean(reporter_metrics)
     overall_std = np.std(reporter_metrics)
+    overall_max = np.max(reporter_metrics)
+    overall_min = np.min(reporter_metrics)
 
-    # engaged_testers = [config for config in reporters_config if
-    #                    abs(overall_mean - np.mean(
-    #                        config['interarrival_time_gen'].observations)) < range_in_std * overall_std]
+    print "remove_drive_in_testers->min_reports ", min_reports, "overall_mean ", overall_mean, "overall_std ", overall_std, "overall_max", overall_max, "overall_min", overall_min
 
     engaged_testers = [config for config in reporters_config if
-                       abs(overall_mean - len(
-                           config['interarrival_time_gen'].observations)) < range_in_std * overall_std]
+                       len(config['interarrival_time_gen'].observations) >= min_reports]
 
     return engaged_testers
 
@@ -236,7 +236,7 @@ def median_magnitude_relative_error(total_completed, total_predicted):
          for estimate, actual in zip(total_completed, total_predicted)])
 
 
-def plot_correlation(total_predicted, total_completed, title, plot):
+def plot_correlation(total_predicted, total_completed, title, figtext, plot):
     """
     A scatter plot for seeing how correlation goes.
     :param total_predicted: List of predicted values.
@@ -250,6 +250,9 @@ def plot_correlation(total_predicted, total_completed, title, plot):
     plt.xlabel("Predicted Resolved")
     plt.ylabel("Actual Resolved")
     plt.plot([min(total_completed), max(total_completed)], [[min(total_completed)], [max(total_completed)]])
+    plt.text(0.5, 0.5, figtext,
+             horizontalalignment='center',
+             verticalalignment='center')
 
     if plot:
         plt.show()
@@ -258,7 +261,7 @@ def plot_correlation(total_predicted, total_completed, title, plot):
 
 
 def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen,
-                      max_time, max_iterations, dev_team_bandwith, gatekeeper_config=False):
+                      max_time, max_iterations, dev_team_bandwith=sys.maxint, gatekeeper_config=False):
     """
     Triggers the simulation according a given configuration.
 
@@ -350,3 +353,5 @@ def collect_and_print(project_key, description, total_completed, total_predicted
         total_predicted), " datapoints ->  Root Mean Squared Error (RMSE):", rmse, " Mean Squared Error (MSE): ", mse, " Mean Absolute Error (MAE): ", \
         mar, " Median Absolute Error (MdAE): ", medar, " Mean Magnitude Relative Error (MMRE): ", mmre, " Balanced MMRE :", \
         bmmre, "Median Magnitude Relative Error (MdMRE): ", mdmre
+
+    return mmre, mdmre

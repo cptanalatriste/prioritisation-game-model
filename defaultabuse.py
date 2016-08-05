@@ -35,7 +35,10 @@ def get_default_usage_data(enhanced_dataframe):
         total_reports = len(valid_reports.index)
         non_default_reports = valid_reports[valid_reports['Priority'] != "Major"]
         total_non_default = len(non_default_reports.index)
-        non_default_ratio = float(total_non_default) / total_reports
+
+        non_default_ratio = None
+        if total_reports > 0:
+            non_default_ratio = float(total_non_default) / total_reports
 
         project_dist.append({'project_key': project_key,
                              'total_reports': total_reports,

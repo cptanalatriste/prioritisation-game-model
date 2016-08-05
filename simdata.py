@@ -63,7 +63,6 @@ def get_resolution_time(report_series):
     :return: Fix effort in days.
     """
 
-    # first_contact_str = report_series['JIRA Resolver In Progress']
     first_contact_str = report_series['Creation Date']
     resolution_date_str = report_series['JIRA Resolved Date']
 
@@ -228,6 +227,7 @@ def filter_by_project(bug_reports, project_keys):
     :param project_key: Project key.
     :return: Bug reports for the project.
     """
+
     project_filter = bug_reports['Project Key'].isin(project_keys)
     project_bug_reports = bug_reports[project_filter]
     return project_bug_reports

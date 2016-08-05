@@ -4,6 +4,7 @@ This modules triggers the bug report simulation.
 import time
 import datetime
 import pytz
+import sys
 
 from scipy import stats
 import numpy as np
@@ -86,7 +87,7 @@ def get_reporters_configuration(max_chunk, training_dataset, debug=False):
             if debug:
                 print "Reporters ", reporter_list, " could not be added. Possible because insufficient samples."
 
-    reporters_config = simutils.remove_drive_in_testers(reporters_config)
+    reporters_config = simutils.remove_drive_in_testers(reporters_config, min_reports=10)
     return reporters_config
 
 
@@ -207,8 +208,9 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         print "total_completed ", total_completed
         print "total_predicted ", total_predicted
 
-    simutils.collect_and_print(project_key, "Total bugs resolved", total_completed, total_predicted)
-    simutils.plot_correlation(total_predicted, total_completed, "_".join(project_key) + "-Total Resolved", plot)
+    mmre, mdmre = simutils.collect_and_print(project_key, "Total bugs resolved", total_completed, total_predicted)
+    simutils.plot_correlation(total_predicted, total_completed, "_".join(project_key) + "-Total Resolved",
+                              "MMRE: " + "{0:0.1f}".format(mmre) + " MdMRE: " + "{0:0.1f}".format(mdmre), plot)
 
     for priority in [simdata.NON_SEVERE_PRIORITY, simdata.SEVERE_PRIORITY, simdata.NORMAL_PRIORITY]:
         completed_true = []
@@ -242,7 +244,8 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
                  result['priority'] == priority][0]
             reported_predicted.append(priority_reported_predicted)
 
-        simutils.collect_and_print(project_key, "Priority " + str(priority), completed_true, completed_predicted)
+        mmre, mdmre = simutils.collect_and_print(project_key, "Priority " + str(priority), completed_true,
+                                                 completed_predicted)
 
         priority_dataframe = pd.DataFrame({
             "completed_true": completed_true,
@@ -261,7 +264,8 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
             print " reported_predicted ", reported_predicted
 
         simutils.plot_correlation(completed_predicted, completed_true,
-                                  "-".join(project_key) + "-Priority " + str(priority), plot)
+                                  "-".join(project_key) + "-Priority " + str(priority),
+                                  "MMRE: " + "{0:0.1f}".format(mmre) + " MdMRE: " + "{0:0.1f}".format(mdmre), plot)
 
 
 def get_simulation_input(project_key="", training_issues=None, fold=1):
@@ -478,8 +482,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, periods_
                 resolution_time_gen=resolution_time_gen,
                 priority_gen=priority_gen,
                 max_time=simulation_time,
-                max_iterations=max_iterations,
-                dev_team_bandwith=dev_team_bandwith)
+                max_iterations=max_iterations)
 
             simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
                                                     reporters_config,
@@ -563,23 +566,16 @@ def main():
 
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
-    project_lists = [["CLOUDSTACK", "OFBIZ", "CASSANDRA", "MAHOUT", "SPARK", "ISIS"]]
-    # project_lists = [enhanced_dataframe["Project Key"].unique()]
-    # project_lists = [[project] for project in enhanced_dataframe["Project Key"].unique()]
-    # project_lists = [["MESOS"]]
-    #
-    project_lists = [get_valid_projects(enhanced_dataframe)]
+    valid_projects = get_valid_projects(enhanced_dataframe)
 
-    for project_list in project_lists:
+    n_folds = 1
+    max_iterations = 100
+    simulate_project(valid_projects, enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
+
+    for project in valid_projects:
         n_folds = 1
         max_iterations = 100
-        simulate_project(project_list, enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
-
-
-        # for project_list in get_valid_projects(enhanced_dataframe):
-        #     n_folds = 1
-        #     max_iterations = 100
-        #     simulate_project([project_list], enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
+        simulate_project([project], enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
 
 
 if __name__ == "__main__":
