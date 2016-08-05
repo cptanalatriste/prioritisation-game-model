@@ -10,11 +10,8 @@ import numpy as np
 
 import pandas as pd
 
+from sklearn.cross_validation import train_test_split
 from sklearn.cross_validation import KFold
-
-from sklearn.metrics import mean_absolute_error
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import median_absolute_error
 
 import defaultabuse
 import simdata
@@ -172,25 +169,6 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     return simulation_result
 
 
-def collect_metrics(true_values, predicted_values):
-    """
-    Returns a list of regression quality metrics.
-    :param true_values: The list containing the true values.
-    :param predicted_values:  The list containing the predicted values.
-    :return: List of metrics.
-    """
-
-    mse = mean_squared_error(true_values, predicted_values)
-    rmse = np.sqrt(mse)
-    mar = mean_absolute_error(true_values, predicted_values)
-    medar = median_absolute_error(true_values, predicted_values)
-    mmre = simutils.mean_magnitude_relative_error(true_values, predicted_values, balanced=False)
-    bmmre = simutils.mean_magnitude_relative_error(true_values, predicted_values, balanced=True)
-    mdmre = simutils.median_magnitude_relative_error(true_values, predicted_values)
-
-    return mse, rmse, mar, medar, mmre, bmmre, mdmre
-
-
 def analyse_results(reporters_config=None, simulation_results=None, project_key=None, debug=False, plot=PLOT):
     """
     Per each tester, it anaysis how close is simulation to real data.
@@ -220,12 +198,7 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
                     print "period: ", simulation_result[
                         "period"], " reporter ", reporter_name, " predicted ", reporter_predicted, " true ", reporter_true
 
-            mse = mean_squared_error(completed_true, completed_predicted)
-            rmse = np.sqrt(mse)
-            msa = mean_absolute_error(completed_true, completed_predicted)
-
-            print "Project ", project_key, " Tester ", reporter_name, " RMSE ", rmse, \
-                " Mean Squared Error ", mse, " Mean Absolute Error ", msa
+            simutils.collect_and_print(project_key, "Tester " + reporter_name, completed_true, completed_predicted)
 
     total_completed = [result['true_resolved'] for result in simulation_results]
     total_predicted = [result['predicted_resolved'] for result in simulation_results]
@@ -234,10 +207,7 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         print "total_completed ", total_completed
         print "total_predicted ", total_predicted
 
-    mse, rmse, mar, medar, mmre, bmmre, mdmre = collect_metrics(total_completed, total_predicted)
-    print "RMSE for total bug resolved in Project ", project_key, ": ", rmse, " Mean Squared Error ", mse, " Mean Absolute Error: ", \
-        mar, " Median Absolute Error: ", medar, " Mean Magnitude Relative Error ", mmre, " Balanced MMRE ", bmmre, "Median Magnitude Relative Error ", mdmre
-
+    simutils.collect_and_print(project_key, "Total bugs resolved", total_completed, total_predicted)
     simutils.plot_correlation(total_predicted, total_completed, "_".join(project_key) + "-Total Resolved", plot)
 
     for priority in [simdata.NON_SEVERE_PRIORITY, simdata.SEVERE_PRIORITY, simdata.NORMAL_PRIORITY]:
@@ -272,7 +242,7 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
                  result['priority'] == priority][0]
             reported_predicted.append(priority_reported_predicted)
 
-        mse, rmse, mar, medar, mmre, bmmre, mdmre = collect_metrics(completed_true, completed_predicted)
+        simutils.collect_and_print(project_key, "Priority " + str(priority), completed_true, completed_predicted)
 
         priority_dataframe = pd.DataFrame({
             "completed_true": completed_true,
@@ -283,10 +253,6 @@ def analyse_results(reporters_config=None, simulation_results=None, project_key=
         })
 
         priority_dataframe.to_csv("csv/" + "_".join(project_key) + "_Priority_" + str(priority) + ".csv", index=False)
-
-        print "Project ", project_key, " Priority ", priority, " RMSE ", rmse, " Mean Squared Error ", mse, \
-            " Mean Absolute Error: ", mar, " Median Absolute Error: ", medar, " Mean Magnitude Relative Error ", mmre, \
-            " Balanced MMRE ", bmmre, "Median Magnitude Relative Error ", mdmre
 
         if debug:
             print " completed_true ", completed_true
@@ -458,8 +424,11 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, periods_
 
     simulation_results = []
 
-    continuous_chunks = get_continuous_chunks(periods_train)
-    max_chunk = max(continuous_chunks, key=len)
+    if fold is None:
+        max_chunk = periods_train
+    else:
+        continuous_chunks = get_continuous_chunks(periods_train)
+        max_chunk = max(continuous_chunks, key=len)
 
     training_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_train)]
     print "Issues in training: ", len(training_issues.index)
@@ -542,16 +511,31 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, ma
 
     simulation_results = []
 
-    k_fold = KFold(len(period_in_range), n_folds=n_folds)
+    if n_folds == 1:
+        test_size = 0.33
+        train_size = 1 - test_size
+        split_point = int(len(period_in_range) * train_size)
 
-    for fold, (train_index, test_index) in enumerate(k_fold):
-        print "Fold number: ", fold
+        periods_train = period_in_range[:split_point]
+        periods_test = period_in_range[split_point:]
 
-        periods_train, periods_test = period_in_range[train_index], period_in_range[test_index]
-
-        fold_results = train_test_simulation(project_key, issues_in_range, max_iterations, periods_train, periods_test,
-                                             fold=fold)
+        # periods_train, periods_test = train_test_split(period_in_range, test_size=0.33)
+        fold_results = train_test_simulation(project_key, issues_in_range, max_iterations, periods_train,
+                                             periods_test,
+                                             fold=None)
         simulation_results.extend(fold_results)
+    else:
+        k_fold = KFold(len(period_in_range), n_folds=n_folds)
+
+        for fold, (train_index, test_index) in enumerate(k_fold):
+            print "Fold number: ", fold
+
+            periods_train, periods_test = period_in_range[train_index], period_in_range[test_index]
+
+            fold_results = train_test_simulation(project_key, issues_in_range, max_iterations, periods_train,
+                                                 periods_test,
+                                                 fold=fold)
+            simulation_results.extend(fold_results)
 
     if len(simulation_results) > 0:
         analyse_results(reporters_config=None, simulation_results=simulation_results, project_key=project_key)
@@ -587,13 +571,13 @@ def main():
     project_lists = [get_valid_projects(enhanced_dataframe)]
 
     for project_list in project_lists:
-        n_folds = 3
+        n_folds = 1
         max_iterations = 100
         simulate_project(project_list, enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
 
 
         # for project_list in get_valid_projects(enhanced_dataframe):
-        #     n_folds = 3
+        #     n_folds = 1
         #     max_iterations = 100
         #     simulate_project([project_list], enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
 

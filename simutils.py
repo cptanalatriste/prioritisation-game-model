@@ -10,8 +10,12 @@ import pandas as pd
 from scipy.stats import uniform
 from scipy.stats import rv_discrete
 
-from sklearn.preprocessing import StandardScaler
+# from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
+
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import median_absolute_error
 
 import matplotlib.pyplot as plt
 
@@ -309,3 +313,40 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
         reports_per_reporter.append(reported_per_reporter)
 
     return completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, reported_per_priotity
+
+
+def collect_metrics(true_values, predicted_values):
+    """
+    Returns a list of regression quality metrics.
+    :param true_values: The list containing the true values.
+    :param predicted_values:  The list containing the predicted values.
+    :return: List of metrics.
+    """
+
+    mse = mean_squared_error(true_values, predicted_values)
+    rmse = np.sqrt(mse)
+    mar = mean_absolute_error(true_values, predicted_values)
+    medar = median_absolute_error(true_values, predicted_values)
+    mmre = mean_magnitude_relative_error(true_values, predicted_values, balanced=False)
+    bmmre = mean_magnitude_relative_error(true_values, predicted_values, balanced=True)
+    mdmre = median_magnitude_relative_error(true_values, predicted_values)
+
+    return mse, rmse, mar, medar, mmre, bmmre, mdmre
+
+
+def collect_and_print(project_key, description, total_completed, total_predicted):
+    """
+    Calls the collect metrics and prints the results.
+    :param project_key:
+    :param description:
+    :param total_completed:
+    :param total_predicted:
+    :return:
+    """
+
+    mse, rmse, mar, medar, mmre, bmmre, mdmre = collect_metrics(total_completed, total_predicted)
+
+    print  description, " in Project ", project_key, " on ", len(
+        total_predicted), " datapoints ->  Root Mean Squared Error (RMSE):", rmse, " Mean Squared Error (MSE): ", mse, " Mean Absolute Error (MAE): ", \
+        mar, " Median Absolute Error (MdAE): ", medar, " Mean Magnitude Relative Error (MMRE): ", mmre, " Balanced MMRE :", \
+        bmmre, "Median Magnitude Relative Error (MdMRE): ", mdmre
