@@ -44,7 +44,14 @@ class TestingContext:
         Return the time required for a bug to be fixed.
         :return: Effort required to fix a bug.
         """
-        return self.resolution_time_gen[int(report_priority)].generate().item()
+
+        generator = self.resolution_time_gen[int(report_priority)]
+
+        fix_effort = 0.0
+        if generator is not None:
+            fix_effort = generator.generate().item()
+
+        return fix_effort
 
     def get_priority(self):
         """

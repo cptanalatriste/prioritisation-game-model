@@ -24,6 +24,8 @@ import winsound
 DEBUG = False
 PLOT = False
 
+from collections import defaultdict
+
 
 def get_reporters_configuration(max_chunk, training_dataset, debug=False):
     """
@@ -280,7 +282,7 @@ def get_simulation_input(project_key="", training_issues=None, fold=1):
 
     priority_gen = simutils.DiscreteEmpiricalDistribution(observations=priority_sample)
 
-    resolution_per_priority = {}
+    resolution_per_priority = defaultdict(lambda: None)
     all_resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False,
                                                   only_valid_resolution=False)
     for priority in priority_sample.unique():
@@ -499,7 +501,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, periods_
     return simulation_results
 
 
-def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, max_iterations=1000):
+def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, test_size=None, max_iterations=1000):
     """
     Launches simulation analysis for an specific project.
     :param project_key: Project identifier.
@@ -514,8 +516,8 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, ma
 
     simulation_results = []
 
-    if n_folds == 1:
-        test_size = 0.33
+    if test_size is not None:
+
         train_size = 1 - test_size
         split_point = int(len(period_in_range) * train_size)
 
@@ -568,14 +570,14 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
     valid_projects = get_valid_projects(enhanced_dataframe)
 
-    n_folds = 1
     max_iterations = 100
-    simulate_project(valid_projects, enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
+    for test_size in [.4, .3, .2]:
+        simulate_project(valid_projects, enhanced_dataframe, test_size=test_size, max_iterations=max_iterations)
 
-    for project in valid_projects:
-        n_folds = 1
-        max_iterations = 100
-        simulate_project([project], enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
+        # n_folds = 1
+
+        # for project in valid_projects:
+        #     simulate_project([project], enhanced_dataframe, n_folds=n_folds, max_iterations=max_iterations)
 
 
 if __name__ == "__main__":
