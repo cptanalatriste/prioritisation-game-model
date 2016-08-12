@@ -186,7 +186,9 @@ def main(file_prefix, strategy_map, enhanced_dataframe, project_keys):
 
     valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
     periods = valid_reports[simdata.PERIOD_COLUMN].unique()
-    reporter_configuration = simdriver.get_reporters_configuration(periods, valid_reports)
+    reporter_configuration = simdriver.get_reporter_configuration(periods, valid_reports)
+    simdriver.fit_reporter_distributions(reporter_configuration)
+
     random.shuffle(reporter_configuration)
 
     split_point = len(reporter_configuration) / 2

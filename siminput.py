@@ -37,7 +37,7 @@ def plot_empirical_data(data_series):
     plt.xlim(min(bin_edges), max(bin_edges))
 
 
-def apply_anderson_darling(dist_name, data_series):
+def apply_anderson_darling(dist_name, data_series, debug=False):
     """
     Applies the Anderson-Darling Test for Goodness-of-Fit
 
@@ -51,14 +51,17 @@ def apply_anderson_darling(dist_name, data_series):
     if dist_name in ["norm", "expon"]:
         # According to Ivezic Anderson-Darling is better for normal. Also, scipy says this works for exponential too.
         statistic, critical_values, significance_level = stats.anderson(data_series, dist_name)
-        print "Anderson-Darling Test for ", dist_name, ": statistic ", statistic
-        for critical_value, significance_level in zip(critical_values, significance_level):
-            print "Critical Value: ", critical_value, " Significance Level: ", significance_level
+
+        if debug:
+            print "Anderson-Darling Test for ", dist_name, ": statistic ", statistic
+            for critical_value, significance_level in zip(critical_values, significance_level):
+                print "Critical Value: ", critical_value, " Significance Level: ", significance_level
     else:
-        print "Anderson-Darling is not suitable for ", dist_name
+        if debug:
+            print "Anderson-Darling is not suitable for ", dist_name
 
 
-def apply_kolmogorov_smirnov(dist_name, cdf_function, data_series):
+def apply_kolmogorov_smirnov(dist_name, cdf_function, data_series, debug=False):
     """
     Applies the Kolmogorov-Smirnov Test for Goodness-of-Fit.
 
@@ -74,10 +77,14 @@ def apply_kolmogorov_smirnov(dist_name, cdf_function, data_series):
         # if dist_name not in ["norm", "expon"]:
         # According to Ivezic, Kolmogorv-Smirnov is a poor choice for those distributions.
         d, p_value = stats.kstest(data_series, cdf_function)
-        print "Kolmogorov-Smirnov Test for ", dist_name, ": d ", d, " p_value: ", p_value
+
+        if debug:
+            print "Kolmogorov-Smirnov Test for ", dist_name, ": d ", d, " p_value: ", p_value
+
+    return p_value
 
 
-def fit_probability_distribution(dist_name, distribution, data_series, xmin, xmax):
+def fit_probability_distribution(dist_name, distribution, data_series, xmin, xmax, debug=False):
     """
     Plots and fitted distribution using the maximum likelihood estimation. Also, before that the Kolmogorov-Smirnov test is
     performed.
@@ -92,7 +99,8 @@ def fit_probability_distribution(dist_name, distribution, data_series, xmin, xma
 
     # Distribution fitting through maximum likelihood estimation.
     parameter_tuple = distribution.fit(data_series)
-    print "Fitted distribution params for ", dist_name, ": ", parameter_tuple
+    if debug:
+        print "Fitted distribution params for ", dist_name, ": ", parameter_tuple
 
     if not xmin:
         xmin = data_series.min()
@@ -118,12 +126,17 @@ def fit_probability_distribution(dist_name, distribution, data_series, xmin, xma
                                   scale=scale) * data_series.count()
         cdf_function = lambda x: distribution.cdf(x, shape, loc=loc, scale=scale)
 
-    apply_kolmogorov_smirnov(dist_name, cdf_function, data_series)
+    ks_p_value = apply_kolmogorov_smirnov(dist_name, cdf_function, data_series)
     apply_anderson_darling(dist_name, data_series)
     plt.plot(counts, label=dist_name)
 
+    return {"dist_name": dist_name,
+            "ks_p_value": ks_p_value,
+            "distribution": distribution,
+            "parameters": parameter_tuple}
 
-def launch_input_analysis(data_series, desc="default", show_data_plot=True):
+
+def launch_input_analysis(data_series, desc="default", show_data_plot=True, save_plot=True):
     """
     The input analysis includes the following activities: Show data statistics, plot an histogram of the data points,
     fit theoretical distributions, start a ks-test of the fitted distribution, plot the theoretical distributions.
@@ -133,27 +146,31 @@ def launch_input_analysis(data_series, desc="default", show_data_plot=True):
     :param show_data_plot: True for showing the plot, false otherwise.
     :return: None.
     """
-    print "data_series: \n", data_series.describe()
-
     xmin = None
     xmax = None
 
     plt.clf()
     plot_empirical_data(data_series)
-    fit_probability_distribution("uniform", stats.uniform, data_series, xmin, xmax)
-    fit_probability_distribution("triang", stats.triang, data_series, xmin, xmax)
-    fit_probability_distribution("norm", stats.norm, data_series, xmin, xmax)
-    fit_probability_distribution("gamma", stats.gamma, data_series, xmin, xmax)
-    fit_probability_distribution("lognorm", stats.lognorm, data_series, xmin, xmax)
-    fit_probability_distribution("expon", stats.expon, data_series, xmin, xmax)
-    fit_probability_distribution("powerlaw", stats.powerlaw, data_series, xmin, xmax)
+
+    p_values = []
+
+    p_values.append(fit_probability_distribution("uniform", stats.uniform, data_series, xmin, xmax))
+    p_values.append(fit_probability_distribution("triang", stats.triang, data_series, xmin, xmax))
+    p_values.append(fit_probability_distribution("norm", stats.norm, data_series, xmin, xmax))
+    p_values.append(fit_probability_distribution("gamma", stats.gamma, data_series, xmin, xmax))
+    p_values.append(fit_probability_distribution("lognorm", stats.lognorm, data_series, xmin, xmax))
+    p_values.append(fit_probability_distribution("expon", stats.expon, data_series, xmin, xmax))
+    p_values.append(fit_probability_distribution("powerlaw", stats.powerlaw, data_series, xmin, xmax))
 
     plt.legend(loc='upper right')
 
     if show_data_plot:
         plt.show()
-    else:
+
+    if save_plot:
         plt.savefig("img/" + desc + ".png")
+
+    return max(p_values, key=lambda dist: dist["ks_p_value"])
 
 
 def get_discrete_distribution(data_series):

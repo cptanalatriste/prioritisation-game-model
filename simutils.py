@@ -27,16 +27,41 @@ MINIMUM_OBSERVATIONS = 3
 
 
 class ContinuousEmpiricalDistribution:
-    def __init__(self, observations):
-        if len(observations) < MINIMUM_OBSERVATIONS:
-            raise ValueError("Only " + str(len(observations)) + " were provided.")
+    def __init__(self, observations=None, distribution=None, parameters=None):
+        self.distribution = None
+        self.parameters = None
 
-        self.observations = observations
-        self.sorted_observations = sorted(set(self.observations))
+        if observations is not None:
+            if len(observations) < MINIMUM_OBSERVATIONS:
+                raise ValueError("Only " + str(len(observations)) + " were provided.")
 
-        items = float(len(self.observations))
-        self.empirical_cdf = [sum(1 for item in observations if item <= observation) / items
-                              for observation in self.sorted_observations]
+            self.observations = observations
+            self.sorted_observations = sorted(set(self.observations))
+
+            items = float(len(self.observations))
+            self.empirical_cdf = [sum(1 for item in observations if item <= observation) / items
+                                  for observation in self.sorted_observations]
+
+        if distribution is not None and parameters is not None:
+            self.distribution = distribution
+            self.parameters = parameters
+
+    def generate_from_scipy(self):
+        parameter_tuple = self.parameters
+
+        if len(parameter_tuple) == 2:
+            loc = parameter_tuple[0]
+            scale = parameter_tuple[1]
+            rand_variate = self.distribution.rvs(loc=loc, scale=scale, size=1)[0]
+
+        elif len(parameter_tuple) == 3:
+            shape = parameter_tuple[0]
+            loc = parameter_tuple[1]
+            scale = parameter_tuple[2]
+
+            rand_variate = self.distribution.rvs(shape, loc=loc, scale=scale, size=1)[0]
+
+        return rand_variate
 
     def generate(self, rand_uniform=None):
         """
@@ -49,6 +74,9 @@ class ContinuousEmpiricalDistribution:
 
         if rand_uniform is None:
             rand_uniform = uniform.rvs(size=1)[0]
+
+        if self.distribution is not None and self.parameters is not None:
+            return self.generate_from_scipy()
 
         k = 0
         for index, cdf in enumerate(self.empirical_cdf):
@@ -76,14 +104,16 @@ class ContinuousEmpiricalDistribution:
 
 
 class DiscreteEmpiricalDistribution:
-    def __init__(self, observations=None, values=None, probabilities=None):
+    def __init__(self, name="", observations=None, values=None, probabilities=None):
         if observations is not None:
             values_with_probabilities = observations.value_counts(normalize=True)
             values = np.array([index for index, _ in values_with_probabilities.iteritems()])
             probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
 
+        self.name = name
         self.values = values
         self.probabilities = probabilities
+
         self.disc_distribution = rv_discrete(values=(range(len(values)), self.probabilities))
 
     def generate(self, rand_uniform=None):

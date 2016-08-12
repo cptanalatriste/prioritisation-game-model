@@ -14,6 +14,7 @@ PRIORITY_CHANGER_COLUMN = "Priority Changer"
 CREATED_DATE_COLUMN = 'Parsed Created Date'
 RESOLUTION_DATE_COLUMN = 'Parsed Resolution Date'
 PERIOD_COLUMN = 'Month'
+BATCH_COLUMN = 'Batch'
 RESOLUTION_TIME_COLUMN = 'Resolution Time'
 SIMPLE_PRIORITY_COLUMN = 'Simplified Priority'
 
@@ -26,6 +27,7 @@ VALID_RESOLUTION_VALUES = ['Done', 'Implemented', 'Fixed']
 SEVERE_PRIORITY = 3
 NORMAL_PRIORITY = 2
 NON_SEVERE_PRIORITY = 1
+BATCH_SIZE = 50
 
 
 def launch_histogram(data_points, config=None):
@@ -116,12 +118,26 @@ def week_of_month(dt):
     return 1 if dt.day <= 15 else 2
 
 
+def period_identifier(report_series):
+    """
+    Generates a period identifier based on report information.
+    :param report_series: Bug report information.
+    :return: Period identifier.
+    """
+
+    index_value = report_series.name
+    batch_size = BATCH_SIZE
+    batch_identifier = int(index_value) / int(batch_size)
+    return batch_identifier
+
+
 def date_as_string(report_series):
     """
     Returns a string representation of the created
     :param report_series:
     :return:
     """
+
     parsed_date = parse_create_date(report_series)
     period_identifier = str(parsed_date.month)
 
@@ -142,6 +158,19 @@ def filter_by_reporter(bug_reports, reporters):
     return bug_reports.loc[reporter_filter]
 
 
+def include_batch_information(bug_reports):
+    """
+    Includes the column for grouping bug reports in batches.
+    :param bug_reports:
+    :return: Dataframe with a batch column
+    """
+    with_refreshed_index = bug_reports.sort(columns=[CREATED_DATE_COLUMN], ascending=[1])
+    with_refreshed_index = with_refreshed_index.reset_index()
+    with_refreshed_index[BATCH_COLUMN] = with_refreshed_index.apply(period_identifier, axis=1)
+
+    return with_refreshed_index
+
+
 def enhace_report_dataframe(bug_reports):
     """
     Adds additional series to the original report dataframe.
@@ -152,6 +181,7 @@ def enhace_report_dataframe(bug_reports):
     bug_reports[RESOLUTION_DATE_COLUMN] = bug_reports.apply(parse_resolution_date, axis=1)
 
     bug_reports[PERIOD_COLUMN] = bug_reports.apply(date_as_string, axis=1)
+
     bug_reports[RESOLUTION_TIME_COLUMN] = bug_reports.apply(get_resolution_time, axis=1)
 
     simplified_priorities = {"Blocker": SEVERE_PRIORITY,

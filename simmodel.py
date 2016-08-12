@@ -31,6 +31,7 @@ class TestingContext:
         self.devtime_level = devtime_level
         self.default_review_time = default_review_time
         self.throttling = throttling
+        self.last_report_time = None
 
         self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {'completed': Monitor(),
                                                                 'reported': 0},
@@ -38,6 +39,18 @@ class TestingContext:
                                                             'reported': 0},
                                   simdata.SEVERE_PRIORITY: {'completed': Monitor(),
                                                             'reported': 0}}
+        self.med_resolution_time = self.get_med_resolution_time()
+
+    def stop_simulation(self, current_time):
+        """
+        Returns True if the simulation must be stopped.
+        :param current_time: Current simulation time.
+        :return: True if we should stop. False otherwise.
+        """
+        if self.last_report_time is not None and (current_time - self.last_report_time) >= self.med_resolution_time:
+            return True
+
+        return False
 
     def get_fix_effort(self, report_priority):
         """
@@ -66,6 +79,20 @@ class TestingContext:
         :return:
         """
         return self.default_review_time
+
+    def get_med_resolution_time(self):
+        """
+        Returns the median of all the resolution times, of all priorities.
+        :return: Median resolution time.
+        """
+        all_resolution_times = []
+
+        for priority in [simdata.NON_SEVERE_PRIORITY, simdata.NORMAL_PRIORITY, simdata.SEVERE_PRIORITY]:
+            generator = self.resolution_time_gen[priority]
+            if generator is not None:
+                all_resolution_times.extend(generator.observations)
+
+        return np.median(all_resolution_times)
 
 
 class BugReportSource(Process):
@@ -110,6 +137,12 @@ class BugReportSource(Process):
         batch_size = self.get_batch_size()
         while bug_level.amount >= batch_size:
             yield get, self, bug_level, batch_size
+
+            if self.testing_context.last_report_time is None and bug_level.amount <= 0:
+                self.testing_context.last_report_time = now()
+
+                # print "Last Bug Report made at  ", self.testing_context.last_report_time, ". Simulation ends after ", \
+                #     self.testing_context.med_resolution_time
 
             for index in range(batch_size):
                 report_key = self.name + "-batch-" + str(bug_level.amount) + "-bug" + str(index)
@@ -166,7 +199,12 @@ class BugReportSource(Process):
         Returns the time to wait after producing another bug report.
         :return: Time to hold before next report.
         """
-        return self.interarrival_time_gen.generate()
+
+        # This was put in place to avoid negative inter-arrival times.
+        interarrival_time = -1
+        while interarrival_time < 0:
+            interarrival_time = self.interarrival_time_gen.generate()
+        return interarrival_time
 
     def get_batch_size(self):
         """
@@ -247,6 +285,24 @@ class BugReport(Process):
             yield release, self, developer_resource
 
 
+class SimulationController(Process):
+    """
+    Controls the execution of the simulation.
+    """
+
+    def __init__(self, name="", testing_context=None):
+        Process.__init__(self, name)
+        self.testing_context = testing_context
+
+    def control(self):
+        while True:
+            yield hold, self, 1
+
+            if self.testing_context.stop_simulation(now()):
+                # print "Simulation ended at ", now(), ". Time after last report: ", self.testing_context.med_resolution_time
+                stopSimulation()
+
+
 def run_model(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen, max_time,
               dev_team_bandwith,
               gatekeeper_config=False):
@@ -275,7 +331,7 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
     preemptable = False
     # Trying preemptable dev queue
-    preemptable = False
+    # preemptable = True
 
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
@@ -286,6 +342,9 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen,
                                      bug_level=bug_level, default_review_time=default_review_time,
                                      throttling=throttling, devtime_level=devtime_level)
+
+    controller = SimulationController(testing_context=testing_context)
+    activate(controller, controller.control())
 
     reporter_monitors = {}
     for reporter_config in reporters_config:
