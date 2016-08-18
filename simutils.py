@@ -291,7 +291,8 @@ def plot_correlation(total_predicted, total_completed, title, figtext, plot):
 
 
 def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen,
-                      max_time, max_iterations, dev_team_bandwith=sys.maxint, gatekeeper_config=False):
+                      max_time, max_iterations, dev_team_bandwith=sys.maxint, gatekeeper_config=False,
+                      quota_system=False):
     """
     Triggers the simulation according a given configuration.
 
@@ -320,7 +321,8 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
                                                                   priority_gen=priority_gen,
                                                                   max_time=max_time,
                                                                   dev_team_bandwith=dev_team_bandwith,
-                                                                  gatekeeper_config=gatekeeper_config)
+                                                                  gatekeeper_config=gatekeeper_config,
+                                                                  quota_system=quota_system)
 
         result_per_reporter = {reporter_name: reporter_info['resolved_monitor'].count() for reporter_name, reporter_info
                                in

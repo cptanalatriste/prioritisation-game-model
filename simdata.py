@@ -186,7 +186,7 @@ def enhace_report_dataframe(bug_reports):
 
     simplified_priorities = {"Blocker": SEVERE_PRIORITY,
                              "Critical": SEVERE_PRIORITY,
-                             "Major": NORMAL_PRIORITY,
+                             "Major": NON_SEVERE_PRIORITY,
                              "Minor": NON_SEVERE_PRIORITY,
                              "Trivial": NON_SEVERE_PRIORITY}
     bug_reports[SIMPLE_PRIORITY_COLUMN] = bug_reports['Priority'].replace(simplified_priorities)

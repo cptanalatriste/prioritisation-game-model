@@ -2,6 +2,7 @@
 This modules is used to gather payoff values needed for equilibrium calculation.
 """
 import time
+import sys
 import winsound
 
 import pandas as pd
@@ -15,11 +16,13 @@ import simutils
 
 SEED = 448
 
-FIRST_TEAM, SECOND_TEAM = "TEAM_1", "TEAM_2"
+TEAM_PREFIX = "TEAM_"
+FIRST_TEAM, SECOND_TEAM, THIRD_TEAM, FORTH_TEAM, FIFTH_TEAM = TEAM_PREFIX + "1", TEAM_PREFIX + "2", TEAM_PREFIX + "3", \
+                                                              TEAM_PREFIX + "4", TEAM_PREFIX + "5"
 
 
-def consolidate_results(period, reporter_configuration, completed_per_reporter, bugs_per_reporter,
-                        reports_per_reporter):
+def consolidate_payoff_results(period, reporter_configuration, completed_per_reporter, bugs_per_reporter,
+                               reports_per_reporter):
     """
     Gather per-run metrics according to a simulation result.
     :param period: Description of the period.
@@ -62,51 +65,14 @@ def consolidate_results(period, reporter_configuration, completed_per_reporter, 
                                        "severe_found": severe_found,
                                        "non_severe_found": non_severe_found,
                                        "normal_found": normal_found,
-                                       "avg_priority_found": get_avg_priority(normal_found, severe_found,
-                                                                              non_severe_found),
                                        "severe_reported": severe_reported,
                                        "non_severe_reported": non_severe_reported,
-                                       "normal_reported": normal_reported,
-                                       "avg_priority_reported": get_avg_priority(normal_reported, severe_reported,
-                                                                                 non_severe_reported)})
+                                       "normal_reported": normal_reported})
 
     return simulation_results
 
 
-def assign_team(reporter_configuration, team_value, strategy_map):
-    """
-    Assigns teams to a reporter config list, including a strategy per team.
-    :param reporter_configuration: List of reporter configuration in the team.
-    :param team_value: Team name.
-    :param strategy_map: Strategies per team.
-    :return: None.
-    """
-    for config in reporter_configuration:
-        config['team'] = team_value
-        config['strategy'] = strategy_map[team_value]
-
-
-def get_avg_priority(team_normal_found, team_severe_found, team_nonsevere_found):
-    """
-    Returns the average priority of a bug report batch.
-    :param team_normal_found: Normal issues in batch
-    :param team_severe_found: Severe issues in batch
-    :param team_nonsevere_found: Non-Severe issues in batch
-    :return: Average priority.
-    """
-    denominator = team_normal_found + team_severe_found + team_nonsevere_found
-
-    if denominator == 0:
-        return None
-
-    team_avg_priority = (
-                            team_normal_found * simdata.NORMAL_PRIORITY + team_severe_found * simdata.SEVERE_PRIORITY + team_nonsevere_found * simdata.NON_SEVERE_PRIORITY) / float(
-        denominator)
-
-    return team_avg_priority
-
-
-def get_team_metrics(file_prefix, game_period, overall_dataframe, optimal_threshold):
+def get_team_metrics(file_prefix, game_period, overall_dataframe):
     """
     Analises the performance of the team based on fixed issues, according to a scenario description.
 
@@ -124,137 +90,123 @@ def get_team_metrics(file_prefix, game_period, overall_dataframe, optimal_thresh
         reports_in_run = period_reports[period_reports['run'] == run]
 
         team_results = {}
-        for team in [FIRST_TEAM, SECOND_TEAM]:
+        for team in [FIRST_TEAM, SECOND_TEAM, THIRD_TEAM, FORTH_TEAM, FIFTH_TEAM]:
             team_run_reports = reports_in_run[reports_in_run['reporter_team'] == team]
 
             team_resolved = team_run_reports['reported_completed'].sum()
             team_reported = team_run_reports['reported'].sum()
 
-            team_normal_found = team_run_reports['normal_found'].sum()
-            team_severe_found = team_run_reports['reported_completed'].sum()
-            team_nonsevere_found = team_run_reports['severe_found'].sum()
-
-            team_avg_priority = get_avg_priority(team_normal_found, team_severe_found, team_nonsevere_found)
-
-            batch_quality = "OPTIMAL"
-            if team_avg_priority < optimal_threshold:
-                batch_quality = "SUB_OPTIMAL"
-
             team_results[team] = {"team_resolved": team_resolved,
-                                  "team_reported": team_reported,
-                                  "batch_quality": batch_quality}
+                                  "team_reported": team_reported}
 
         consolidated_result.append({"run": run,
-                                    "team_1_quality": team_results[FIRST_TEAM]['batch_quality'],
                                     "team_1_results": team_results[FIRST_TEAM]['team_resolved'],
                                     "team_1_reports": team_results[FIRST_TEAM]['team_reported'],
-                                    "team_2_quality": team_results[SECOND_TEAM]['batch_quality'],
                                     "team_2_results": team_results[SECOND_TEAM]['team_resolved'],
                                     "team_2_reports": team_results[SECOND_TEAM]['team_reported'],
-                                    "scenario": team_results[FIRST_TEAM]['batch_quality'] + "-" +
-                                                team_results[SECOND_TEAM]['batch_quality']
+                                    "team_3_results": team_results[THIRD_TEAM]['team_resolved'],
+                                    "team_3_reports": team_results[THIRD_TEAM]['team_reported'],
+                                    "team_4_results": team_results[FORTH_TEAM]['team_resolved'],
+                                    "team_4_reports": team_results[FORTH_TEAM]['team_reported'],
+                                    "team_5_results": team_results[FIFTH_TEAM]['team_resolved'],
+                                    "team_5_reports": team_results[FIFTH_TEAM]['team_reported'],
                                     })
 
     consolidated_dataframe = pd.DataFrame(consolidated_result)
-    scenarios = consolidated_dataframe["scenario"].value_counts(normalize=True)
-    # print "scenarios: \n", scenarios
-
-    for scenario, frecuency in scenarios.iteritems():
-        scenario_reports = consolidated_dataframe[consolidated_dataframe["scenario"] == scenario]
-
-        team_1_results = scenario_reports["team_1_results"]
-        team_2_results = scenario_reports["team_2_results"]
-
-        team_1_resolved = team_1_results.median()
-        team_2_resolved = team_2_results.median()
-
-        team_1_reports = scenario_reports["team_1_reports"]
-        team_2_reports = scenario_reports["team_2_reports"]
-
-        dev_fix_ratio = (team_1_results.sum() + team_2_results.sum()) / float(
-            team_1_reports.sum() + team_2_reports.sum())
-
-        print "scenario: ", scenario, "profile ", file_prefix, " frecuency: ", frecuency, "counts: ", len(
-            scenario_reports.index), "team_1_resolved ", team_1_resolved, " team_2_resolved ", team_2_resolved, \
-            " dev_fix_ratio ", dev_fix_ratio
-
     consolidated_dataframe.to_csv("csv/" + file_prefix + "_consolidated_result.csv", index=False)
 
+    team_1_avg = int(consolidated_dataframe['team_1_results'].mean())
+    team_2_avg = int(consolidated_dataframe['team_2_results'].mean())
+    team_3_avg = int(consolidated_dataframe['team_3_results'].mean())
+    team_4_avg = int(consolidated_dataframe['team_4_results'].mean())
+    team_5_avg = int(consolidated_dataframe['team_5_results'].mean())
 
-def main(file_prefix, strategy_map, enhanced_dataframe, project_keys):
-    print "Starting ", file_prefix, " on project ", project_keys
+    print "file_prefix: ", file_prefix, " team_1_avg ", team_1_avg, " team_2_avg ", team_2_avg, " team_3_avg ", team_3_avg, \
+        " team_4_avg ", team_4_avg, " team_5_avg ", team_5_avg, " for gambit", ", ".join(
+        [str(team_1_avg), str(team_2_avg), str(team_3_avg), str(team_4_avg), str(team_5_avg)])
+
+
+def select_game_players(reporter_configuration):
+    """
+    Selects which of the players available will be the ones playing the game.
+    :param reporter_configuration: List of non drive-by testers.
+    :return:
+    """
+    sorted_reporters = sorted(reporter_configuration,
+                              key=lambda config: len(config['interarrival_time_gen'].observations), reverse=True)
+    number_of_players = 5
+
+    return sorted_reporters[:number_of_players]
+
+
+def main(strategy_maps, enhanced_dataframe, project_keys):
+    print "Starting simulation on projects ", project_keys
+    total_issues = len(enhanced_dataframe.index)
+    reducing_factor = 0.10
+    enhanced_dataframe = enhanced_dataframe[:int(total_issues * reducing_factor)]
+
+    print "Original issues ", total_issues, " Issues remaining after reduction: ", len(enhanced_dataframe.index)
 
     valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
     periods = valid_reports[simdata.PERIOD_COLUMN].unique()
     reporter_configuration = simdriver.get_reporter_configuration(periods, valid_reports)
+
+    reporter_configuration = select_game_players(reporter_configuration)
     simdriver.fit_reporter_distributions(reporter_configuration)
 
-    random.shuffle(reporter_configuration)
-
-    split_point = len(reporter_configuration) / 2
-
-    assign_team(reporter_configuration[: split_point], FIRST_TEAM, strategy_map)
-    assign_team(reporter_configuration[split_point:], SECOND_TEAM, strategy_map)
+    for index, config in enumerate(reporter_configuration):
+        config['team'] = TEAM_PREFIX + str(index + 1)
 
     engaged_testers = [reporter_config['name'] for reporter_config in reporter_configuration]
     valid_reports = simdata.filter_by_reporter(valid_reports, engaged_testers)
     print "Issues in training after reporter filtering: ", len(valid_reports.index)
 
-    max_iterations = 10000
-    simulation_days = 30
-    simulation_time = simulation_days * 24
+    max_iterations = 100
+    simulation_time = sys.maxint
 
-    overall_results = []
+    print "Starting simulation for project ", project_keys
 
-    # Only for testing
-    game_period = "2015-03"
-    periods = [game_period]
-    for period in periods:
-        print "Starting simulation for project ", project_keys, " period: ", period
-        issues_for_period = valid_reports[valid_reports[simdata.PERIOD_COLUMN] == period]
-        reports_per_month = len(issues_for_period.index)
+    reports_for_simulation = len(valid_reports.index)
 
-        resolution_time_gen, priority_gen = simdriver.get_simulation_input(project_keys, valid_reports)
-        dev_team_size, issues_resolved, resolved_in_period = simdriver.get_dev_team_production(period,
-                                                                                               issues_for_period,
-                                                                                               simulation_days)
-        print "Reports for period: ", reports_per_month, " Developer Team Size: ", dev_team_size, \
-            " Resolved in Period: ", issues_resolved
+    resolution_time_gen, priority_gen = simdriver.get_simulation_input("_".join(project_keys), valid_reports)
+    dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = simdriver.get_dev_team_production(
+        valid_reports)
 
-        gatekeeper_config = {'review_time': 2,
-                             'capacity': 1,
-                             'throttling': True}
+    bug_reporters = valid_reports['Reported By']
+    test_team_size = bug_reporters.nunique()
 
-        gatekeeper_config = False
-        #
-        # gatekeeper_config = {'review_time': 2,
-        #                      'capacity': 1,
-        #                      'throttling': False}
+    print "Project ", project_keys, " Test Period: ", "ALL", " Testers: ", test_team_size, " Developers:", dev_team_size, \
+        " Reports: ", reports_for_simulation, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
 
-        completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, reports_per_priority = simutils.launch_simulation(
+    for map_info in strategy_maps:
+
+        file_prefix, strategy_map = map_info['name'], map_info['map']
+
+        for config in reporter_configuration:
+            config['strategy'] = strategy_map[config['team']]
+
+        print "Launching simulation of resolved issues for profile ", file_prefix
+        completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, reported_per_priotity = simutils.launch_simulation(
             team_capacity=dev_team_size,
-            report_number=reports_per_month,
+            report_number=reports_for_simulation,
             reporters_config=reporter_configuration,
             resolution_time_gen=resolution_time_gen,
             priority_gen=priority_gen,
             max_time=simulation_time,
             max_iterations=max_iterations,
-            gatekeeper_config=gatekeeper_config)
+            dev_team_bandwith=dev_team_bandwith,
+            quota_system=True)
 
-        results = consolidate_results(period, reporter_configuration, completed_per_reporter, bugs_per_reporter,
-                                      reports_per_reporter, reports_per_priority)
-        overall_results.extend(results)
+        print "Simulation ended"
 
-    overall_dataframe = pd.DataFrame(overall_results)
-    overall_dataframe.to_csv("csv/" + file_prefix + '_simulation_results.csv', index=False)
+        simulation_result = consolidate_payoff_results("ALL", reporter_configuration, completed_per_reporter,
+                                                       bugs_per_reporter,
+                                                       reports_per_reporter)
 
-    optimal_threshold = overall_dataframe["avg_priority_found"].mean()
-    print "Mean Batch Priority: ", optimal_threshold
+        overall_dataframe = pd.DataFrame(simulation_result)
+        overall_dataframe.to_csv("csv/" + file_prefix + '_simulation_results.csv', index=False)
 
-    mean_reported = overall_dataframe["avg_priority_reported"].mean()
-    print "Mean Reported Priority: ", mean_reported
-
-    get_team_metrics(file_prefix, game_period, overall_dataframe, optimal_threshold)
+        get_team_metrics(file_prefix, "ALL", overall_dataframe)
 
 
 if __name__ == "__main__":
@@ -268,24 +220,210 @@ if __name__ == "__main__":
         print "Adding calculated fields..."
         enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-        project_keys = ["MESOS"]
+        valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
 
-        strategy_profiles = [{'name': 'INFLATE_NOTINFLATE',
-                              'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
-                                      SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
-                             {'name': 'NOTINFLATE_NOTINFLATE',
-                              'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
-                                      SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
-                             {'name': 'INFLATE_INFLATE',
-                              'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
-                                      SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
-                             {'name': 'NOTINFLATE_INFLATE',
-                              'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
-                                      SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}}
-                             ]
+        strategy_profiles_1 = [{'name': 'INFLATE_INFLATE_INFLATE_INFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_INFLATE_INFLATE_INFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_NOTINFLATE_INFLATE_INFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_NOTINFLATE_INFLATE_INFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_INFLATE_NOTINFLATE_INFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_NOTINFLATE_NOTINFLATE_INFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_INFLATE_NOTINFLATE_INFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_NOTINFLATE_NOTINFLATE_INFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_INFLATE_INFLATE_NOTINFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_NOTINFLATE_INFLATE_NOTINFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}}
+                               ]
 
-        for profile in strategy_profiles:
-            main(profile['name'], profile['map'], enhanced_dataframe, project_keys)
+        strategy_profiles_2 = [{'name': 'INFLATE_INFLATE_NOTINFLATE_NOTINFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_NOTINFLATE_NOTINFLATE_NOTINFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_INFLATE_INFLATE_NOTINFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_NOTINFLATE_INFLATE_NOTINFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_INFLATE_NOTINFLATE_NOTINFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_NOTINFLATE_NOTINFLATE_NOTINFLATE_INFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_INFLATE_INFLATE_INFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_INFLATE_NOTINFLATE_INFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_INFLATE_NOTINFLATE_NOTINFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}}
+
+                               ]
+
+        strategy_profiles_3 = [{'name': 'INFLATE_INFLATE_INFLATE_NOTINFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_INFLATE_INFLATE_INFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_INFLATE_INFLATE_NOTINFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_INFLATE_NOTINFLATE_INFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_INFLATE_NOTINFLATE_NOTINFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_NOTINFLATE_NOTINFLATE_NOTINFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_NOTINFLATE_NOTINFLATE_INFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_NOTINFLATE_INFLATE_NOTINFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'NOTINFLATE_NOTINFLATE_INFLATE_INFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_NOTINFLATE_NOTINFLATE_NOTINFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_NOTINFLATE_NOTINFLATE_INFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_NOTINFLATE_INFLATE_NOTINFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}},
+                               {'name': 'INFLATE_NOTINFLATE_INFLATE_INFLATE_NOTINFLATE',
+                                'map': {FIRST_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        SECOND_TEAM: simmodel.NOT_INFLATE_STRATEGY,
+                                        THIRD_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FORTH_TEAM: simmodel.SIMPLE_INFLATE_STRATEGY,
+                                        FIFTH_TEAM: simmodel.NOT_INFLATE_STRATEGY}}
+                               ]
+
+        strategy_profiles = strategy_profiles_1 + strategy_profiles_2 + strategy_profiles_3
+        main(strategy_profiles, enhanced_dataframe, valid_projects)
+
     finally:
         winsound.Beep(2500, 1000)
 

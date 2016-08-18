@@ -24,7 +24,8 @@ class TestingContext:
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, resolution_time_gen, priority_gen, bug_level, default_review_time, throttling, devtime_level):
+    def __init__(self, resolution_time_gen, priority_gen, bug_level, default_review_time, throttling, devtime_level,
+                 quota_system):
         self.resolution_time_gen = resolution_time_gen
         self.priority_gen = priority_gen
         self.bug_level = bug_level
@@ -32,6 +33,7 @@ class TestingContext:
         self.default_review_time = default_review_time
         self.throttling = throttling
         self.last_report_time = None
+        self.quota_system = quota_system
 
         self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {'completed': Monitor(),
                                                                 'reported': 0},
@@ -47,7 +49,11 @@ class TestingContext:
         :param current_time: Current simulation time.
         :return: True if we should stop. False otherwise.
         """
-        if self.last_report_time is not None and (current_time - self.last_report_time) >= self.med_resolution_time:
+
+        if self.last_report_time:
+            elapsed_time = (current_time - self.last_report_time)
+
+        if self.last_report_time is not None and elapsed_time >= self.med_resolution_time:
             return True
 
         return False
@@ -141,19 +147,12 @@ class BugReportSource(Process):
             if self.testing_context.last_report_time is None and bug_level.amount <= 0:
                 self.testing_context.last_report_time = now()
 
-                # print "Last Bug Report made at  ", self.testing_context.last_report_time, ". Simulation ends after ", \
-                #     self.testing_context.med_resolution_time
-
             for index in range(batch_size):
                 report_key = self.name + "-batch-" + str(bug_level.amount) + "-bug" + str(index)
                 real_priority, report_priority = self.get_report_priority()
                 fix_effort = self.testing_context.get_fix_effort(real_priority)
                 review_time = self.testing_context.get_review_time()
                 throttling = self.testing_context.throttling
-
-                # print "fix_effort ", fix_effort
-                # if fix_effort< 0:
-                #     print "self.testing_context.resolution_time_gen.observations ", self.testing_context.resolution_time_gen.observations
 
                 bug_report = BugReport(name=report_key, reporter=self,
                                        fix_effort=fix_effort,
@@ -169,7 +168,7 @@ class BugReportSource(Process):
                          bug_report.arrive(developer_resource=developer_resource,
                                            gatekeeper_resource=gatekeeper_resource,
                                            resolution_monitors=[reporter_monitor, reported_priority_monitor],
-                                           devtime_level=devtime_level))
+                                           devtime_level=devtime_level, quota_system=self.testing_context.quota_system))
 
                 self.priority_counters[real_priority] += 1
 
@@ -181,6 +180,8 @@ class BugReportSource(Process):
 
             batch_size = self.get_batch_size()
 
+        self.testing_context.last_report_time = now()
+
     def get_report_priority(self):
         real_priority = self.testing_context.get_priority()
         priority_for_report = real_priority
@@ -190,7 +191,7 @@ class BugReportSource(Process):
                 priority_for_report += 1
 
             if self.strategy == SIMPLE_INFLATE_STRATEGY:
-                priority_for_report += 1
+                priority_for_report += 2
 
         return real_priority, priority_for_report
 
@@ -228,12 +229,17 @@ class BugReport(Process):
         self.review_time = review_time
         self.throttling = throttling
 
-    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, devtime_level, debug=False):
+    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, devtime_level, quota_system,
+               debug=False):
         """
         The Process Execution Method for the Bug Reported process.
         :return:
         """
         arrival_time = now()
+
+        inflation = False
+        if self.report_priority != self.real_priority:
+            inflation = True
 
         if debug:
             pending_bugs = len(developer_resource.waitQ)
@@ -247,7 +253,7 @@ class BugReport(Process):
             yield hold, self, self.review_time
 
             # print "Gatekeeper finished review", now()
-            if self.report_priority != self.real_priority and self.throttling:
+            if inflation and self.throttling:
                 self.reporter.reporter_reputation -= 1
                 # print "Inflation detected! Applying throttling ", self.reporter.reporter_reputation
 
@@ -260,6 +266,25 @@ class BugReport(Process):
 
         if debug:
             print now(), ": Report ", self.name, " ready for fixing. "
+
+        if quota_system:
+            # TODO(cgavidia): Improve penalty calculation.
+            penalty = 4000
+            quota_manager = devtime_level
+
+            donation = float(penalty) / (len(quota_manager.keys()) - 1)
+            devtime_level = quota_manager[self.reporter.name]
+
+            if inflation:
+                # print "Inflation detected!"
+
+                yield get, self, devtime_level, penalty
+                # print " penalty ", penalty, " appplied to ", self.reporter.name
+
+                for reporter, quota in quota_manager.iteritems():
+                    if reporter != self.reporter.name:
+                        yield put, self, quota, donation
+                        # print " donation ", donation, " appplied to ", reporter
 
         if devtime_level.amount <= 0:
             if debug:
@@ -305,7 +330,8 @@ class SimulationController(Process):
 
 def run_model(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen, max_time,
               dev_team_bandwith,
-              gatekeeper_config=False):
+              gatekeeper_config=False,
+              quota_system=False):
     """
     Triggers the simulation, according to the provided parameters.
     :param team_capacity: Number of bug resolvers.
@@ -330,18 +356,23 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
 
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
     preemptable = False
-    # Trying preemptable dev queue
-    # preemptable = True
 
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
+
     bug_level = Level(capacity=sys.maxint, initialBuffered=report_number, monitored=True)
     devtime_level = Level(capacity=sys.maxint, initialBuffered=dev_team_bandwith, monitored=True)
+
+    if quota_system:
+
+        quota_per_dev = dev_team_bandwith / len(reporters_config)
+        devtime_level = {config['name']: Level(capacity=sys.maxint, initialBuffered=quota_per_dev, monitored=True) for
+                         config in reporters_config}
 
     initialize()
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen,
                                      bug_level=bug_level, default_review_time=default_review_time,
-                                     throttling=throttling, devtime_level=devtime_level)
+                                     throttling=throttling, devtime_level=devtime_level, quota_system=quota_system)
 
     controller = SimulationController(testing_context=testing_context)
     activate(controller, controller.control())
@@ -351,6 +382,7 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
         reporter_monitor = Monitor()
         bug_reporter = BugReportSource(reporter_config=reporter_config,
                                        testing_context=testing_context)
+
         activate(bug_reporter,
                  bug_reporter.start_reporting(developer_resource=developer_resource,
                                               gatekeeper_resource=gatekeeper_resource,
