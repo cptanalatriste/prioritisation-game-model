@@ -324,7 +324,7 @@ def analyse_results(name="", reporters_config=None, simulation_results=None, pro
                                   plot)
 
 
-def get_simulation_input(project_key="", training_issues=None, fold=1):
+def get_simulation_input(training_issues=None, fold=1):
     """
     Extract the simulation paramaters from the training dataset.
     :param training_issues: Training data set.
@@ -332,9 +332,8 @@ def get_simulation_input(project_key="", training_issues=None, fold=1):
     """
 
     priority_sample = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
-    print "Simplified Priorities in Training Range: \n ", priority_sample.value_counts()
-
-    priority_gen = simutils.DiscreteEmpiricalDistribution(name="priority_dist", observations=priority_sample)
+    counts_per_priority = priority_sample.value_counts()
+    print "Simplified Priorities in Training Range: \n ", counts_per_priority
 
     resolution_per_priority = defaultdict(lambda: None)
     all_resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False,
@@ -364,7 +363,7 @@ def get_simulation_input(project_key="", training_issues=None, fold=1):
 
             resolution_per_priority[priority] = resolution_time_gen
 
-    return resolution_per_priority, priority_gen
+    return resolution_per_priority
 
 
 def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None):
@@ -382,10 +381,6 @@ def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None):
 
     project_bugs = simdata.filter_by_project(enhanced_dataframe, project_keys)
     print "Total issues for projects ", project_keys, ": ", len(project_bugs.index)
-
-    # Excluding the last two months of data, since there might not be enough time for resolution.
-    project_bugs = project_bugs[~project_bugs[simdata.PERIOD_COLUMN].isin(["2015-10", "2015-11"])]
-    print "After removing the last two months of data: ", len(project_bugs.index)
 
     project_bugs = simdata.exclude_self_fixes(project_bugs)
     print "After self-fix exclusion: ", project_keys, ": ", len(project_bugs.index)
@@ -532,7 +527,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, periods_
     training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
     print "Issues in training after reporter filtering: ", len(training_issues.index)
 
-    resolution_time_gen, priority_gen = get_simulation_input("_".join(project_key), training_issues, fold=fold)
+    resolution_time_gen = get_simulation_input(training_issues, fold=fold)
     if resolution_time_gen is None:
         print "Not enough resolution time info! ", project_key
         return
@@ -548,7 +543,9 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, periods_
     for test_period in unique_batches:
         issues_for_period = test_issues[test_issues[simdata.BATCH_COLUMN] == test_period]
 
-        reports_per_month = len(issues_for_period.index)
+        bugs_by_priority = {index: value
+                            for index, value in
+                            issues_for_period[simdata.SIMPLE_PRIORITY_COLUMN].value_counts().iteritems()}
 
         dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(
             issues_for_period)
@@ -557,21 +554,17 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, periods_
         test_team_size = bug_reporters.nunique()
 
         print "Project ", project_key, " Test Period: ", test_period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
-            " Reports: ", reports_per_month, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
+            " Reports: ", bugs_by_priority, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
 
         if is_valid_period(issues_for_period, resolved_in_period):
-            # This doubled time is on purpose: Simulation is expected to end before.
-            simulation_time = sys.maxint
 
             completed_per_reporter, completed_per_priority, _, _, reports_per_priority = simutils.launch_simulation(
                 team_capacity=dev_team_size,
-                report_number=reports_per_month,
+                bugs_by_priority=bugs_by_priority,
                 reporters_config=reporters_config,
                 resolution_time_gen=resolution_time_gen,
-                priority_gen=priority_gen,
-                max_time=simulation_time,
                 max_iterations=max_iterations,
-                dev_team_bandwith=dev_team_bandwith)
+                dev_team_bandwidth=dev_team_bandwith)
 
             simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
                                                     reporters_config,

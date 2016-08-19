@@ -24,11 +24,10 @@ class TestingContext:
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, resolution_time_gen, priority_gen, bug_level, default_review_time, throttling, devtime_level,
+    def __init__(self, resolution_time_gen, bugs_by_priority, default_review_time, throttling,
+                 devtime_level,
                  quota_system):
         self.resolution_time_gen = resolution_time_gen
-        self.priority_gen = priority_gen
-        self.bug_level = bug_level
         self.devtime_level = devtime_level
         self.default_review_time = default_review_time
         self.throttling = throttling
@@ -41,7 +40,38 @@ class TestingContext:
                                                             'reported': 0},
                                   simdata.SEVERE_PRIORITY: {'completed': Monitor(),
                                                             'reported': 0}}
+
         self.med_resolution_time = self.get_med_resolution_time()
+        self.bug_catalog, self.bug_level = self.config_bug_catalog(bugs_by_priority)
+
+    def config_bug_catalog(self, bugs_by_priority):
+        """
+        Initializes the randomized catalog of bugs and the bug level.
+        :param bugs_by_priority: Map with number of defects per priority.
+        :return: A list of defects and the bug level.
+        """
+        report_number = 0
+        bug_catalog = []
+
+        for priority, bugs in bugs_by_priority.iteritems():
+            report_number += bugs
+
+            for index in range(bugs):
+                bug_catalog.append({'report_key': 'Priotity_' + str(priority) + "_Index_" + str(index),
+                                    'real_priority': priority,
+                                    'fix_effort': self.get_fix_effort(priority)})
+
+        bug_level = Level(capacity=sys.maxint, initialBuffered=int(np.asscalar(report_number)), monitored=True)
+        np.random.shuffle(bug_catalog)
+
+        return bug_catalog, bug_level
+
+    def catch_bug(self):
+        """
+        Removes an item from the bug catalog.
+        :return: The removed item.
+        """
+        return self.bug_catalog.pop()
 
     def stop_simulation(self, current_time):
         """
@@ -71,13 +101,6 @@ class TestingContext:
             fix_effort = generator.generate().item()
 
         return fix_effort
-
-    def get_priority(self):
-        """
-        Returns the priority of the produced bug report.
-        :return: The priority of the generate bug.
-        """
-        return self.priority_gen.generate()[0]
 
     def get_review_time(self):
         """
@@ -148,9 +171,12 @@ class BugReportSource(Process):
                 self.testing_context.last_report_time = now()
 
             for index in range(batch_size):
-                report_key = self.name + "-batch-" + str(bug_level.amount) + "-bug" + str(index)
-                real_priority, report_priority = self.get_report_priority()
-                fix_effort = self.testing_context.get_fix_effort(real_priority)
+                bug_info = self.testing_context.catch_bug()
+                report_key = bug_info['report_key']
+                real_priority = bug_info['real_priority']
+                fix_effort = bug_info['fix_effort']
+
+                report_priority = self.get_report_priority(real_priority)
                 review_time = self.testing_context.get_review_time()
                 throttling = self.testing_context.throttling
 
@@ -182,8 +208,12 @@ class BugReportSource(Process):
 
         self.testing_context.last_report_time = now()
 
-    def get_report_priority(self):
-        real_priority = self.testing_context.get_priority()
+    def get_report_priority(self, real_priority):
+        """
+        Returns a priority to include in the report, according to the tester strategy.
+        :param real_priority: Ground-truth priority of the bug.
+        :return: Priority to report.
+        """
         priority_for_report = real_priority
 
         if real_priority < simdata.SEVERE_PRIORITY:
@@ -193,7 +223,7 @@ class BugReportSource(Process):
             if self.strategy == SIMPLE_INFLATE_STRATEGY:
                 priority_for_report += 2
 
-        return real_priority, priority_for_report
+        return priority_for_report
 
     def get_interarrival_time(self):
         """
@@ -324,21 +354,19 @@ class SimulationController(Process):
             yield hold, self, 1
 
             if self.testing_context.stop_simulation(now()):
-                # print "Simulation ended at ", now(), ". Time after last report: ", self.testing_context.med_resolution_time
                 stopSimulation()
 
 
-def run_model(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen, max_time,
+def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen, max_time,
               dev_team_bandwith,
               gatekeeper_config=False,
               quota_system=False):
     """
     Triggers the simulation, according to the provided parameters.
     :param team_capacity: Number of bug resolvers.
-    :param report_number: Total number of defects.
+    :param bugs_by_priority: Total number of defects per priority.
     :param reporters_config: Configuration of the bug reporters.
     :param resolution_time_gen: Variate generator for resolution time.
-    :param priority_gen: Variate generator for priorities.
     :param max_time: Simulation time.
     :return: Monitor for each bug reporter.
     """
@@ -360,18 +388,16 @@ def run_model(team_capacity, report_number, reporters_config, resolution_time_ge
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
 
-    bug_level = Level(capacity=sys.maxint, initialBuffered=report_number, monitored=True)
     devtime_level = Level(capacity=sys.maxint, initialBuffered=dev_team_bandwith, monitored=True)
 
     if quota_system:
-
         quota_per_dev = dev_team_bandwith / len(reporters_config)
         devtime_level = {config['name']: Level(capacity=sys.maxint, initialBuffered=quota_per_dev, monitored=True) for
                          config in reporters_config}
 
     initialize()
-    testing_context = TestingContext(resolution_time_gen=resolution_time_gen, priority_gen=priority_gen,
-                                     bug_level=bug_level, default_review_time=default_review_time,
+    testing_context = TestingContext(resolution_time_gen=resolution_time_gen,
+                                     bugs_by_priority=bugs_by_priority, default_review_time=default_review_time,
                                      throttling=throttling, devtime_level=devtime_level, quota_system=quota_system)
 
     controller = SimulationController(testing_context=testing_context)

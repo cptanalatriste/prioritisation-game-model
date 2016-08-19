@@ -51,7 +51,7 @@ def launch_histogram(data_points, config=None):
     plt.xlim(min(bin_edges), max(bin_edges))
 
     if file_name:
-        plt.savefig("img/" + file_name)
+        plt.savefig("img/" + file_name, bbox_inches='tight')
     else:
         plt.show()
 

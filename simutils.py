@@ -287,21 +287,24 @@ def plot_correlation(total_predicted, total_completed, title, figtext, plot):
     if plot:
         plt.show()
     else:
-        plt.savefig("img/" + title + ".png")
+        plt.savefig("img/" + title + ".png", bbox_inches='tight')
 
 
-def launch_simulation(team_capacity, report_number, reporters_config, resolution_time_gen, priority_gen,
-                      max_time, max_iterations, dev_team_bandwith=sys.maxint, gatekeeper_config=False,
+def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen,
+                      max_iterations,
+                      max_time=sys.maxint, dev_team_bandwidth=sys.maxint, gatekeeper_config=False,
                       quota_system=False):
     """
     Triggers the simulation according a given configuration.
 
+    :param quota_system: True to enable the quota-throttling system.
+    :param gatekeeper_config: True to enable the gatekeeper mechanism.
+    :param dev_team_bandwidth: Number of developer hours available.
     :param max_iterations: Maximum number of simulation executions.
     :param team_capacity: Number of developers in the team.
-    :param report_number: Number of bugs for the period.
+    :param bugs_by_priority: Number of bugs for the period per priority.
     :param reporters_config: Bug reporter configuration.
     :param resolution_time_gen: Resolution time required by developers.
-    :param priority_gen: The priority contained on the bug reports.
     :param max_time: Simulation time.
     :return: List containing the number of fixed reports.
     """
@@ -315,12 +318,11 @@ def launch_simulation(team_capacity, report_number, reporters_config, resolution
     for _ in range(max_iterations):
         np.random.seed()
         reporter_monitors, priority_monitors = simmodel.run_model(team_capacity=team_capacity,
-                                                                  report_number=report_number,
+                                                                  bugs_by_priority=bugs_by_priority,
                                                                   reporters_config=reporters_config,
                                                                   resolution_time_gen=resolution_time_gen,
-                                                                  priority_gen=priority_gen,
                                                                   max_time=max_time,
-                                                                  dev_team_bandwith=dev_team_bandwith,
+                                                                  dev_team_bandwith=dev_team_bandwidth,
                                                                   gatekeeper_config=gatekeeper_config,
                                                                   quota_system=quota_system)
 
