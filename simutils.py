@@ -22,8 +22,20 @@ import matplotlib.pyplot as plt
 
 import simdata
 import simmodel
+import simutils
 
 MINIMUM_OBSERVATIONS = 3
+
+NON_SEVERE_TRUE_COLUMN = "Non-Severe-True"
+NON_SEVERE_INFLATED_COLUMN = "Non-Severe-Inflated"
+SEVERE_TRUE_COLUMN = "Severe-True"
+SEVERE_DEFLATED_COLUMN = "Severe-Deflated"
+CORRECTION_COLUMN = "Corrections"
+NONSEVERE_CORRECTION_COLUMN = "NonSevere-Corrections"
+SEVERE_CORRECTION_COLUMN = "Severe-Corrections"
+
+REPORTER_COLUMNS = [NON_SEVERE_TRUE_COLUMN, NON_SEVERE_INFLATED_COLUMN, SEVERE_TRUE_COLUMN,
+                    SEVERE_DEFLATED_COLUMN, CORRECTION_COLUMN, NONSEVERE_CORRECTION_COLUMN, SEVERE_CORRECTION_COLUMN]
 
 
 class ContinuousEmpiricalDistribution:
@@ -92,11 +104,6 @@ class ContinuousEmpiricalDistribution:
                 else:
                     return self.sorted_observations[k]
 
-        # print "k", k, "element_k ", element_k, " cdf_k ", cdf_k, " element_k_next ", element_k_next, " cdf_k_next ", cdf_k_next, " rand_uniform ", rand_uniform
-        #
-        # print "rand_uniform ", rand_uniform
-        # print "self.empirical_cdf ", self.empirical_cdf
-
         rand_variate = element_k + (rand_uniform - cdf_k) / \
                                    float(cdf_k_next - cdf_k) * (element_k_next - element_k)
 
@@ -136,7 +143,7 @@ def remove_drive_in_testers(reporters_config, min_reports):
     Removes drive-in testers, defined as the testers who's mean interrival time is larger than range_in_std standard deviations of the
     overall average interarrival times.
     :param reporters_config: Reporter configuration.
-    :param range_in_std: Number of standard deviations to be considered in range.
+    :param min_reports: Minimum number of reports to be considered non drive-by.
     :return: Filtered list of reporters config.
     """
     # reporter_metrics = [np.mean(config['interarrival_time_gen'].observations) for config in reporters_config]
@@ -155,17 +162,78 @@ def remove_drive_in_testers(reporters_config, min_reports):
     return engaged_testers
 
 
-def assign_strategies(reporters_config, training_issues, debug=False):
+def get_reporter_behavior_dataframe(reporters_config):
+    """
+    Returns a dataframe describing bug reporter behaviour.
+    :param reporters_config: List of reporter configuration.
+    :return: Dataframe with behaviour information.
+    """
+
+    reporter_records = []
+    for config in reporters_config:
+        total_nonsevere = float(config['reports_per_priority'][simdata.NON_SEVERE_PRIORITY])
+        total_severe = float(config['reports_per_priority'][simdata.SEVERE_PRIORITY])
+        total_modified = float(config['with_modified_priority'])
+
+        non_severe_true = config['modified_details']['priority_1_true']
+        non_severe_false = config['modified_details']['priority_1_false']
+        non_severe_modified = non_severe_true + non_severe_false
+
+        severe_true = config['modified_details']['priority_3_true']
+        severe_false = config['modified_details']['priority_3_false']
+        severe_modified = severe_true + severe_false
+
+        reporter_records.append(
+            [non_severe_true / non_severe_modified if non_severe_modified != 0 else 0,
+             non_severe_false / non_severe_modified if non_severe_modified != 0 else 0,
+             severe_true / severe_modified if severe_modified != 0 else 0,
+             severe_false / severe_modified if severe_modified != 0 else 0,
+             total_modified / (total_nonsevere + total_severe),
+             non_severe_modified / total_nonsevere if total_nonsevere != 0 else 0,
+             severe_modified / total_severe if total_severe != 0 else 0])
+
+    reporter_dataframe = pd.DataFrame(reporter_records)
+
+    reporter_dataframe.columns = REPORTER_COLUMNS
+    return reporter_dataframe
+
+
+def elbow_method_for_reporters(reporter_configuration):
+    """
+    Elbow method implementation for estimating the optimal number of clusters for a given task.
+    :param reporter_configuration: List of reporter configuration info.
+    :return: Generates the elbow method plot as a file.
+    """
+    distortions = []
+
+    reporter_dataframe = get_reporter_behavior_dataframe(reporter_configuration)
+
+    report_features = reporter_dataframe.values
+
+    for clusters in range(1, 11):
+        kmeans = KMeans(n_clusters=clusters,
+                        init='k-means++',
+                        n_init=10,
+                        max_iter=300,
+                        random_state=0)
+
+        kmeans.fit(report_features)
+        distortions.append(kmeans.inertia_)
+
+    plt.clf()
+    plt.plot(range(1, 11), distortions, marker='o')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Distortion')
+    plt.savefig("img/elbow_for_reporters.png", bbox_inches='tight')
+
+
+def assign_strategies(reporters_config, training_issues, n_clusters=3, debug=False):
     """
     Assigns an inflation pattern to the reporter based on clustering.
     :param reporters_config: Reporter configuration.
     :param training_issues: Training dataset.
     :return: Reporting Configuration including inflation pattern.
     """
-    reporter_records = [
-        [config['priority_map'][simdata.NON_SEVERE_PRIORITY], config['priority_map'][simdata.NORMAL_PRIORITY],
-         config['priority_map'][simdata.SEVERE_PRIORITY],
-         config['with_modified_priority']] for config in reporters_config]
 
     global_priority_map = DiscreteEmpiricalDistribution(
         observations=training_issues[simdata.SIMPLE_PRIORITY_COLUMN]).get_probabilities()
@@ -173,13 +241,9 @@ def assign_strategies(reporters_config, training_issues, debug=False):
     if debug:
         print "global_priority_map: ", global_priority_map
 
-    reporter_dataframe = pd.DataFrame(reporter_records)
-    correction_column = "Corrections"
-    non_severe_column = "Non-Severe"
-    severe_column = "Severe"
-    normal_column = "Normal"
+    reporter_dataframe = get_reporter_behavior_dataframe(reporters_config)
 
-    reporter_dataframe.columns = [non_severe_column, normal_column, severe_column, correction_column]
+    # TODO(cgavidia): Refactor this heavily!
 
     # Removing scaling because of cluster quality.
     # scaler = StandardScaler()
@@ -188,15 +252,16 @@ def assign_strategies(reporters_config, training_issues, debug=False):
     #     [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
     #      global_priority_map[simdata.SEVERE_PRIORITY], 0.0])
 
+    expected_corrections = 0.0
     global_features = [global_priority_map[simdata.NON_SEVERE_PRIORITY], global_priority_map[simdata.NORMAL_PRIORITY],
-                       global_priority_map[simdata.SEVERE_PRIORITY], 0.0]
+                       global_priority_map[simdata.SEVERE_PRIORITY], expected_corrections]
     report_features = reporter_dataframe.values
 
     print "Starting clustering algorithms ..."
-    k_means = KMeans(n_clusters=2,
-                     init='random',
+    k_means = KMeans(n_clusters=n_clusters,
+                     init='k-means++',
+                     n_init=10,
                      max_iter=300,
-                     tol=1e-04,
                      random_state=0)
 
     predicted_clusters = k_means.fit_predict(report_features)
@@ -214,10 +279,9 @@ def assign_strategies(reporters_config, training_issues, debug=False):
 
     for strategy in [simmodel.NOT_INFLATE_STRATEGY, simmodel.INFLATE_STRATEGY]:
         reporters_per_strategy = reporter_dataframe[reporter_dataframe[strategy_column] == strategy]
-        print "Strategy: ", strategy, " reporters: ", len(reporters_per_strategy.index), " avg corrections: ", \
-            reporters_per_strategy[correction_column].mean(), " avg non-severe prob: ", reporters_per_strategy[
-            non_severe_column].mean(), " avg normal prob: ", reporters_per_strategy[
-            normal_column].mean(), " avg severe prob: ", reporters_per_strategy[severe_column].mean()
+        # print "Strategy: ", strategy, " reporters: ", len(reporters_per_strategy.index), " avg corrections: ", \
+        #     reporters_per_strategy[CORRECTION_COLUMN].mean(), " avg non-severe prob: ", reporters_per_strategy[
+        #     NON_SEVERE_COLUMN].mean(), " avg severe prob: ", reporters_per_strategy[SEVERE_COLUMN].mean()
 
 
 def magnitude_relative_error(estimate, actual, balanced=False):
@@ -295,7 +359,7 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
                       max_time=sys.maxint, dev_team_bandwidth=sys.maxint, gatekeeper_config=False,
                       quota_system=False):
     """
-    Triggers the simulation according a given configuration.
+    Triggers the simulation according a given configuration. It includes the seed reset behaviour.
 
     :param quota_system: True to enable the quota-throttling system.
     :param gatekeeper_config: True to enable the gatekeeper mechanism.
@@ -309,11 +373,13 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
     :return: List containing the number of fixed reports.
     """
 
+    # TODO(cgavidia): This also screams refactoring.
     completed_per_reporter = []
     completed_per_priority = []
     reported_per_priotity = []
     bugs_per_reporter = []
     reports_per_reporter = []
+    resolved_per_reporter = []
 
     for _ in range(max_iterations):
         np.random.seed()
@@ -339,17 +405,25 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
                                 priority_monitors.iteritems()}
         reported_per_priotity.append(reports_per_priority)
 
-        found_per_reporter = {reporter_name: reporter_info['priority_counters'] for reporter_name, reporter_info
-                              in
-                              reporter_monitors.iteritems()}
-        bugs_per_reporter.append(found_per_reporter)
+        bugs_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'priority_counters'))
+        reports_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'report_counters'))
+        resolved_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'resolved_counters'))
 
-        reported_per_reporter = {reporter_name: reporter_info['report_counters'] for reporter_name, reporter_info
-                                 in
-                                 reporter_monitors.iteritems()}
-        reports_per_reporter.append(reported_per_reporter)
+    return completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, resolved_per_reporter
 
-    return completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, reported_per_priotity
+
+def gather_reporter_statistics(reporter_monitors, metric_name):
+    """
+    Extracts a per-reporter map of an specific metric.
+    :param reporter_monitors: List of all reporter monitors.
+    :param metric_name: Monitor of interest.
+    :return: Map, containing the metric information.
+    """
+    metric_per_reporter = {reporter_name: reporter_info[metric_name] for reporter_name, reporter_info
+                           in
+                           reporter_monitors.iteritems()}
+
+    return metric_per_reporter
 
 
 def collect_metrics(true_values, predicted_values):

@@ -14,9 +14,13 @@ PRIORITY_CHANGER_COLUMN = "Priority Changer"
 CREATED_DATE_COLUMN = 'Parsed Created Date'
 RESOLUTION_DATE_COLUMN = 'Parsed Resolution Date'
 PERIOD_COLUMN = 'Month'
+ISSUE_KEY_COLUMN = 'Issue Key'
 BATCH_COLUMN = 'Batch'
 RESOLUTION_TIME_COLUMN = 'Resolution Time'
+
 SIMPLE_PRIORITY_COLUMN = 'Simplified Priority'
+ORIGINAL_SIMPLE_PRIORITY_COLUMN = 'Original Simplified Priority'
+NEW_SIMPLE_PRIORITY_COLUMN = 'New Simplified Priority'
 
 REPORTER_COLUMN = 'Reported By'
 RESOLVER_COLUMN = 'JIRA Resolved By'
@@ -27,6 +31,13 @@ VALID_RESOLUTION_VALUES = ['Done', 'Implemented', 'Fixed']
 SEVERE_PRIORITY = 3
 NORMAL_PRIORITY = 2
 NON_SEVERE_PRIORITY = 1
+SIMPLIFIED_PRIORITIES = {"Blocker": SEVERE_PRIORITY,
+                         "Critical": SEVERE_PRIORITY,
+                         "Major": SEVERE_PRIORITY,
+                         "Minor": NON_SEVERE_PRIORITY,
+                         "Trivial": NON_SEVERE_PRIORITY}
+SUPPORTED_PRIORITIES = [NON_SEVERE_PRIORITY, SEVERE_PRIORITY]
+
 BATCH_SIZE = 50
 
 
@@ -184,12 +195,10 @@ def enhace_report_dataframe(bug_reports):
 
     bug_reports[RESOLUTION_TIME_COLUMN] = bug_reports.apply(get_resolution_time, axis=1)
 
-    simplified_priorities = {"Blocker": SEVERE_PRIORITY,
-                             "Critical": SEVERE_PRIORITY,
-                             "Major": NON_SEVERE_PRIORITY,
-                             "Minor": NON_SEVERE_PRIORITY,
-                             "Trivial": NON_SEVERE_PRIORITY}
-    bug_reports[SIMPLE_PRIORITY_COLUMN] = bug_reports['Priority'].replace(simplified_priorities)
+    bug_reports[SIMPLE_PRIORITY_COLUMN] = bug_reports['Priority'].replace(SIMPLIFIED_PRIORITIES)
+    bug_reports[ORIGINAL_SIMPLE_PRIORITY_COLUMN] = bug_reports['Original Priority'].replace(SIMPLIFIED_PRIORITIES)
+    bug_reports[NEW_SIMPLE_PRIORITY_COLUMN] = bug_reports['New Priority'].replace(SIMPLIFIED_PRIORITIES)
+
     return bug_reports
 
 

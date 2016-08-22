@@ -29,32 +29,26 @@ MINIMUM_P_VALUE = 0.05
 from collections import defaultdict
 
 
-def get_period_start(period_identifiers, bug_dataset):
+def get_period_start(bug_dataset):
     """
     Returns the period start date, for interrival time calculation.
     :param period_identifier: List of periods to consider.
     :param bug_dataset: Bug report dataset.
     :return: Date for the starting period.
     """
-    sorted_periods = sorted(period_identifiers)
 
-    # This is the logic when we consider months as simulation periods.
-    year, month = sorted_periods[0].split("-")
-    period_start = datetime.datetime(year=int(year), month=int(month), day=1, tzinfo=pytz.utc)
-
-    # period_reports = bug_dataset[bug_dataset[simdata.BATCH_COLUMN] == sorted_periods[0]]
-    # period_start = period_reports[simdata.CREATED_DATE_COLUMN].min()
+    period_start = bug_dataset[simdata.CREATED_DATE_COLUMN].min()
     return period_start
 
 
-def get_reporter_configuration(max_chunk, training_dataset, debug=False):
+def get_reporter_configuration(training_dataset, debug=False):
     """
     Returns the reporting information required for the simulation to run.
 
     Includes drive-in tester removal.
 
-    :param issues_in_range: Bug report data frame
-    :return:
+    :param training_dataset: Bug report data frame
+    :return: List containing reporter information.
     """
 
     issues_by_tester = training_dataset[simdata.REPORTER_COLUMN].value_counts()
@@ -62,15 +56,12 @@ def get_reporter_configuration(max_chunk, training_dataset, debug=False):
     print "Reporters in training dataset: ", len(testers_in_order)
 
     reporters_config = []
-    period_start = get_period_start(max_chunk, training_dataset)
+    period_start = get_period_start(training_dataset)
 
     for index, reporter_list in enumerate([[tester] for tester in testers_in_order]):
         bug_reports = simdata.filter_by_reporter(training_dataset, reporter_list)
 
-        training_periods = bug_reports[simdata.PERIOD_COLUMN]
-        bug_reports_for_batch = bug_reports[training_periods.isin(max_chunk)]
-        batches = simdata.get_report_batches(bug_reports_for_batch)
-
+        batches = simdata.get_report_batches(bug_reports)
         arrival_times = [batch["batch_head"] for batch in batches]
 
         inter_arrival_sample = simdata.get_interarrival_times(arrival_times, period_start)
@@ -90,8 +81,23 @@ def get_reporter_configuration(max_chunk, training_dataset, debug=False):
                 observations=bug_reports[simdata.SIMPLE_PRIORITY_COLUMN])
             priority_map = priority_distribution.get_probabilities()
 
+            reports_per_priority = {index: value for index, value in
+                                    bug_reports[simdata.SIMPLE_PRIORITY_COLUMN].value_counts().iteritems()}
+            reports_per_priority = defaultdict(int, reports_per_priority)
+
             modified_priority = simdata.get_modified_priority_bugs(bug_reports)
             with_modified_priority = len(modified_priority.index)
+
+            inflation_records = {}
+            for priority in simdata.SUPPORTED_PRIORITIES:
+                bugs = modified_priority[modified_priority[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+                true_reports = bugs[
+                    bugs[simdata.SIMPLE_PRIORITY_COLUMN] == bugs[simdata.ORIGINAL_SIMPLE_PRIORITY_COLUMN]]
+                inflated_reports = bugs[
+                    bugs[simdata.SIMPLE_PRIORITY_COLUMN] != bugs[simdata.ORIGINAL_SIMPLE_PRIORITY_COLUMN]]
+
+                inflation_records["priority_" + str(priority) + "_true"] = len(true_reports.index)
+                inflation_records["priority_" + str(priority) + "_false"] = len(inflated_reports.index)
 
             if debug:
                 print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
@@ -100,12 +106,16 @@ def get_reporter_configuration(max_chunk, training_dataset, debug=False):
                     batch_sizes_sample), " std: ", np.std(
                     batch_sizes_sample), " priority_map ", priority_map, " with_modified_priority ", with_modified_priority
 
-            reporters_config.append({'name': reporter_name,
-                                     'interarrival_time_gen': inter_arrival_time_gen,
-                                     'batch_size_gen': batch_size_gen,
-                                     'reporter_list': reporter_list,
-                                     'priority_map': priority_map,
-                                     'with_modified_priority': with_modified_priority})
+            config = {'name': reporter_name,
+                      'interarrival_time_gen': inter_arrival_time_gen,
+                      'batch_size_gen': batch_size_gen,
+                      'reporter_list': reporter_list,
+                      'reports_per_priority': reports_per_priority,
+                      'with_modified_priority': with_modified_priority,
+                      'modified_details': inflation_records}
+
+            reporters_config.append(config)
+
         except ValueError as _:
             if debug:
                 print "Reporters ", reporter_list, " could not be added. Possible because insufficient samples."
@@ -179,7 +189,7 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     simulation_result["predicted_resolved"] = np.mean(results)
 
     # TODO: This reporter/priority logic can be refactored.
-    for priority in [simdata.SEVERE_PRIORITY, simdata.NON_SEVERE_PRIORITY, simdata.NORMAL_PRIORITY]:
+    for priority in simdata.SUPPORTED_PRIORITIES:
         resolved_per_priority = resolved_in_month[resolved_in_month[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
         reported_per_priority = issues_for_period[issues_for_period[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
 
@@ -267,7 +277,7 @@ def analyse_results(name="", reporters_config=None, simulation_results=None, pro
                               "Points:{} MMRE:{} MdMRE:{}".format(len(total_predicted), int(mmre), int(mdmre)),
                               plot)
 
-    for priority in [simdata.NON_SEVERE_PRIORITY, simdata.SEVERE_PRIORITY, simdata.NORMAL_PRIORITY]:
+    for priority in simdata.SUPPORTED_PRIORITIES:
         completed_true = []
         completed_predicted = []
 
@@ -488,7 +498,7 @@ def is_valid_period(issues_for_period, resolved_in_period):
     return fix_ratio < threshold
 
 
-def train_test_simulation(project_key, issues_in_range, max_iterations, periods_train, periods_test, fold=0,
+def train_test_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_test, fold=0,
                           debug=False):
     """
 
@@ -505,16 +515,10 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, periods_
 
     simulation_results = []
 
-    if fold is None:
-        max_chunk = periods_train
-    else:
-        continuous_chunks = get_continuous_chunks(periods_train)
-        max_chunk = max(continuous_chunks, key=len)
-
-    training_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_train)]
+    training_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_train)]
     print "Issues in training: ", len(training_issues.index)
 
-    reporters_config = get_reporter_configuration(max_chunk, training_issues)
+    reporters_config = get_reporter_configuration(training_issues)
 
     try:
         simutils.assign_strategies(reporters_config, training_issues)
@@ -532,7 +536,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, periods_
         print "Not enough resolution time info! ", project_key
         return
 
-    test_issues = issues_in_range[issues_in_range[simdata.PERIOD_COLUMN].isin(periods_test)]
+    test_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_test)]
     print "Issues in test: ", len(test_issues.index)
     test_issues = simdata.filter_by_reporter(test_issues, engaged_testers)
     print "Issues in test after reporter filtering: ", len(test_issues.index)
@@ -558,7 +562,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, periods_
 
         if is_valid_period(issues_for_period, resolved_in_period):
 
-            completed_per_reporter, completed_per_priority, _, _, reports_per_priority = simutils.launch_simulation(
+            completed_per_reporter, completed_per_priority, _, _, reports_per_priority, _ = simutils.launch_simulation(
                 team_capacity=dev_team_size,
                 bugs_by_priority=bugs_by_priority,
                 reporters_config=reporters_config,
@@ -589,10 +593,10 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
     :return: None
     """
     issues_in_range = get_valid_reports(project_key, enhanced_dataframe, exclude_priority=None)
+    issues_in_range = issues_in_range.sort(simdata.CREATED_DATE_COLUMN, ascending=True)
 
-    period_in_range = issues_in_range[simdata.PERIOD_COLUMN].unique()
-    print "Original number of periods: ", len(period_in_range)
-    period_in_range.sort()
+    keys_in_range = issues_in_range[simdata.ISSUE_KEY_COLUMN].unique()
+    print "Original number of issue keys: ", len(keys_in_range)
 
     simulation_results = []
 
@@ -601,25 +605,25 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
         name = "Test_Size_" + str(test_size)
 
         train_size = 1 - test_size
-        split_point = int(len(period_in_range) * train_size)
+        split_point = int(len(keys_in_range) * train_size)
 
-        periods_train = period_in_range[:split_point]
-        periods_test = period_in_range[split_point:]
+        keys_train = keys_in_range[:split_point]
+        keys_test = keys_in_range[split_point:]
 
-        print "Training simulation and validating: ", name, " Months in Train: ", len(
-            periods_train), " Months in Test: ", len(periods_test)
+        print "Training simulation and validating: ", name, " Keys in Train: ", len(
+            keys_train), " Keys in Test: ", len(keys_test)
 
-        fold_results = train_test_simulation(project_key, issues_in_range, max_iterations, periods_train,
-                                             periods_test,
+        fold_results = train_test_simulation(project_key, issues_in_range, max_iterations, keys_train,
+                                             keys_test,
                                              fold=None)
         simulation_results.extend(fold_results)
     else:
-        k_fold = KFold(len(period_in_range), n_folds=n_folds)
+        k_fold = KFold(len(keys_in_range), n_folds=n_folds)
 
         for fold, (train_index, test_index) in enumerate(k_fold):
             print "Fold number: ", fold
 
-            periods_train, periods_test = period_in_range[train_index], period_in_range[test_index]
+            periods_train, periods_test = keys_in_range[train_index], keys_in_range[test_index]
 
             fold_results = train_test_simulation(project_key, issues_in_range, max_iterations, periods_train,
                                                  periods_test,
@@ -655,7 +659,7 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
     valid_projects = get_valid_projects(enhanced_dataframe)
 
-    max_iterations = 1000
+    max_iterations = 100
     test_sizes = [.4, .3, .2]
 
     for test_size in test_sizes:

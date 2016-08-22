@@ -19,6 +19,33 @@ SIMPLE_INFLATE_STRATEGY = 'SIMPLE_INFLATE'
 INITIAL_REPUTATION = 10
 
 
+class EmpiricalInflationStrategy:
+    """
+    Empirical Strategy for a two-level priority hierarchy
+    """
+
+    def __init__(self, strategy_config):
+        self.strategy_config = strategy_config
+
+    def priority_to_report(self, original_priority):
+        result = original_priority
+
+        correct = np.random.uniform()
+        if original_priority == simdata.NON_SEVERE_PRIORITY and correct <= self.strategy_config[
+            simutils.NONSEVERE_CORRECTION_COLUMN]:
+            inflate = np.random.uniform()
+            if inflate <= self.strategy_config[simutils.NON_SEVERE_INFLATED_COLUMN]:
+                result = simdata.SEVERE_PRIORITY
+
+        elif original_priority == simdata.SEVERE_PRIORITY and correct <= self.strategy_config[
+            simutils.SEVERE_CORRECTION_COLUMN]:
+            deflate = np.random.uniform()
+            if deflate <= self.strategy_config[simutils.SEVERE_DEFLATED_COLUMN]:
+                result = simdata.NON_SEVERE_PRIORITY
+
+        return result
+
+
 class TestingContext:
     """
     This class will produce the characteristics of the discovered defects.
@@ -116,7 +143,7 @@ class TestingContext:
         """
         all_resolution_times = []
 
-        for priority in [simdata.NON_SEVERE_PRIORITY, simdata.NORMAL_PRIORITY, simdata.SEVERE_PRIORITY]:
+        for priority in simdata.SUPPORTED_PRIORITIES:
             generator = self.resolution_time_gen[priority]
             if generator is not None:
                 all_resolution_times.extend(generator.observations)
@@ -143,13 +170,22 @@ class BugReportSource(Process):
             if self.strategy == INFLATE_STRATEGY:
                 self.inflation_gen = simutils.DiscreteEmpiricalDistribution(values=[True, False],
                                                                             probabilities=[0.5, 0.5])
+        else:
+            self.strategy = None
 
-        self.priority_counters = {simdata.NON_SEVERE_PRIORITY: 0,
-                                  simdata.NORMAL_PRIORITY: 0,
-                                  simdata.SEVERE_PRIORITY: 0}
-        self.report_counters = {simdata.NON_SEVERE_PRIORITY: 0,
-                                simdata.NORMAL_PRIORITY: 0,
-                                simdata.SEVERE_PRIORITY: 0}
+        self.priority_counters = self.start_priority_counter()
+        self.report_counters = self.start_priority_counter()
+        self.resolved_counters = self.start_priority_counter()
+
+    @staticmethod
+    def start_priority_counter():
+        """
+        Returns a priority-based counter.
+        :return: A map, with an entry per priority.
+        """
+        return {simdata.NON_SEVERE_PRIORITY: 0,
+                simdata.NORMAL_PRIORITY: 0,
+                simdata.SEVERE_PRIORITY: 0}
 
     def start_reporting(self, developer_resource, gatekeeper_resource, reporter_monitor):
         """
@@ -190,14 +226,19 @@ class BugReportSource(Process):
                 reported_priority_monitor = self.testing_context.priority_monitors[report_priority]['completed']
 
                 devtime_level = self.testing_context.devtime_level
+
+                inflation_penalty = None
+                if self.testing_context.quota_system:
+                    inflation_penalty = self.testing_context.med_resolution_time.item()
+
                 activate(bug_report,
                          bug_report.arrive(developer_resource=developer_resource,
                                            gatekeeper_resource=gatekeeper_resource,
-                                           resolution_monitors=[reporter_monitor, reported_priority_monitor],
-                                           devtime_level=devtime_level, quota_system=self.testing_context.quota_system))
+                                           resolution_monitors=[reporter_monitor, reported_priority_monitor,
+                                                                self.resolved_counters],
+                                           devtime_level=devtime_level, inflation_penalty=inflation_penalty))
 
                 self.priority_counters[real_priority] += 1
-
                 self.report_counters[report_priority] += 1
                 self.testing_context.priority_monitors[report_priority]['reported'] += 1
 
@@ -214,14 +255,18 @@ class BugReportSource(Process):
         :param real_priority: Ground-truth priority of the bug.
         :return: Priority to report.
         """
+
+        if self.strategy is not None and isinstance(self.strategy, EmpiricalInflationStrategy):
+            return self.strategy.priority_to_report(real_priority)
+
         priority_for_report = real_priority
 
         if real_priority < simdata.SEVERE_PRIORITY:
             if self.inflation_gen is not None and self.inflation_gen.generate():
                 priority_for_report += 1
 
-            if self.strategy == SIMPLE_INFLATE_STRATEGY:
-                priority_for_report += 2
+            if self.strategy is not None and self.strategy == SIMPLE_INFLATE_STRATEGY:
+                priority_for_report += 1
 
         return priority_for_report
 
@@ -259,7 +304,7 @@ class BugReport(Process):
         self.review_time = review_time
         self.throttling = throttling
 
-    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, devtime_level, quota_system,
+    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, devtime_level, inflation_penalty,
                debug=False):
         """
         The Process Execution Method for the Bug Reported process.
@@ -267,55 +312,47 @@ class BugReport(Process):
         """
         arrival_time = now()
 
-        inflation = False
+        false_report = False
         if self.report_priority != self.real_priority:
-            inflation = True
+            false_report = True
 
         if debug:
             pending_bugs = len(developer_resource.waitQ)
             print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Reported Priority: ", \
                 self.report_priority, "Pending bugs: ", pending_bugs
 
+        # This section relates to the gatekeeper logic.
         if gatekeeper_resource:
-            # print "Requesting gatekeeper ", now(), "priority ", self.reporter.reporter_reputation
 
             yield request, self, gatekeeper_resource, self.reporter.reporter_reputation
             yield hold, self, self.review_time
 
-            # print "Gatekeeper finished review", now()
-            if inflation and self.throttling:
+            if false_report and self.throttling:
                 self.reporter.reporter_reputation -= 1
-                # print "Inflation detected! Applying throttling ", self.reporter.reporter_reputation
 
             self.report_priority = self.real_priority
             yield release, self, gatekeeper_resource
-            # print "Gatekeeper released!", now()
 
-        # print "Requesting developer resource: ", self.report_priority
         yield request, self, developer_resource, int(self.report_priority)
 
         if debug:
             print now(), ": Report ", self.name, " ready for fixing. "
 
-        if quota_system:
-            # TODO(cgavidia): Improve penalty calculation.
-            penalty = 4000
+        # This sections applies the quota system process.
+        if inflation_penalty:
             quota_manager = devtime_level
 
-            donation = float(penalty) / (len(quota_manager.keys()) - 1)
+            donation = float(inflation_penalty) / (len(quota_manager.keys()) - 1)
             devtime_level = quota_manager[self.reporter.name]
 
-            if inflation:
-                # print "Inflation detected!"
-
-                yield get, self, devtime_level, penalty
-                # print " penalty ", penalty, " appplied to ", self.reporter.name
+            if false_report:
+                yield get, self, devtime_level, inflation_penalty
 
                 for reporter, quota in quota_manager.iteritems():
                     if reporter != self.reporter.name:
                         yield put, self, quota, donation
-                        # print " donation ", donation, " appplied to ", reporter
 
+        # Finally, here we're using our development time budget.
         if devtime_level.amount <= 0:
             if debug:
                 print "No more developer time available."
@@ -329,14 +366,15 @@ class BugReport(Process):
             resol_time = now() - arrival_time
 
             for monitor in resolution_monitors:
-                monitor.observe(resol_time)
+                if isinstance(monitor, dict):
+                    monitor[self.real_priority] += 1
+                else:
+                    monitor.observe(resol_time)
 
             if debug:
                 print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting. Fix effort: ", \
                     self.fix_effort, " Available Dev Time: ", devtime_level.amount
         else:
-            # yield get, self, devtime_level, devtime_level.amount
-            # yield hold, self, devtime_level.amount
             yield release, self, developer_resource
 
 
@@ -415,10 +453,10 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
                                               reporter_monitor=reporter_monitor), at=start_time)
         reporter_monitors[reporter_config['name']] = {"resolved_monitor": reporter_monitor,
                                                       "priority_counters": bug_reporter.priority_counters,
-                                                      "report_counters": bug_reporter.report_counters}
+                                                      "report_counters": bug_reporter.report_counters,
+                                                      "resolved_counters": bug_reporter.resolved_counters}
 
     simulation_result = simulate(until=max_time)
-    # print "simulation_result ", simulation_result
     return reporter_monitors, testing_context.priority_monitors
 
 
