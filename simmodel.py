@@ -7,6 +7,7 @@ from SimPy.SimPlot import *
 
 import numpy as np
 
+import payoffgetter
 import simdata
 import simutils
 
@@ -14,7 +15,8 @@ CRITICAL_PRIORITY = 100
 
 NOT_INFLATE_STRATEGY = 'NOT_INFLATE'
 INFLATE_STRATEGY = 'INFLATE'
-SIMPLE_INFLATE_STRATEGY = 'SIMPLE_INFLATE'
+SIMPLE_INFLATE_STRATEGY = 'SIMPLEINFLATE'
+HONEST_STRATEGY = 'HONEST'
 
 INITIAL_REPUTATION = 10
 
@@ -25,6 +27,7 @@ class EmpiricalInflationStrategy:
     """
 
     def __init__(self, strategy_config):
+        self.name = strategy_config['name']
         self.strategy_config = strategy_config
 
     def priority_to_report(self, original_priority):
@@ -231,6 +234,9 @@ class BugReportSource(Process):
                 if self.testing_context.quota_system:
                     inflation_penalty = self.testing_context.med_resolution_time.item()
 
+                    if payoffgetter.FORCE_PENALTY is not None:
+                        inflation_penalty = payoffgetter.FORCE_PENALTY
+
                 activate(bug_report,
                          bug_report.arrive(developer_resource=developer_resource,
                                            gatekeeper_resource=gatekeeper_resource,
@@ -256,6 +262,9 @@ class BugReportSource(Process):
         :return: Priority to report.
         """
 
+        if self.strategy is None or self.strategy['name'] == HONEST_STRATEGY:
+            return real_priority
+
         if self.strategy is not None and isinstance(self.strategy, EmpiricalInflationStrategy):
             return self.strategy.priority_to_report(real_priority)
 
@@ -265,8 +274,8 @@ class BugReportSource(Process):
             if self.inflation_gen is not None and self.inflation_gen.generate():
                 priority_for_report += 1
 
-            if self.strategy is not None and self.strategy == SIMPLE_INFLATE_STRATEGY:
-                priority_for_report += 1
+            if self.strategy is not None and self.strategy['name'] == SIMPLE_INFLATE_STRATEGY:
+                priority_for_report += 2
 
         return priority_for_report
 

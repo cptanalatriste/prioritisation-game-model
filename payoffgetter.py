@@ -4,6 +4,7 @@ This modules is used to gather payoff values needed for equilibrium calculation.
 import time
 import sys
 import winsound
+import subprocess
 
 import pandas as pd
 
@@ -15,11 +16,22 @@ import simdata
 import simdriver
 import simutils
 
-REDUCING_FACTOR = 1.0
+from string import Template
+
+REDUCING_FACTOR = 0.1
+REPLICATIONS_PER_PROFILE = 100
+PRIORITY_SCORING = False
+THROTTLING_ENABLED = False
+FORCE_PENALTY = None
+
 FIRST_TEAM, SECOND_TEAM, THIRD_TEAM, FORTH_TEAM, FIFTH_TEAM = 0, 1, 2, 3, 4
 
+GAMBIT_FOLDER = "C:\Program Files (x86)\Gambit\\"
+QUANTAL_RESPONSE_SOLVER = "gambit-logit.exe"
+ONLY_NASH_OPTION = "-e"
 
-def get_payoff_score(severe_completed, non_severe_completed, normal_completed):
+
+def get_payoff_score(severe_completed, non_severe_completed, normal_completed, priority_based=True):
     """
     Calculates the payoff per user after an specific run.
     :param severe_completed:
@@ -33,8 +45,13 @@ def get_payoff_score(severe_completed, non_severe_completed, normal_completed):
         simdata.SEVERE_PRIORITY: 10 * 5
     }
 
-    return severe_completed * score_map[simdata.SEVERE_PRIORITY] + non_severe_completed * score_map[
-        simdata.NON_SEVERE_PRIORITY] + normal_completed * score_map[simdata.NORMAL_PRIORITY]
+    if priority_based:
+        score = severe_completed * score_map[simdata.SEVERE_PRIORITY] + non_severe_completed * score_map[
+            simdata.NON_SEVERE_PRIORITY] + normal_completed * score_map[simdata.NORMAL_PRIORITY]
+    else:
+        score = severe_completed + non_severe_completed + normal_completed
+
+    return score
 
 
 def consolidate_payoff_results(period, reporter_configuration, completed_per_reporter, bugs_per_reporter,
@@ -78,7 +95,7 @@ def consolidate_payoff_results(period, reporter_configuration, completed_per_rep
             non_severe_reported = run_reported[reporter_name][simdata.NON_SEVERE_PRIORITY]
             normal_reported = run_reported[reporter_name][simdata.NORMAL_PRIORITY]
 
-            payoff_score = get_payoff_score(severe_completed, non_severe_completed, normal_completed)
+            payoff_score = get_payoff_score(severe_completed, non_severe_completed, normal_completed, PRIORITY_SCORING)
 
             simulation_results.append({"period": period,
                                        "run": run,
@@ -174,7 +191,16 @@ def select_game_players(reporter_configuration, number_of_players=5):
     return sorted_reporters[:number_of_players]
 
 
-def get_strategy_catalog(reporter_configuration, n_clusters=3):
+def get_heuristic_strategies():
+    """
+    Returns a set of strategies not related with how users are behaving in data.
+    :return:
+    """
+    return [{'name': simmodel.HONEST_STRATEGY},
+            {'name': simmodel.SIMPLE_INFLATE_STRATEGY}]
+
+
+def get_empirical_strategies(reporter_configuration, n_clusters=3):
     """
     It will group a list of reporters in a predefined number of clusters
     :param reporter_configuration: List of reporter configuration
@@ -216,7 +242,7 @@ def get_strategy_catalog(reporter_configuration, n_clusters=3):
             " ", simutils.REPORTER_COLUMNS[severe_correction_index], ": ", "{0:.0f}%".format(
             centroid[severe_correction_index] * 100)
 
-        strategies_per_team.append({'name': 'Centroid_' + str(index),
+        strategies_per_team.append({'name': 'EMPIRICAL' + str(index),
                                     simutils.NONSEVERE_CORRECTION_COLUMN: centroid[nonsevere_correction_index],
                                     simutils.SEVERE_CORRECTION_COLUMN: centroid[severe_correction_index],
                                     simutils.NON_SEVERE_INFLATED_COLUMN: centroid[nonsevere_inflation_index],
@@ -231,15 +257,12 @@ def get_strategy_catalog(reporter_configuration, n_clusters=3):
     return strategies_per_team
 
 
-def get_strategy_map(strategies_per_team, teams):
+def get_strategy_map(strategy_list, teams):
     """
     Creates a strategy map, with all the possible strategy profiles on the game.
     :return:
     """
     strategy_maps = []
-
-    strategy_list = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config in
-                     strategies_per_team]
     strategy_profiles = list(itertools.product(strategy_list, repeat=teams))
 
     for profile in strategy_profiles:
@@ -247,9 +270,8 @@ def get_strategy_map(strategies_per_team, teams):
                         'map': {}}
 
         # To keep the order preferred by Gambit
-
         for index, strategy in enumerate(reversed(list(profile))):
-            strategy_map['name'] += strategy.strategy_config['name'] + "_"
+            strategy_map['name'] += strategy['name'] + "_"
             strategy_map['map'][index] = strategy
 
         strategy_maps.append(strategy_map)
@@ -267,6 +289,94 @@ def group_in_teams(reporter_configuration):
         config['team'] = index
 
     return len(reporter_configuration)
+
+
+def get_strategic_game_format(game_desc, reporter_configuration, strategies_catalog, profile_payoffs):
+    """
+    Generates the content of a Gambit NFG file.
+    :return: Name of the generated file.
+    """
+
+    template = 'NFG 1 R "$num_reporters reporters - $num_strategies strategies - $game_desc" { $player_catalog } \n\n ' \
+               '{ $actions_per_player \n}\n""\n\n' \
+               '{\n$payoff_per_profile\n}\n$profile_ordering'
+
+    nfg_template = Template(template)
+    teams = set(['"Team_' + config['name'] + '"' for config in reporter_configuration])
+    actions = " ".join(['"' + strategy['name'] + '"' for strategy in strategies_catalog])
+    action_list = ["{ " + actions + " }" for _ in teams]
+
+    profile_lines = []
+    profile_ordering = []
+
+    for index, profile_info in enumerate(profile_payoffs):
+        profile_name, payoffs = profile_info
+        payoff_line = '{ "' + profile_name + '" ' + ",".join(payoffs) + " }"
+        profile_lines.append(payoff_line)
+
+        profile_ordering.append(str(index + 1))
+
+    num_reporters = len(reporter_configuration)
+    num_strategies = len(strategies_catalog)
+    player_catalog = " ".join(teams)
+    actions_per_player = "\n".join(action_list)
+    payoff_per_profile = "\n".join(profile_lines)
+    profile_ordering = " ".join(profile_ordering)
+
+    file_content = nfg_template.substitute({'num_reporters': num_reporters,
+                                            'num_strategies': num_strategies,
+                                            'game_desc': game_desc,
+                                            'player_catalog': player_catalog,
+                                            'actions_per_player': actions_per_player,
+                                            'payoff_per_profile': payoff_per_profile,
+                                            'profile_ordering': profile_ordering})
+
+    file_name = str(num_reporters) + "_players_" + str(num_strategies) + "_strategies_" + game_desc + "_strategies.nfg"
+    with open(file_name, "w") as gambit_file:
+        gambit_file.write(file_content)
+
+    return file_name
+
+
+def calculate_equilibrium(reporter_configuration, strategies_catalog, gambit_file):
+    """
+    Executes Gambit for equilibrium calculation.
+    :param strategies_catalog: Catalog of available strategies.
+    :param reporter_configuration: List of reporter configurations.
+    :param gambit_file:
+    :return:
+    """
+
+    print "Calculating equilibrium for: ", gambit_file
+    process = GAMBIT_FOLDER + QUANTAL_RESPONSE_SOLVER
+
+    solver_process = subprocess.Popen([process, ONLY_NASH_OPTION, gambit_file], stdout=subprocess.PIPE)
+
+    nash_equilibrium = None
+    while True:
+        line = solver_process.stdout.readline()
+        if line != '':
+            nash_equilibrium = line
+        else:
+            break
+
+    start_index = 3
+    last_index = -2
+
+    nash_equilibrium = nash_equilibrium[start_index:last_index].split(",")
+
+    player_index = 0
+    strategy_index = 0
+
+    for probability in nash_equilibrium:
+        print "Team ", reporter_configuration[player_index]['team'], "-> Strategy: ", \
+            strategies_catalog[strategy_index]['name'], " \t\tProbability", probability
+
+        if strategy_index < len(strategies_catalog) - 1:
+            strategy_index += 1
+        else:
+            player_index += 1
+            strategy_index = 0
 
 
 def start_payoff_calculation(enhanced_dataframe, project_keys):
@@ -290,7 +400,14 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     simutils.elbow_method_for_reporters(reporter_configuration)
 
     clusters = 2
-    strategies_catalog = get_strategy_catalog(reporter_configuration, n_clusters=clusters)
+    empirical_strategies = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config in
+                            get_empirical_strategies(reporter_configuration, n_clusters=clusters)]
+
+    strategies_catalog = []
+    # strategies_catalog.extend(empirical_strategies)
+    strategies_catalog.extend(get_heuristic_strategies())
+
+    print "strategies_catalog: ", strategies_catalog
 
     reporter_configuration = select_game_players(reporter_configuration)
     print "Reporters selected for playing the game ", len(reporter_configuration)
@@ -319,13 +436,13 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     print "Project ", project_keys, " Test Period: ", "ALL", " Testers: ", test_team_size, " Developers:", dev_team_size, \
         " Reports: ", bugs_by_priority, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
 
-    max_iterations = 30
     simulation_time = sys.maxint
-    quota_system = True
 
-    gambit_lines = []
+    profile_payoffs = []
 
-    print "Simulation configuration: max_iterations ", max_iterations, " quota_system ", quota_system
+    print "Simulation configuration: REPLICATIONS_PER_PROFILE ", REPLICATIONS_PER_PROFILE, " THROTTLING_ENABLED ", \
+        THROTTLING_ENABLED, " FORCE_PENALTY ", FORCE_PENALTY, " PRIORITY_SCORING ", PRIORITY_SCORING, \
+        " REDUCING_FACTOR ", REDUCING_FACTOR
 
     for index, map_info in enumerate(strategy_maps):
 
@@ -340,9 +457,9 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
             reporters_config=reporter_configuration,
             resolution_time_gen=resolution_time_gen,
             max_time=simulation_time,
-            max_iterations=max_iterations,
+            max_iterations=REPLICATIONS_PER_PROFILE,
             dev_team_bandwidth=dev_team_bandwith,
-            quota_system=quota_system)
+            quota_system=THROTTLING_ENABLED)
 
         simulation_result = consolidate_payoff_results("ALL", reporter_configuration, completed_per_reporter,
                                                        bugs_per_reporter,
@@ -353,11 +470,15 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
         overall_dataframe.to_csv("csv/" + file_prefix + '_simulation_results.csv', index=False)
 
         payoffs = get_team_metrics(str(index) + "-" + file_prefix, "ALL", teams, overall_dataframe)
-        gambit_line = '{ "' + file_prefix + '" ' + ",".join(payoffs) + " }"
-        gambit_lines.append(gambit_line)
+        profile_payoffs.append((file_prefix, payoffs))
 
-    print "Profiles for Gambit: \n"
-    print "\n".join(gambit_lines)
+    game_desc = "AS-IS" if not THROTTLING_ENABLED else "THROTTLING"
+
+    print "Generating Gambit NFG file ..."
+    gambit_file = get_strategic_game_format(game_desc, reporter_configuration, strategies_catalog, profile_payoffs)
+
+    print "Executing Gambit for equilibrium calculation..."
+    calculate_equilibrium(reporter_configuration, strategies_catalog, gambit_file)
 
 
 def main():
