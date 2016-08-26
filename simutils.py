@@ -34,8 +34,8 @@ CORRECTION_COLUMN = "Corrections"
 NONSEVERE_CORRECTION_COLUMN = "NonSevere-Corrections"
 SEVERE_CORRECTION_COLUMN = "Severe-Corrections"
 
-REPORTER_COLUMNS = [NON_SEVERE_TRUE_COLUMN, NON_SEVERE_INFLATED_COLUMN, SEVERE_TRUE_COLUMN,
-                    SEVERE_DEFLATED_COLUMN, CORRECTION_COLUMN, NONSEVERE_CORRECTION_COLUMN, SEVERE_CORRECTION_COLUMN]
+REPORTER_COLUMNS = [NON_SEVERE_INFLATED_COLUMN, SEVERE_DEFLATED_COLUMN, CORRECTION_COLUMN, NONSEVERE_CORRECTION_COLUMN,
+                    SEVERE_CORRECTION_COLUMN]
 
 
 class ContinuousEmpiricalDistribution:
@@ -184,9 +184,7 @@ def get_reporter_behavior_dataframe(reporters_config):
         severe_modified = severe_true + severe_false
 
         reporter_records.append(
-            [non_severe_true / non_severe_modified if non_severe_modified != 0 else 0,
-             non_severe_false / non_severe_modified if non_severe_modified != 0 else 0,
-             severe_true / severe_modified if severe_modified != 0 else 0,
+            [non_severe_false / non_severe_modified if non_severe_modified != 0 else 0,
              severe_false / severe_modified if severe_modified != 0 else 0,
              total_modified / (total_nonsevere + total_severe),
              non_severe_modified / total_nonsevere if total_nonsevere != 0 else 0,
@@ -206,7 +204,9 @@ def elbow_method_for_reporters(reporter_configuration):
     """
     distortions = []
 
-    reporter_dataframe = get_reporter_behavior_dataframe(reporter_configuration)
+    reporters_with_corrections = [config for config in reporter_configuration if
+                                  config['with_modified_priority'] > 0]
+    reporter_dataframe = get_reporter_behavior_dataframe(reporters_with_corrections)
 
     report_features = reporter_dataframe.values
 

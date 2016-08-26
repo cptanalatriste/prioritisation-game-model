@@ -18,11 +18,14 @@ import simutils
 
 from string import Template
 
-REDUCING_FACTOR = 0.1
+REDUCING_FACTOR = 1.0
 REPLICATIONS_PER_PROFILE = 100
-PRIORITY_SCORING = False
+PRIORITY_SCORING = True
 THROTTLING_ENABLED = False
 FORCE_PENALTY = None
+EMPIRICAL_STRATEGIES = True
+HEURISTIC_STRATEGIES = False
+N_CLUSTERS = 3
 
 FIRST_TEAM, SECOND_TEAM, THIRD_TEAM, FORTH_TEAM, FIFTH_TEAM = 0, 1, 2, 3, 4
 
@@ -208,6 +211,13 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
     """
 
     print "Gathering strategies from reporter behaviour ..."
+    print "Original number of reporters: ", len(reporter_configuration)
+
+    reporters_with_corrections = [config for config in reporter_configuration if
+                                  config['with_modified_priority'] > 0]
+    print "Reporters with corrections: ", len(reporters_with_corrections)
+
+    correction_dataframe = simutils.get_reporter_behavior_dataframe(reporters_with_corrections)
     reporter_dataframe = simutils.get_reporter_behavior_dataframe(reporter_configuration)
 
     kmeans = KMeans(n_clusters=n_clusters,
@@ -216,7 +226,9 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
                     max_iter=300,
                     random_state=0)
 
-    predicted_clusters = kmeans.fit_predict(reporter_dataframe)
+    kmeans.fit(correction_dataframe)
+
+    predicted_clusters = kmeans.predict(reporter_dataframe)
     cluster_column = 'cluster'
     reporter_dataframe[cluster_column] = predicted_clusters
 
@@ -225,18 +237,16 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
 
     strategies_per_team = []
     for index, centroid in enumerate(centroids):
-        nonsevere_correction_index = 5
-        severe_correction_index = 6
-        nonsevere_inflation_index = 1
-        severe_deflation_index = 3
+        nonsevere_correction_index = 3
+        severe_correction_index = 4
+        nonsevere_inflation_index = 0
+        severe_deflation_index = 1
 
-        print " ", simutils.REPORTER_COLUMNS[0], ": ", "{0:.0f}%".format(centroid[0] * 100), \
-            " ", simutils.REPORTER_COLUMNS[nonsevere_inflation_index], ": ", "{0:.0f}%".format(
+        print  " ", simutils.REPORTER_COLUMNS[nonsevere_inflation_index], ": ", "{0:.0f}%".format(
             centroid[nonsevere_inflation_index] * 100), \
-            " ", simutils.REPORTER_COLUMNS[2], ": ", "{0:.0f}%".format(centroid[2]), \
             " ", simutils.REPORTER_COLUMNS[severe_deflation_index], ": ", "{0:.0f}%".format(
             centroid[severe_deflation_index] * 100), \
-            " ", simutils.REPORTER_COLUMNS[4], ": ", "{0:.0f}%".format(centroid[4] * 100), \
+            " ", simutils.REPORTER_COLUMNS[2], ": ", "{0:.0f}%".format(centroid[2] * 100), \
             " ", simutils.REPORTER_COLUMNS[nonsevere_correction_index], ": ", "{0:.0f}%".format(
             centroid[nonsevere_correction_index] * 100), \
             " ", simutils.REPORTER_COLUMNS[severe_correction_index], ": ", "{0:.0f}%".format(
@@ -271,9 +281,16 @@ def get_strategy_map(strategy_list, teams):
 
         # To keep the order preferred by Gambit
         for index, strategy in enumerate(reversed(list(profile))):
-            strategy_map['name'] += strategy['name'] + "_"
+            strategy_name = None
+            if isinstance(strategy, simmodel.EmpiricalInflationStrategy):
+                strategy_name = strategy.name
+            else:
+                strategy_name = strategy['name']
+
+            strategy_map['name'] += strategy_name + "_"
             strategy_map['map'][index] = strategy
 
+        strategy_map['name'] = strategy_map['name'][:-1]
         strategy_maps.append(strategy_map)
 
     return strategy_maps
@@ -399,13 +416,16 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     print "Generating elbow-method plot..."
     simutils.elbow_method_for_reporters(reporter_configuration)
 
-    clusters = 2
     empirical_strategies = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config in
-                            get_empirical_strategies(reporter_configuration, n_clusters=clusters)]
+                            get_empirical_strategies(reporter_configuration, n_clusters=N_CLUSTERS)]
 
     strategies_catalog = []
-    # strategies_catalog.extend(empirical_strategies)
-    strategies_catalog.extend(get_heuristic_strategies())
+
+    if EMPIRICAL_STRATEGIES:
+        strategies_catalog.extend(empirical_strategies)
+
+    if HEURISTIC_STRATEGIES:
+        strategies_catalog.extend(get_heuristic_strategies())
 
     print "strategies_catalog: ", strategies_catalog
 
@@ -442,7 +462,8 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
 
     print "Simulation configuration: REPLICATIONS_PER_PROFILE ", REPLICATIONS_PER_PROFILE, " THROTTLING_ENABLED ", \
         THROTTLING_ENABLED, " FORCE_PENALTY ", FORCE_PENALTY, " PRIORITY_SCORING ", PRIORITY_SCORING, \
-        " REDUCING_FACTOR ", REDUCING_FACTOR
+        " REDUCING_FACTOR ", REDUCING_FACTOR, " EMPIRICAL_STRATEGIES ", EMPIRICAL_STRATEGIES, \
+        " HEURISTIC_STRATEGIES ", HEURISTIC_STRATEGIES, " N_CLUSTERS ", N_CLUSTERS
 
     for index, map_info in enumerate(strategy_maps):
 

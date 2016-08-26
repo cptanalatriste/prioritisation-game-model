@@ -262,7 +262,7 @@ class BugReportSource(Process):
         :return: Priority to report.
         """
 
-        if self.strategy is None or self.strategy['name'] == HONEST_STRATEGY:
+        if self.strategy is None or (isinstance(self.strategy, dict) and self.strategy['name'] == HONEST_STRATEGY):
             return real_priority
 
         if self.strategy is not None and isinstance(self.strategy, EmpiricalInflationStrategy):
