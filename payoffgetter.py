@@ -19,12 +19,14 @@ import simutils
 from string import Template
 
 REDUCING_FACTOR = 1.0
+
+# On the Walsh paper, they do 2500 replications per profile.
 REPLICATIONS_PER_PROFILE = 100
 PRIORITY_SCORING = True
-THROTTLING_ENABLED = False
+THROTTLING_ENABLED = True
 FORCE_PENALTY = None
-EMPIRICAL_STRATEGIES = True
-HEURISTIC_STRATEGIES = False
+EMPIRICAL_STRATEGIES = False
+HEURISTIC_STRATEGIES = True
 N_CLUSTERS = 3
 
 FIRST_TEAM, SECOND_TEAM, THIRD_TEAM, FORTH_TEAM, FIFTH_TEAM = 0, 1, 2, 3, 4
@@ -464,6 +466,8 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
         THROTTLING_ENABLED, " FORCE_PENALTY ", FORCE_PENALTY, " PRIORITY_SCORING ", PRIORITY_SCORING, \
         " REDUCING_FACTOR ", REDUCING_FACTOR, " EMPIRICAL_STRATEGIES ", EMPIRICAL_STRATEGIES, \
         " HEURISTIC_STRATEGIES ", HEURISTIC_STRATEGIES, " N_CLUSTERS ", N_CLUSTERS
+
+    print "Simulating ", len(strategy_maps), " strategy profiles..."
 
     for index, map_info in enumerate(strategy_maps):
 

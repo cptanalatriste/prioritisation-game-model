@@ -48,6 +48,9 @@ class EmpiricalInflationStrategy:
 
         return result
 
+    def __getitem__(self, item):
+        return self.strategy_config[item]
+
 
 class TestingContext:
     """
