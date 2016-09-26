@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 import datetime
 import pytz
 
-ALL_ISSUES_CSV = "C:\Users\Carlos G. Gavidia\git\github-data-miner\UNFILTERED\Release_Counter_UNFILTERED.csv"
+GIT_HOME = "D:\git"
+ALL_ISSUES_CSV = GIT_HOME + "\github-data-miner\UNFILTERED\Release_Counter_UNFILTERED.csv"
 
 PRIORITY_CHANGER_COLUMN = "Priority Changer"
 CREATED_DATE_COLUMN = 'Parsed Created Date'

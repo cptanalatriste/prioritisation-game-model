@@ -1,10 +1,12 @@
 """
-This modules is used to gather payoff values needed for equilibrium calculation.
+This modules is used to gather payoff values needed for equilibrium calculation. Now it is also capable of triggering
+gambit and calculating the equilibrium.
 """
 import time
 import sys
 import winsound
 import subprocess
+import copy
 
 import pandas as pd
 
@@ -19,15 +21,15 @@ import simutils
 from string import Template
 
 REDUCING_FACTOR = 1.0
-
-# On the Walsh paper, they do 2500 replications per profile.
-REPLICATIONS_PER_PROFILE = 100
+REPLICATIONS_PER_PROFILE = 100  # On the Walsh paper, they do 2500 replications per profile.
 PRIORITY_SCORING = True
 THROTTLING_ENABLED = True
 FORCE_PENALTY = None
-EMPIRICAL_STRATEGIES = False
-HEURISTIC_STRATEGIES = True
+EMPIRICAL_STRATEGIES = True
+HEURISTIC_STRATEGIES = False
 N_CLUSTERS = 3
+N_PLAYERS = 5
+CLONE_PLAYER = 0
 
 FIRST_TEAM, SECOND_TEAM, THIRD_TEAM, FORTH_TEAM, FIFTH_TEAM = 0, 1, 2, 3, 4
 
@@ -184,14 +186,27 @@ def get_team_metrics(file_prefix, game_period, teams, overall_dataframe):
     return [str(team_1_avg), str(team_2_avg), str(team_3_avg), str(team_4_avg), str(team_5_avg)]
 
 
-def select_game_players(reporter_configuration, number_of_players=5):
+def select_game_players(reporter_configuration, number_of_players=5, clone_player=None):
     """
     Selects which of the players available will be the ones playing the game.
+    :param clone_player: The index of the players. whose clones will be returned.
+    :param number_of_players: Number of players to be playing the game.
     :param reporter_configuration: List of non drive-by testers.
     :return: List of selected players.
     """
     sorted_reporters = sorted(reporter_configuration,
                               key=lambda config: len(config['interarrival_time_gen'].observations), reverse=True)
+
+    if clone_player is not None:
+        source_player = sorted_reporters[clone_player]
+        list_with_clones = []
+
+        for index in range(number_of_players):
+            clone = copy.deepcopy(source_player)
+            clone['name'] = 'clone_' + source_player['name'] + '_' + str(index)
+            list_with_clones.append(clone)
+
+        return list_with_clones
 
     return sorted_reporters[:number_of_players]
 
@@ -272,7 +287,7 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
 def get_strategy_map(strategy_list, teams):
     """
     Creates a strategy map, with all the possible strategy profiles on the game.
-    :return:
+    :return: A map with all the possible strategy profiles according the players and strategies available.
     """
     strategy_maps = []
     strategy_profiles = list(itertools.product(strategy_list, repeat=teams))
@@ -283,7 +298,6 @@ def get_strategy_map(strategy_list, teams):
 
         # To keep the order preferred by Gambit
         for index, strategy in enumerate(reversed(list(profile))):
-            strategy_name = None
             if isinstance(strategy, simmodel.EmpiricalInflationStrategy):
                 strategy_name = strategy.name
             else:
@@ -350,7 +364,7 @@ def get_strategic_game_format(game_desc, reporter_configuration, strategies_cata
                                             'payoff_per_profile': payoff_per_profile,
                                             'profile_ordering': profile_ordering})
 
-    file_name = str(num_reporters) + "_players_" + str(num_strategies) + "_strategies_" + game_desc + "_strategies.nfg"
+    file_name = str(num_reporters) + "_players_" + str(num_strategies) + "_strategies_" + game_desc + "_game.nfg"
     with open(file_name, "w") as gambit_file:
         gambit_file.write(file_content)
 
@@ -412,14 +426,14 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     print "Original issues ", total_issues, " Issues remaining after reduction: ", len(enhanced_dataframe.index)
 
     valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
-    reporter_configuration = simdriver.get_reporter_configuration(valid_reports)
-    print "Reporters after drive-in tester removal ..."
+    valid_reporters = simdriver.get_reporter_configuration(valid_reports)
+    print "Reporters after drive-in tester removal ...", len(valid_reporters)
 
     print "Generating elbow-method plot..."
-    simutils.elbow_method_for_reporters(reporter_configuration)
+    simutils.elbow_method_for_reporters(valid_reporters)
 
     empirical_strategies = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config in
-                            get_empirical_strategies(reporter_configuration, n_clusters=N_CLUSTERS)]
+                            get_empirical_strategies(valid_reporters, n_clusters=N_CLUSTERS)]
 
     strategies_catalog = []
 
@@ -431,11 +445,17 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
 
     print "strategies_catalog: ", strategies_catalog
 
-    reporter_configuration = select_game_players(reporter_configuration)
-    print "Reporters selected for playing the game ", len(reporter_configuration)
-    simdriver.fit_reporter_distributions(reporter_configuration)
+    # This are the reporters whose reported bugs will be used to configure the simulation.
+    reporter_configuration = select_game_players(valid_reporters, number_of_players=N_PLAYERS)
 
-    teams = group_in_teams(reporter_configuration)
+    # This is the configuration of the actual game players.
+    player_configuration = select_game_players(valid_reporters, number_of_players=N_PLAYERS,
+                                               clone_player=CLONE_PLAYER)
+
+    print "Reporters selected for playing the game ", len(player_configuration)
+    simdriver.fit_reporter_distributions(player_configuration)
+
+    teams = group_in_teams(player_configuration)
     strategy_maps = get_strategy_map(strategies_catalog, teams)
 
     engaged_testers = [reporter_config['name'] for reporter_config in reporter_configuration]
@@ -455,7 +475,7 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     bug_reporters = valid_reports['Reported By']
     test_team_size = bug_reporters.nunique()
 
-    print "Project ", project_keys, " Test Period: ", "ALL", " Testers: ", test_team_size, " Developers:", dev_team_size, \
+    print "Project ", project_keys, " Test Period: ", "ALL", " Reporters: ", test_team_size, " Developers:", dev_team_size, \
         " Reports: ", bugs_by_priority, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
 
     simulation_time = sys.maxint
@@ -465,7 +485,8 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     print "Simulation configuration: REPLICATIONS_PER_PROFILE ", REPLICATIONS_PER_PROFILE, " THROTTLING_ENABLED ", \
         THROTTLING_ENABLED, " FORCE_PENALTY ", FORCE_PENALTY, " PRIORITY_SCORING ", PRIORITY_SCORING, \
         " REDUCING_FACTOR ", REDUCING_FACTOR, " EMPIRICAL_STRATEGIES ", EMPIRICAL_STRATEGIES, \
-        " HEURISTIC_STRATEGIES ", HEURISTIC_STRATEGIES, " N_CLUSTERS ", N_CLUSTERS
+        " HEURISTIC_STRATEGIES ", HEURISTIC_STRATEGIES, " N_CLUSTERS ", N_CLUSTERS, " N_PLAYERS ", N_PLAYERS, \
+        " CLONE_PLAYER ", CLONE_PLAYER
 
     print "Simulating ", len(strategy_maps), " strategy profiles..."
 
@@ -473,20 +494,20 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
 
         file_prefix, strategy_map = map_info['name'], map_info['map']
 
-        for config in reporter_configuration:
+        for config in player_configuration:
             config['strategy'] = strategy_map[config['team']]
 
         completed_per_reporter, _, bugs_per_reporter, reports_per_reporter, resolved_per_reporter = simutils.launch_simulation(
             team_capacity=dev_team_size,
             bugs_by_priority=bugs_by_priority,
-            reporters_config=reporter_configuration,
+            reporters_config=player_configuration,
             resolution_time_gen=resolution_time_gen,
             max_time=simulation_time,
             max_iterations=REPLICATIONS_PER_PROFILE,
             dev_team_bandwidth=dev_team_bandwith,
             quota_system=THROTTLING_ENABLED)
 
-        simulation_result = consolidate_payoff_results("ALL", reporter_configuration, completed_per_reporter,
+        simulation_result = consolidate_payoff_results("ALL", player_configuration, completed_per_reporter,
                                                        bugs_per_reporter,
                                                        reports_per_reporter,
                                                        resolved_per_reporter)
@@ -500,10 +521,10 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     game_desc = "AS-IS" if not THROTTLING_ENABLED else "THROTTLING"
 
     print "Generating Gambit NFG file ..."
-    gambit_file = get_strategic_game_format(game_desc, reporter_configuration, strategies_catalog, profile_payoffs)
+    gambit_file = get_strategic_game_format(game_desc, player_configuration, strategies_catalog, profile_payoffs)
 
     print "Executing Gambit for equilibrium calculation..."
-    calculate_equilibrium(reporter_configuration, strategies_catalog, gambit_file)
+    calculate_equilibrium(player_configuration, strategies_catalog, gambit_file)
 
 
 def main():
