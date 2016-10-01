@@ -5,7 +5,6 @@ gambit and calculating the equilibrium.
 import time
 import sys
 import winsound
-import subprocess
 import copy
 
 import pandas as pd
@@ -17,34 +16,39 @@ import simmodel
 import simdata
 import simdriver
 import simutils
+import gtutils
 
-from string import Template
-
+# General game configuration
 REDUCING_FACTOR = 1.0
-REPLICATIONS_PER_PROFILE = 100  # On the Walsh paper, they do 2500 replications per profile.
+REPLICATIONS_PER_PROFILE = 1000  # On the Walsh paper, they do 2500 replications per profile.
 PRIORITY_SCORING = True
-THROTTLING_ENABLED = True
-FORCE_PENALTY = None
-EMPIRICAL_STRATEGIES = True
-HEURISTIC_STRATEGIES = False
-N_CLUSTERS = 3
 N_PLAYERS = 5
 CLONE_PLAYER = 0
 
-FIRST_TEAM, SECOND_TEAM, THIRD_TEAM, FORTH_TEAM, FIFTH_TEAM = 0, 1, 2, 3, 4
+# Throtling configuration parameters.
+THROTTLING_ENABLED = False
+FORCE_PENALTY = None
 
-GAMBIT_FOLDER = "C:\Program Files (x86)\Gambit\\"
-QUANTAL_RESPONSE_SOLVER = "gambit-logit.exe"
-ONLY_NASH_OPTION = "-e"
+# Empirical Strategies parameters.
+EMPIRICAL_STRATEGIES = False
+N_CLUSTERS = 3
+
+HEURISTIC_STRATEGIES = True
+GATEKEEPER_CONFIG = {'review_time': 8,  # False to disable the Gatekeeper on the simulation.
+                     'capacity': 1}
+
+FIRST_TEAM, SECOND_TEAM, THIRD_TEAM, FORTH_TEAM, FIFTH_TEAM = 0, 1, 2, 3, 4
 
 
 def get_payoff_score(severe_completed, non_severe_completed, normal_completed, priority_based=True):
     """
     Calculates the payoff per user after an specific run.
-    :param severe_completed:
-    :param non_severe_completed:
-    :param normal_completed:
-    :return:
+
+    :param priority_based: If True, each defect solved has a specific score based on the priority.
+    :param severe_completed: Severe bugs resolved.
+    :param non_severe_completed: Non Severe bugs resolved.
+    :param normal_completed: Normal bugs resolved.
+    :return: Payoff score.
     """
     score_map = {
         simdata.NON_SEVERE_PRIORITY: 10,
@@ -126,7 +130,7 @@ def consolidate_payoff_results(period, reporter_configuration, completed_per_rep
 
 def get_team_metrics(file_prefix, game_period, teams, overall_dataframe):
     """
-    Analises the performance of the team based on fixed issues, according to a scenario description.
+    Analizes the performance of the team based on fixed issues, according to a scenario description.
 
     :param teams: Number of teams in the game.
     :param file_prefix: Strategy profile descripcion.
@@ -324,94 +328,6 @@ def group_in_teams(reporter_configuration):
     return len(reporter_configuration)
 
 
-def get_strategic_game_format(game_desc, reporter_configuration, strategies_catalog, profile_payoffs):
-    """
-    Generates the content of a Gambit NFG file.
-    :return: Name of the generated file.
-    """
-
-    template = 'NFG 1 R "$num_reporters reporters - $num_strategies strategies - $game_desc" { $player_catalog } \n\n ' \
-               '{ $actions_per_player \n}\n""\n\n' \
-               '{\n$payoff_per_profile\n}\n$profile_ordering'
-
-    nfg_template = Template(template)
-    teams = set(['"Team_' + config['name'] + '"' for config in reporter_configuration])
-    actions = " ".join(['"' + strategy['name'] + '"' for strategy in strategies_catalog])
-    action_list = ["{ " + actions + " }" for _ in teams]
-
-    profile_lines = []
-    profile_ordering = []
-
-    for index, profile_info in enumerate(profile_payoffs):
-        profile_name, payoffs = profile_info
-        payoff_line = '{ "' + profile_name + '" ' + ",".join(payoffs) + " }"
-        profile_lines.append(payoff_line)
-
-        profile_ordering.append(str(index + 1))
-
-    num_reporters = len(reporter_configuration)
-    num_strategies = len(strategies_catalog)
-    player_catalog = " ".join(teams)
-    actions_per_player = "\n".join(action_list)
-    payoff_per_profile = "\n".join(profile_lines)
-    profile_ordering = " ".join(profile_ordering)
-
-    file_content = nfg_template.substitute({'num_reporters': num_reporters,
-                                            'num_strategies': num_strategies,
-                                            'game_desc': game_desc,
-                                            'player_catalog': player_catalog,
-                                            'actions_per_player': actions_per_player,
-                                            'payoff_per_profile': payoff_per_profile,
-                                            'profile_ordering': profile_ordering})
-
-    file_name = str(num_reporters) + "_players_" + str(num_strategies) + "_strategies_" + game_desc + "_game.nfg"
-    with open(file_name, "w") as gambit_file:
-        gambit_file.write(file_content)
-
-    return file_name
-
-
-def calculate_equilibrium(reporter_configuration, strategies_catalog, gambit_file):
-    """
-    Executes Gambit for equilibrium calculation.
-    :param strategies_catalog: Catalog of available strategies.
-    :param reporter_configuration: List of reporter configurations.
-    :param gambit_file:
-    :return:
-    """
-
-    print "Calculating equilibrium for: ", gambit_file
-    process = GAMBIT_FOLDER + QUANTAL_RESPONSE_SOLVER
-
-    solver_process = subprocess.Popen([process, ONLY_NASH_OPTION, gambit_file], stdout=subprocess.PIPE)
-
-    nash_equilibrium = None
-    while True:
-        line = solver_process.stdout.readline()
-        if line != '':
-            nash_equilibrium = line
-        else:
-            break
-
-    start_index = 3
-    last_index = -2
-
-    nash_equilibrium = nash_equilibrium[start_index:last_index].split(",")
-
-    player_index = 0
-    strategy_index = 0
-
-    for probability in nash_equilibrium:
-        print "Team ", reporter_configuration[player_index]['team'], "-> Strategy: ", \
-            strategies_catalog[strategy_index]['name'], " \t\tProbability", probability
-
-        if strategy_index < len(strategies_catalog) - 1:
-            strategy_index += 1
-        else:
-            player_index += 1
-            strategy_index = 0
-
-
 def start_payoff_calculation(enhanced_dataframe, project_keys):
     """
     Given a strategy profile list, calculates payoffs per player thorugh simulation.
@@ -486,7 +402,7 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
         THROTTLING_ENABLED, " FORCE_PENALTY ", FORCE_PENALTY, " PRIORITY_SCORING ", PRIORITY_SCORING, \
         " REDUCING_FACTOR ", REDUCING_FACTOR, " EMPIRICAL_STRATEGIES ", EMPIRICAL_STRATEGIES, \
         " HEURISTIC_STRATEGIES ", HEURISTIC_STRATEGIES, " N_CLUSTERS ", N_CLUSTERS, " N_PLAYERS ", N_PLAYERS, \
-        " CLONE_PLAYER ", CLONE_PLAYER
+        " CLONE_PLAYER ", CLONE_PLAYER, " GATEKEEPER_CONFIG ", GATEKEEPER_CONFIG
 
     print "Simulating ", len(strategy_maps), " strategy profiles..."
 
@@ -505,7 +421,8 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
             max_time=simulation_time,
             max_iterations=REPLICATIONS_PER_PROFILE,
             dev_team_bandwidth=dev_team_bandwith,
-            quota_system=THROTTLING_ENABLED)
+            quota_system=THROTTLING_ENABLED,
+            gatekeeper_config=GATEKEEPER_CONFIG)
 
         simulation_result = consolidate_payoff_results("ALL", player_configuration, completed_per_reporter,
                                                        bugs_per_reporter,
@@ -519,12 +436,14 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
         profile_payoffs.append((file_prefix, payoffs))
 
     game_desc = "AS-IS" if not THROTTLING_ENABLED else "THROTTLING"
+    game_desc = "GATEKEEPER" if GATEKEEPER_CONFIG is not None else game_desc
 
     print "Generating Gambit NFG file ..."
-    gambit_file = get_strategic_game_format(game_desc, player_configuration, strategies_catalog, profile_payoffs)
+    gambit_file = gtutils.get_strategic_game_format(game_desc, player_configuration, strategies_catalog,
+                                                    profile_payoffs)
 
     print "Executing Gambit for equilibrium calculation..."
-    calculate_equilibrium(player_configuration, strategies_catalog, gambit_file)
+    gtutils.calculate_equilibrium(player_configuration, strategies_catalog, gambit_file)
 
 
 def main():

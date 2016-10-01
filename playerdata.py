@@ -2,7 +2,6 @@
 This modules contain some data analysis do detect players actions and strategies.
 """
 
-import siminput
 import simdata
 import pandas as pd
 import numpy as np

@@ -18,8 +18,6 @@ INFLATE_STRATEGY = 'INFLATE'
 SIMPLE_INFLATE_STRATEGY = 'SIMPLEINFLATE'
 HONEST_STRATEGY = 'HONEST'
 
-INITIAL_REPUTATION = 10
-
 
 class EmpiricalInflationStrategy:
     """
@@ -57,13 +55,22 @@ class TestingContext:
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, resolution_time_gen, bugs_by_priority, default_review_time, throttling,
+    def __init__(self, resolution_time_gen, bugs_by_priority, default_review_time,
                  devtime_level,
                  quota_system):
+        """
+        Configures the context of the simulation.
+
+        :param resolution_time_gen: Generators for resolution time, depending on their priority.
+        :param bugs_by_priority: Number of defects present on the system, per priority.
+        :param default_review_time: Time the gatekeeper uses for assesing the bug true priority.
+        :param devtime_level: Level containing the number of developer time hours available for bug fixing.
+        :param quota_system: If true, the number of developer hours available will be distributed among testers, penalizing inflators.
+        """
+
         self.resolution_time_gen = resolution_time_gen
         self.devtime_level = devtime_level
         self.default_review_time = default_review_time
-        self.throttling = throttling
         self.last_report_time = None
         self.quota_system = quota_system
 
@@ -167,7 +174,6 @@ class BugReportSource(Process):
         self.interarrival_time_gen = reporter_config['interarrival_time_gen']
         self.batch_size_gen = reporter_config['batch_size_gen']
         self.testing_context = testing_context
-        self.reporter_reputation = INITIAL_REPUTATION
 
         self.inflation_gen = None
         strategy_key = 'strategy'
@@ -196,7 +202,8 @@ class BugReportSource(Process):
     def start_reporting(self, developer_resource, gatekeeper_resource, reporter_monitor):
         """
         Activates a number of bug reports according to an inter-arrival time.
-        :param resol_time_monitor: Monitor for the resolution time.
+        :param gatekeeper_resource: The Gatekeeping Team Resource.
+        :param reporter_monitor: Monitor for reporters.
         :param developer_resource: The Development Team resource.
         :return: None
         """
@@ -220,14 +227,12 @@ class BugReportSource(Process):
 
                 report_priority = self.get_report_priority(real_priority)
                 review_time = self.testing_context.get_review_time()
-                throttling = self.testing_context.throttling
 
                 bug_report = BugReport(name=report_key, reporter=self,
                                        fix_effort=fix_effort,
                                        report_priority=report_priority,
                                        real_priority=real_priority,
-                                       review_time=review_time,
-                                       throttling=throttling)
+                                       review_time=review_time)
 
                 reported_priority_monitor = self.testing_context.priority_monitors[report_priority]['completed']
 
@@ -307,21 +312,28 @@ class BugReport(Process):
     A project member whose main responsibility is bug reporting.
     """
 
-    def __init__(self, name, reporter, fix_effort, report_priority, real_priority, review_time, throttling):
+    def __init__(self, name, reporter, fix_effort, report_priority, real_priority, review_time):
         Process.__init__(self, name)
         self.reporter = reporter
         self.fix_effort = fix_effort
         self.report_priority = report_priority
         self.real_priority = real_priority
         self.review_time = review_time
-        self.throttling = throttling
 
     def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, devtime_level, inflation_penalty,
                debug=False):
         """
         The Process Execution Method for the Bug Reported process.
-        :return:
+
+        :param developer_resource: Resource representing the development team.
+        :param gatekeeper_resource: Resource representing the Bug Gatekeeper.
+        :param resolution_monitors: List of monitors for resolved bugs.
+        :param devtime_level: Level containing the developer time hours available.
+        :param inflation_penalty: The number of dev times hours an inflator gets penalized, in case there's a quota system in place.
+        :param debug: True to have detailed log messaged.
+        :return: None.
         """
+
         arrival_time = now()
 
         false_report = False
@@ -335,12 +347,8 @@ class BugReport(Process):
 
         # This section relates to the gatekeeper logic.
         if gatekeeper_resource:
-
-            yield request, self, gatekeeper_resource, self.reporter.reporter_reputation
+            yield request, self, gatekeeper_resource
             yield hold, self, self.review_time
-
-            if false_report and self.throttling:
-                self.reporter.reporter_reputation -= 1
 
             self.report_priority = self.real_priority
             yield release, self, gatekeeper_resource
@@ -413,6 +421,10 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
               quota_system=False):
     """
     Triggers the simulation, according to the provided parameters.
+    :param gatekeeper_config: Configuration parameters for the Gatekeeper.
+    :param quota_system: If true, the developer time is divided among all the bug reporters in the simulation.
+                            If inflation happens, the offender gets penalized.
+    :param dev_team_bandwith: Number of hours available for bug fixing tasks.
     :param team_capacity: Number of bug resolvers.
     :param bugs_by_priority: Total number of defects per priority.
     :param reporters_config: Configuration of the bug reporters.
@@ -424,10 +436,8 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
 
     gatekeeper_resource = None
     default_review_time = None
-    throttling = False
     if gatekeeper_config:
         default_review_time = gatekeeper_config['review_time']
-        throttling = gatekeeper_config['throttling']
         gatekeeper_resource = Resource(capacity=gatekeeper_config['capacity'], name="gatekeeper_team",
                                        unitName="gatekeeper", qType=PriorityQ,
                                        preemptable=False)
@@ -448,7 +458,7 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
     initialize()
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen,
                                      bugs_by_priority=bugs_by_priority, default_review_time=default_review_time,
-                                     throttling=throttling, devtime_level=devtime_level, quota_system=quota_system)
+                                     devtime_level=devtime_level, quota_system=quota_system)
 
     controller = SimulationController(testing_context=testing_context)
     activate(controller, controller.control())
