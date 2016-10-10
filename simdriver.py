@@ -53,7 +53,6 @@ def get_reporter_configuration(training_dataset, debug=False):
 
     issues_by_tester = training_dataset[simdata.REPORTER_COLUMN].value_counts()
     testers_in_order = [index for index, _ in issues_by_tester.iteritems()]
-    print "Reporters in training dataset: ", len(testers_in_order)
 
     reporters_config = []
     period_start = get_period_start(training_dataset)
@@ -120,8 +119,10 @@ def get_reporter_configuration(training_dataset, debug=False):
             if debug:
                 print "Reporters ", reporter_list, " could not be added. Possible because insufficient samples."
 
+    original_reporters = len(reporters_config)
     reporters_config = simutils.remove_drive_in_testers(reporters_config, min_reports=10)
-    print "Number of reporters after drive-by filtering: ", len(reporters_config)
+    print "Original reporters: ", original_reporters, "Number of reporters after drive-by filtering: ", len(
+        reporters_config)
 
     return reporters_config
 
@@ -353,8 +354,7 @@ def get_simulation_input(training_issues=None, fold=1):
             priority_resolved = all_resolved_issues[all_resolved_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
             resolution_time_sample = priority_resolved[simdata.RESOLUTION_TIME_COLUMN].dropna()
 
-            print "Resolution times in Training Range for Priority", priority, ": \n"
-            resolution_time_sample.describe()
+            print "Resolution times in Training Range for Priority", priority, ": \n", resolution_time_sample.describe()
 
             best_fit = siminput.launch_input_analysis(resolution_time_sample, "RESOL_TIME_" + str(fold),
                                                       show_data_plot=False, save_plot=False)
@@ -444,10 +444,9 @@ def get_dev_team_production(issues_for_period):
     :return: Developer Team Size and Developer Team Production.
     """
 
-    # The commented line is when considering a month as simulation period.
-    # year, month_string = test_period.split('-')
-    # month = int(month_string)
-    # start_date = datetime.datetime(year=int(year), month=month, day=1, tzinfo=pytz.utc)
+    print "Retrieving dev team parameters from ", len(issues_for_period), " reports by ", \
+        issues_for_period['Reported By'].nunique(), " testers "
+
     start_date = issues_for_period[simdata.CREATED_DATE_COLUMN].min()
 
     resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False,

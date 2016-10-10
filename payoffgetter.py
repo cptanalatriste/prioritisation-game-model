@@ -2,6 +2,8 @@
 This modules is used to gather payoff values needed for equilibrium calculation. Now it is also capable of triggering
 gambit and calculating the equilibrium.
 """
+
+from collections import defaultdict
 import time
 import sys
 import winsound
@@ -19,11 +21,20 @@ import simutils
 import gtutils
 
 # General game configuration
-REDUCING_FACTOR = 1.0
-REPLICATIONS_PER_PROFILE = 1000  # On the Walsh paper, they do 2500 replications per profile.
+REDUCING_FACTOR = 1
+REPLICATIONS_PER_PROFILE = 100  # On the Walsh paper, they do 2500 replications per profile.
+
+# Payoff function parameters
 PRIORITY_SCORING = True
-N_PLAYERS = 5
-CLONE_PLAYER = 0
+SCORE_MAP = {
+    simdata.NON_SEVERE_PRIORITY: 10,
+    simdata.NORMAL_PRIORITY: 10 * 2,
+    simdata.SEVERE_PRIORITY: 10 * 5
+}
+
+N_PLAYERS = None  # None, for not filtering among suitable players.
+CLONE_PLAYER = 0  # None to disable cloning
+CLONE_MEDIAN = True
 
 # Throtling configuration parameters.
 THROTTLING_ENABLED = False
@@ -31,13 +42,18 @@ FORCE_PENALTY = None
 
 # Empirical Strategies parameters.
 EMPIRICAL_STRATEGIES = False
-N_CLUSTERS = 3
+N_CLUSTERS = 5
 
 HEURISTIC_STRATEGIES = True
+
+# Gatekeeper configuration.
 GATEKEEPER_CONFIG = {'review_time': 8,  # False to disable the Gatekeeper on the simulation.
                      'capacity': 1}
+GATEKEEPER_CONFIG = False
 
-FIRST_TEAM, SECOND_TEAM, THIRD_TEAM, FORTH_TEAM, FIFTH_TEAM = 0, 1, 2, 3, 4
+# Team Configuration
+NUMBER_OF_TEAMS = 2
+AGGREGATE_AGENT_TEAM = -1
 
 
 def get_payoff_score(severe_completed, non_severe_completed, normal_completed, priority_based=True):
@@ -50,15 +66,10 @@ def get_payoff_score(severe_completed, non_severe_completed, normal_completed, p
     :param normal_completed: Normal bugs resolved.
     :return: Payoff score.
     """
-    score_map = {
-        simdata.NON_SEVERE_PRIORITY: 10,
-        simdata.NORMAL_PRIORITY: 10 * 2,
-        simdata.SEVERE_PRIORITY: 10 * 5
-    }
 
     if priority_based:
-        score = severe_completed * score_map[simdata.SEVERE_PRIORITY] + non_severe_completed * score_map[
-            simdata.NON_SEVERE_PRIORITY] + normal_completed * score_map[simdata.NORMAL_PRIORITY]
+        score = severe_completed * SCORE_MAP[simdata.SEVERE_PRIORITY] + non_severe_completed * SCORE_MAP[
+            simdata.NON_SEVERE_PRIORITY] + normal_completed * SCORE_MAP[simdata.NORMAL_PRIORITY]
     else:
         score = severe_completed + non_severe_completed + normal_completed
 
@@ -91,6 +102,7 @@ def consolidate_payoff_results(period, reporter_configuration, completed_per_rep
         for reporter_config in reporter_configuration:
             reporter_name = reporter_config['name']
             reporter_team = reporter_config['team']
+            reporter_strategy = reporter_config['strategy']['name']
 
             reported_completed = run_resolved[reporter_name]
 
@@ -112,6 +124,7 @@ def consolidate_payoff_results(period, reporter_configuration, completed_per_rep
                                        "run": run,
                                        "reporter_name": reporter_name,
                                        "reporter_team": reporter_team,
+                                       "reporter_strategy": reporter_strategy,
                                        "reported": severe_reported + non_severe_reported + normal_reported,
                                        "reported_completed": reported_completed,
                                        "severe_found": severe_found,
@@ -128,7 +141,7 @@ def consolidate_payoff_results(period, reporter_configuration, completed_per_rep
     return simulation_results
 
 
-def get_team_metrics(file_prefix, game_period, teams, overall_dataframe):
+def get_team_metrics(file_prefix, game_period, teams, overall_dataframes):
     """
     Analizes the performance of the team based on fixed issues, according to a scenario description.
 
@@ -138,81 +151,99 @@ def get_team_metrics(file_prefix, game_period, teams, overall_dataframe):
     :param overall_dataframe: Dataframe with run information.
     :return: List of outputs per team
     """
-    runs = overall_dataframe['run'].unique()
-    period_reports = overall_dataframe[overall_dataframe['period'] == game_period]
+    runs = overall_dataframes[0]['run'].unique()
 
     consolidated_result = []
+
+    print "Dataframes under analysis: ", len(overall_dataframes)
     for run in runs:
-        reports_in_run = period_reports[period_reports['run'] == run]
 
         team_results = {}
         for team in range(teams):
-            team_run_reports = reports_in_run[reports_in_run['reporter_team'] == team]
 
-            team_resolved = team_run_reports['reported_completed'].sum()
-            team_reported = team_run_reports['reported'].sum()
-            team_score = team_run_reports['payoff_score'].sum()
+            for index, overall_dataframe in enumerate(overall_dataframes):
+                period_reports = overall_dataframe[overall_dataframe['period'] == game_period]
+                reports_in_run = period_reports[period_reports['run'] == run]
 
-            team_results[team] = {"team_resolved": team_resolved,
-                                  "team_reported": team_reported,
-                                  "team_score": team_score}
+                team_run_reports = reports_in_run[reports_in_run['reporter_team'] == team]
+                if len(team_run_reports.index) > 0:
+                    team_resolved = team_run_reports['reported_completed'].sum()
+                    team_reported = team_run_reports['reported'].sum()
+                    team_score = team_run_reports['payoff_score'].sum()
 
-        consolidated_result.append({"run": run,
-                                    "team_1_results": team_results[FIRST_TEAM]['team_resolved'],
-                                    "team_1_reports": team_results[FIRST_TEAM]['team_reported'],
-                                    "team_1_score": team_results[FIRST_TEAM]['team_score'],
-                                    "team_2_results": team_results[SECOND_TEAM]['team_resolved'],
-                                    "team_2_reports": team_results[SECOND_TEAM]['team_reported'],
-                                    "team_2_score": team_results[SECOND_TEAM]['team_score'],
-                                    "team_3_results": team_results[THIRD_TEAM]['team_resolved'],
-                                    "team_3_reports": team_results[THIRD_TEAM]['team_reported'],
-                                    "team_3_score": team_results[THIRD_TEAM]['team_score'],
-                                    "team_4_results": team_results[FORTH_TEAM]['team_resolved'],
-                                    "team_4_reports": team_results[FORTH_TEAM]['team_reported'],
-                                    "team_4_score": team_results[FORTH_TEAM]['team_score'],
-                                    "team_5_results": team_results[FIFTH_TEAM]['team_resolved'],
-                                    "team_5_reports": team_results[FIFTH_TEAM]['team_reported'],
-                                    "team_5_score": team_results[FIFTH_TEAM]['team_score']
-                                    })
+                    team_results[team] = {"team_resolved": team_resolved,
+                                          "team_reported": team_reported,
+                                          "team_score": team_score}
+
+        simulation_result = {"run": run}
+
+        for team_index in range(NUMBER_OF_TEAMS):
+            team_prefix = "team_" + str(team_index + 1) + "_"
+            simulation_result[team_prefix + "results"] = team_results[team_index]['team_resolved']
+            simulation_result[team_prefix + "reports"] = team_results[team_index]['team_reported']
+            simulation_result[team_prefix + "score"] = team_results[team_index]['team_score']
+
+        consolidated_result.append(simulation_result)
 
     consolidated_dataframe = pd.DataFrame(consolidated_result)
     consolidated_dataframe.to_csv("csv/" + file_prefix + "_consolidated_result.csv", index=False)
 
-    team_1_avg = int(consolidated_dataframe['team_1_score'].mean())
-    team_2_avg = int(consolidated_dataframe['team_2_score'].mean())
-    team_3_avg = int(consolidated_dataframe['team_3_score'].mean())
-    team_4_avg = int(consolidated_dataframe['team_4_score'].mean())
-    team_5_avg = int(consolidated_dataframe['team_5_score'].mean())
+    team_averages = []
+    for team_index in range(NUMBER_OF_TEAMS):
+        score_column = "team_" + str(team_index + 1) + "_score"
+        team_averages.append(int(consolidated_dataframe[score_column].mean()))
 
-    print "file_prefix: ", file_prefix, " team_1_avg\t", team_1_avg, " team_2_avg\t", team_2_avg, " team_3_avg\t", team_3_avg, \
-        " team_4_avg\t", team_4_avg, " team_5_avg\t", team_5_avg
-
-    return [str(team_1_avg), str(team_2_avg), str(team_3_avg), str(team_4_avg), str(team_5_avg)]
+    print "file_prefix: ", file_prefix, " team_averages\t", team_averages, "\n"
+    return [str(team_avg) for team_avg in team_averages]
 
 
 def select_game_players(reporter_configuration, number_of_players=5, clone_player=None):
     """
     Selects which of the players available will be the ones playing the game.
     :param clone_player: The index of the players. whose clones will be returned.
-    :param number_of_players: Number of players to be playing the game.
+    :param number_of_players: Number of players to be playing the game. In case it is None, no filtering will be performed.
     :param reporter_configuration: List of non drive-by testers.
     :return: List of selected players.
     """
     sorted_reporters = sorted(reporter_configuration,
                               key=lambda config: len(config['interarrival_time_gen'].observations), reverse=True)
 
+    if number_of_players is None:
+        number_of_players = len(reporter_configuration)
+
     if clone_player is not None:
-        source_player = sorted_reporters[clone_player]
+        source_player = [sorted_reporters[clone_player]]
+        source_name = source_player[0]['name']
+
+        print "Cloning player at index: ", clone_player, "(", source_name, ")"
+        simdriver.fit_reporter_distributions(source_player)
+
         list_with_clones = []
 
         for index in range(number_of_players):
-            clone = copy.deepcopy(source_player)
-            clone['name'] = 'clone_' + source_player['name'] + '_' + str(index)
+            clone = copy.deepcopy(source_player[0])
+            clone['name'] = 'clone_' + source_name + '_' + str(index)
             list_with_clones.append(clone)
 
         return list_with_clones
 
     return sorted_reporters[:number_of_players]
+
+
+def select_reporters_for_simulation(reporter_configuration):
+    """
+    The production of these reporters will be considered for simulation extraction parameters
+    :param reporter_configuration: All valid reporters.
+    :return: A filtered list of reporters.
+    """
+
+    reporters_with_corrections = [config for config in reporter_configuration if
+                                  config['with_modified_priority'] > 0]
+
+    print "Original Reporters: ", len(reporter_configuration), " Reporters with corrected priorities: ", len(
+        reporters_with_corrections)
+
+    return reporters_with_corrections
 
 
 def get_heuristic_strategies():
@@ -316,16 +347,112 @@ def get_strategy_map(strategy_list, teams):
     return strategy_maps
 
 
-def group_in_teams(reporter_configuration):
+def aggregate_players(agent_team, reporter_configuration):
     """
-    Assigns a team to each of the players
+    Assigns a team to each of the players, peformming player aggregation.
     :param reporter_configuration: Configuration of the selected players.
     :return: Number of teams.
     """
-    for index, config in enumerate(reporter_configuration):
-        config['team'] = index
 
-    return len(reporter_configuration)
+    # We are applying the rationale for a twins player game: For a player C, C represents a single agent in a cluster
+    # while C' represents the cluster as an aggregate. This is the one-cluster approach for symmetric games.
+
+    team_attribute = 'team'
+    individual_agent_index = 0
+
+    reporter_configuration[individual_agent_index][team_attribute] = agent_team
+
+    for index in range(len(reporter_configuration)):
+        if index != individual_agent_index:
+            reporter_configuration[index][team_attribute] = AGGREGATE_AGENT_TEAM
+
+
+def configure_strategies_per_team(player_configuration, strategy_map):
+    """
+    Assigns the strategies corresponding to teams according to an specific strategy profile.
+    :return: Player index whose payoff value is of interest.
+    """
+
+    for config in player_configuration:
+        config['strategy'] = strategy_map[config['team']]
+
+
+def get_twins_strategy_map(agent_team, strategy_map):
+    """
+    Generates a strategy map for a twins reduction simulation.
+    :param agent_team: The team that will be assigned to an individual agent.
+    :param strategy_map: Original Strategy Map.
+    :return:
+    """
+
+    twins_strategy_map = strategy_map.copy()
+
+    opponent_strategy = None
+    for team_in_copy, strategy_in_copy in twins_strategy_map.iteritems():
+        if team_in_copy != agent_team:
+            opponent_strategy = strategy_in_copy
+
+    twins_strategy_map[AGGREGATE_AGENT_TEAM] = opponent_strategy
+    return twins_strategy_map
+
+
+def check_simulation_history(overall_dataframes, player_configuration):
+    """
+    Recycles a previous execution result in case it is consistent with the profile to execute. Specially usefull
+    while simulating simetric games.
+
+    :param overall_dataframes: Data from previous simulations.
+    :param twins_strategy_map: Strategy map to execute
+    :return: Recycled dataframe.
+    """
+
+    counter_key = 'counter'
+    team_key = 'team'
+    strategy_column = 'reporter_strategy'
+
+    strategy_counters = defaultdict(lambda: {counter_key: 0,
+                                             team_key: set()})
+
+    for player in player_configuration:
+        strategy_name = player['strategy']['name']
+        strategy_counters[strategy_name][counter_key] += 1
+
+        strategy_counters[strategy_name][team_key].add(player[team_key])
+
+    for overall_dataframe in overall_dataframes:
+        first_run = 0
+        single_execution = overall_dataframe[overall_dataframe['run'] == first_run]
+
+        chosen_for_recycling = True
+        for strategy, strategy_info in strategy_counters.iteritems():
+            strategy_on_dataframe = single_execution[single_execution[strategy_column] == strategy]
+
+            if len(strategy_on_dataframe.index) != strategy_counters[strategy][counter_key]:
+                chosen_for_recycling = False
+
+        if chosen_for_recycling:
+            recycled_dataframe = overall_dataframe.copy()
+
+            if len(strategy_counters.keys()) == 1:
+                filter = (recycled_dataframe[strategy_column] == strategy) & \
+                         (recycled_dataframe['reporter_team'] != AGGREGATE_AGENT_TEAM)
+                configured_team = None
+                for team in strategy_counters[strategy_counters.keys()[0]][team_key]:
+                    if team != AGGREGATE_AGENT_TEAM:
+                        configured_team = team
+
+                recycled_dataframe.loc[filter, 'reporter_team'] = configured_team
+            else:
+                for strategy, strategy_info in strategy_counters.iteritems():
+                    print "strategy ", strategy, "strategy_info ", strategy_info
+                    configured_team = strategy_counters[strategy][team_key].pop()
+
+                    recycled_dataframe.loc[
+                        recycled_dataframe[strategy_column] == strategy, 'reporter_team'] = configured_team
+
+            return recycled_dataframe
+
+    return None
 
 
 def start_payoff_calculation(enhanced_dataframe, project_keys):
@@ -339,7 +466,8 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     total_issues = len(enhanced_dataframe.index)
     enhanced_dataframe = enhanced_dataframe[:int(total_issues * REDUCING_FACTOR)]
 
-    print "Original issues ", total_issues, " Issues remaining after reduction: ", len(enhanced_dataframe.index)
+    print "Original issues ", total_issues, "Reduction Factor: ", REDUCING_FACTOR, " Issues remaining after reduction: ", len(
+        enhanced_dataframe.index)
 
     valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
     valid_reporters = simdriver.get_reporter_configuration(valid_reports)
@@ -362,16 +490,23 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     print "strategies_catalog: ", strategies_catalog
 
     # This are the reporters whose reported bugs will be used to configure the simulation.
-    reporter_configuration = select_game_players(valid_reporters, number_of_players=N_PLAYERS)
+    reporter_configuration = select_reporters_for_simulation(valid_reporters)
 
     # This is the configuration of the actual game players.
-    player_configuration = select_game_players(valid_reporters, number_of_players=N_PLAYERS,
-                                               clone_player=CLONE_PLAYER)
+    clone_player = CLONE_PLAYER
+    if CLONE_MEDIAN:
+        clone_player = len(reporter_configuration) / 2
+
+    player_configuration = select_game_players(reporter_configuration, number_of_players=N_PLAYERS,
+                                               clone_player=clone_player)
 
     print "Reporters selected for playing the game ", len(player_configuration)
-    simdriver.fit_reporter_distributions(player_configuration)
 
-    teams = group_in_teams(player_configuration)
+    if clone_player is None:
+        # When cloning is configured, distribution fitting happened before.
+        simdriver.fit_reporter_distributions(player_configuration)
+
+    teams = NUMBER_OF_TEAMS
     strategy_maps = get_strategy_map(strategies_catalog, teams)
 
     engaged_testers = [reporter_config['name'] for reporter_config in reporter_configuration]
@@ -402,45 +537,59 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
         THROTTLING_ENABLED, " FORCE_PENALTY ", FORCE_PENALTY, " PRIORITY_SCORING ", PRIORITY_SCORING, \
         " REDUCING_FACTOR ", REDUCING_FACTOR, " EMPIRICAL_STRATEGIES ", EMPIRICAL_STRATEGIES, \
         " HEURISTIC_STRATEGIES ", HEURISTIC_STRATEGIES, " N_CLUSTERS ", N_CLUSTERS, " N_PLAYERS ", N_PLAYERS, \
-        " CLONE_PLAYER ", CLONE_PLAYER, " GATEKEEPER_CONFIG ", GATEKEEPER_CONFIG
+        " CLONE_PLAYER ", CLONE_PLAYER, " CLONE_MEDIAN ", CLONE_MEDIAN, " GATEKEEPER_CONFIG ", GATEKEEPER_CONFIG
 
     print "Simulating ", len(strategy_maps), " strategy profiles..."
 
+    simulation_history = []
     for index, map_info in enumerate(strategy_maps):
-
         file_prefix, strategy_map = map_info['name'], map_info['map']
 
-        for config in player_configuration:
-            config['strategy'] = strategy_map[config['team']]
+        overall_dataframes = []
 
-        completed_per_reporter, _, bugs_per_reporter, reports_per_reporter, resolved_per_reporter = simutils.launch_simulation(
-            team_capacity=dev_team_size,
-            bugs_by_priority=bugs_by_priority,
-            reporters_config=player_configuration,
-            resolution_time_gen=resolution_time_gen,
-            max_time=simulation_time,
-            max_iterations=REPLICATIONS_PER_PROFILE,
-            dev_team_bandwidth=dev_team_bandwith,
-            quota_system=THROTTLING_ENABLED,
-            gatekeeper_config=GATEKEEPER_CONFIG)
+        for team, strategy in strategy_map.iteritems():
+            print "Getting payoff for team ", team, " on profile ", file_prefix
+            aggregate_players(team, player_configuration)
+            twins_strategy_map = get_twins_strategy_map(team, strategy_map)
 
-        simulation_result = consolidate_payoff_results("ALL", player_configuration, completed_per_reporter,
-                                                       bugs_per_reporter,
-                                                       reports_per_reporter,
-                                                       resolved_per_reporter)
+            configure_strategies_per_team(player_configuration, twins_strategy_map)
+            overall_dataframe = check_simulation_history(simulation_history, player_configuration)
 
-        overall_dataframe = pd.DataFrame(simulation_result)
-        overall_dataframe.to_csv("csv/" + file_prefix + '_simulation_results.csv', index=False)
+            if overall_dataframe is None:
+                completed_per_reporter, _, bugs_per_reporter, reports_per_reporter, resolved_per_reporter = simutils.launch_simulation(
+                    team_capacity=dev_team_size,
+                    bugs_by_priority=bugs_by_priority,
+                    reporters_config=player_configuration,
+                    resolution_time_gen=resolution_time_gen,
+                    max_time=simulation_time,
+                    max_iterations=REPLICATIONS_PER_PROFILE,
+                    dev_team_bandwidth=dev_team_bandwith,
+                    quota_system=THROTTLING_ENABLED,
+                    gatekeeper_config=GATEKEEPER_CONFIG)
 
-        payoffs = get_team_metrics(str(index) + "-" + file_prefix, "ALL", teams, overall_dataframe)
+                simulation_result = consolidate_payoff_results("ALL", player_configuration, completed_per_reporter,
+                                                               bugs_per_reporter,
+                                                               reports_per_reporter,
+                                                               resolved_per_reporter)
+                overall_dataframe = pd.DataFrame(simulation_result)
+                simulation_history.append(overall_dataframe)
+
+            else:
+                print "Profile ", twins_strategy_map, " has being already executed. Recycling dataframe."
+
+            overall_dataframe.to_csv("csv/agent_team_" + str(team) + "_" + file_prefix + '_simulation_results.csv',
+                                     index=False)
+            overall_dataframes.append(overall_dataframe)
+
+        payoffs = get_team_metrics(str(index) + "-" + file_prefix, "ALL", teams, overall_dataframes)
         profile_payoffs.append((file_prefix, payoffs))
 
     game_desc = "AS-IS" if not THROTTLING_ENABLED else "THROTTLING"
-    game_desc = "GATEKEEPER" if GATEKEEPER_CONFIG is not None else game_desc
+    game_desc = "GATEKEEPER" if GATEKEEPER_CONFIG else game_desc
 
     print "Generating Gambit NFG file ..."
     gambit_file = gtutils.get_strategic_game_format(game_desc, player_configuration, strategies_catalog,
-                                                    profile_payoffs)
+                                                    profile_payoffs, teams)
 
     print "Executing Gambit for equilibrium calculation..."
     gtutils.calculate_equilibrium(player_configuration, strategies_catalog, gambit_file)

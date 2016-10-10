@@ -381,7 +381,9 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
     reports_per_reporter = []
     resolved_per_reporter = []
 
-    for _ in range(max_iterations):
+    print "Running ", max_iterations, " replications: ",
+    for replication_index in range(max_iterations):
+        print replication_index + 1, " ",
         np.random.seed()
         reporter_monitors, priority_monitors = simmodel.run_model(team_capacity=team_capacity,
                                                                   bugs_by_priority=bugs_by_priority,
@@ -409,6 +411,7 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
         reports_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'report_counters'))
         resolved_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'resolved_counters'))
 
+    print
     return completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, resolved_per_reporter
 
 

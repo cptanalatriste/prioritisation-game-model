@@ -6,11 +6,15 @@ import subprocess
 from string import Template
 
 GAMBIT_FOLDER = "C:\Program Files (x86)\Gambit\\"
+
+ENUMERATE_EQUILIBRIA_SOLVER = "gambit-enummixed.exe"
+NO_BANNER_OPTION = "-q"
+
 QUANTAL_RESPONSE_SOLVER = "gambit-logit.exe"
 ONLY_NASH_OPTION = "-e"
 
 
-def get_strategic_game_format(game_desc, reporter_configuration, strategies_catalog, profile_payoffs):
+def get_strategic_game_format(game_desc, reporter_configuration, strategies_catalog, profile_payoffs, players):
     """
     Generates the content of a Gambit NFG file.
     :return: Name of the generated file.
@@ -21,7 +25,7 @@ def get_strategic_game_format(game_desc, reporter_configuration, strategies_cata
                '{\n$payoff_per_profile\n}\n$profile_ordering'
 
     nfg_template = Template(template)
-    teams = set(['"Team_' + config['name'] + '"' for config in reporter_configuration])
+    teams = set(['"Team_' + str(team_number) + '"' for team_number in range(players)])
     actions = " ".join(['"' + strategy['name'] + '"' for strategy in strategies_catalog])
     action_list = ["{ " + actions + " }" for _ in teams]
 
@@ -31,8 +35,8 @@ def get_strategic_game_format(game_desc, reporter_configuration, strategies_cata
     for index, profile_info in enumerate(profile_payoffs):
         profile_name, payoffs = profile_info
         payoff_line = '{ "' + profile_name + '" ' + ",".join(payoffs) + " }"
-        profile_lines.append(payoff_line)
 
+        profile_lines.append(payoff_line)
         profile_ordering.append(str(index + 1))
 
     num_reporters = len(reporter_configuration)
@@ -66,33 +70,36 @@ def calculate_equilibrium(reporter_configuration, strategies_catalog, gambit_fil
     :return:
     """
 
-    print "Calculating equilibrium for: ", gambit_file
-    process = GAMBIT_FOLDER + QUANTAL_RESPONSE_SOLVER
+    process = GAMBIT_FOLDER + ENUMERATE_EQUILIBRIA_SOLVER
+    print "Calculating equilibrium for: ", gambit_file, " using ", process
 
-    solver_process = subprocess.Popen([process, ONLY_NASH_OPTION, gambit_file], stdout=subprocess.PIPE)
+    solver_process = subprocess.Popen([process, NO_BANNER_OPTION, gambit_file], stdout=subprocess.PIPE)
 
-    nash_equilibrium = None
+    nash_equilibrium_strings = []
     while True:
         line = solver_process.stdout.readline()
         if line != '':
-            nash_equilibrium = line
+            nash_equilibrium_strings.append(line)
         else:
             break
 
     start_index = 3
     last_index = -2
 
-    nash_equilibrium = nash_equilibrium[start_index:last_index].split(",")
+    for index, nash_equilibrium in enumerate(nash_equilibrium_strings):
+        print "Equilibrium ", str(index + 1), " of ", len(nash_equilibrium_strings)
 
-    player_index = 0
-    strategy_index = 0
+        nash_equilibrium = nash_equilibrium[start_index:last_index].split(",")
 
-    for probability in nash_equilibrium:
-        print "Team ", reporter_configuration[player_index]['team'], "-> Strategy: ", \
-            strategies_catalog[strategy_index]['name'], " \t\tProbability", probability
+        team_index = 0
+        strategy_index = 0
 
-        if strategy_index < len(strategies_catalog) - 1:
-            strategy_index += 1
-        else:
-            player_index += 1
-            strategy_index = 0
+        for probability in nash_equilibrium:
+            print "Team ", team_index, "-> Strategy: ", \
+                strategies_catalog[strategy_index]['name'], " \t\tProbability", probability
+
+            if strategy_index < len(strategies_catalog) - 1:
+                strategy_index += 1
+            else:
+                team_index += 1
+                strategy_index = 0

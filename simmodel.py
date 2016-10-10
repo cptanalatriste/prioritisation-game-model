@@ -1,6 +1,7 @@
 """
 This module is a discrete event simulation model for the bug reporting process
 """
+from collections import defaultdict
 
 from SimPy.Simulation import *
 from SimPy.SimPlot import *
@@ -11,10 +12,6 @@ import payoffgetter
 import simdata
 import simutils
 
-CRITICAL_PRIORITY = 100
-
-NOT_INFLATE_STRATEGY = 'NOT_INFLATE'
-INFLATE_STRATEGY = 'INFLATE'
 SIMPLE_INFLATE_STRATEGY = 'SIMPLEINFLATE'
 HONEST_STRATEGY = 'HONEST'
 
@@ -82,6 +79,8 @@ class TestingContext:
                                                             'reported': 0}}
 
         self.med_resolution_time = self.get_med_resolution_time()
+        self.inflation_penalty = self.get_inflation_penalty()
+
         self.bug_catalog, self.bug_level = self.config_bug_catalog(bugs_by_priority)
 
     def config_bug_catalog(self, bugs_by_priority):
@@ -163,6 +162,20 @@ class TestingContext:
 
         return np.median(all_resolution_times)
 
+    def get_inflation_penalty(self):
+        """
+        Returns the discount from a tester's quota if inflation is detected.
+        :return: Inflation penalty.
+        """
+        all_resolution_times = []
+
+        for priority in simdata.SUPPORTED_PRIORITIES:
+            generator = self.resolution_time_gen[priority]
+            if generator is not None:
+                all_resolution_times.extend(generator.observations)
+
+        return max(all_resolution_times).item()
+
 
 class BugReportSource(Process):
     """
@@ -175,13 +188,9 @@ class BugReportSource(Process):
         self.batch_size_gen = reporter_config['batch_size_gen']
         self.testing_context = testing_context
 
-        self.inflation_gen = None
         strategy_key = 'strategy'
         if strategy_key in reporter_config:
             self.strategy = reporter_config[strategy_key]
-            if self.strategy == INFLATE_STRATEGY:
-                self.inflation_gen = simutils.DiscreteEmpiricalDistribution(values=[True, False],
-                                                                            probabilities=[0.5, 0.5])
         else:
             self.strategy = None
 
@@ -240,7 +249,8 @@ class BugReportSource(Process):
 
                 inflation_penalty = None
                 if self.testing_context.quota_system:
-                    inflation_penalty = self.testing_context.med_resolution_time.item()
+                    # Trying this
+                    inflation_penalty = self.testing_context.inflation_penalty
 
                     if payoffgetter.FORCE_PENALTY is not None:
                         inflation_penalty = payoffgetter.FORCE_PENALTY
@@ -279,11 +289,9 @@ class BugReportSource(Process):
         priority_for_report = real_priority
 
         if real_priority < simdata.SEVERE_PRIORITY:
-            if self.inflation_gen is not None and self.inflation_gen.generate():
-                priority_for_report += 1
 
             if self.strategy is not None and self.strategy['name'] == SIMPLE_INFLATE_STRATEGY:
-                priority_for_report += 2
+                priority_for_report = simdata.SEVERE_PRIORITY
 
         return priority_for_report
 
@@ -358,7 +366,7 @@ class BugReport(Process):
         if debug:
             print now(), ": Report ", self.name, " ready for fixing. "
 
-        # This sections applies the quota system process.
+        # This sections applies the quota system process. The Bug Report is holding a Developer resource.
         if inflation_penalty:
             quota_manager = devtime_level
 
@@ -368,9 +376,17 @@ class BugReport(Process):
             if false_report:
                 yield get, self, devtime_level, inflation_penalty
 
+                if debug:
+                    print "Penalty applied: Removing ", inflation_penalty, " from existing quota of ", devtime_level.amount
+
                 for reporter, quota in quota_manager.iteritems():
                     if reporter != self.reporter.name:
                         yield put, self, quota, donation
+
+                # Priority gets corrected and the report is re-entered on the queue
+                self.report_priority = self.real_priority
+                yield release, self, developer_resource
+                yield request, self, developer_resource, int(self.report_priority)
 
         # Finally, here we're using our development time budget.
         if devtime_level.amount <= 0:
@@ -395,6 +411,10 @@ class BugReport(Process):
                 print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting. Fix effort: ", \
                     self.fix_effort, " Available Dev Time: ", devtime_level.amount
         else:
+            if debug:
+                print "Not enough dev time in quota for fixing ", self.name, " Required: ", self.fix_effort, \
+                    " Avaialble: ", devtime_level.amount
+
             yield release, self, developer_resource
 
 
@@ -418,9 +438,10 @@ class SimulationController(Process):
 def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen, max_time,
               dev_team_bandwith,
               gatekeeper_config=False,
-              quota_system=False):
+              quota_system=False, debug=False):
     """
     Triggers the simulation, according to the provided parameters.
+    :param debug: Enable to got debug information.
     :param gatekeeper_config: Configuration parameters for the Gatekeeper.
     :param quota_system: If true, the developer time is divided among all the bug reporters in the simulation.
                             If inflation happens, the offender gets penalized.
@@ -464,10 +485,14 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
     activate(controller, controller.control())
 
     reporter_monitors = {}
+
+    strategy_counters = defaultdict(int)
     for reporter_config in reporters_config:
         reporter_monitor = Monitor()
         bug_reporter = BugReportSource(reporter_config=reporter_config,
                                        testing_context=testing_context)
+
+        strategy_counters[bug_reporter.strategy['name']] += 1
 
         activate(bug_reporter,
                  bug_reporter.start_reporting(developer_resource=developer_resource,
@@ -477,6 +502,11 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
                                                       "priority_counters": bug_reporter.priority_counters,
                                                       "report_counters": bug_reporter.report_counters,
                                                       "resolved_counters": bug_reporter.resolved_counters}
+
+    if debug:
+        print "strategy_counters: ", strategy_counters, " testing_context.med_resolution_time ", testing_context.med_resolution_time, \
+            "testing_context.inflation_penalty ", testing_context.inflation_penalty, "len(reporters_config) ", len(
+            reporters_config)
 
     simulation_result = simulate(until=max_time)
     return reporter_monitors, testing_context.priority_monitors
