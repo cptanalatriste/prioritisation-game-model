@@ -348,10 +348,10 @@ class BugReport(Process):
         if self.report_priority != self.real_priority:
             false_report = True
 
-        if debug:
-            pending_bugs = len(developer_resource.waitQ)
-            print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Reported Priority: ", \
-                self.report_priority, "Pending bugs: ", pending_bugs
+        # if debug:
+        #     pending_bugs = len(developer_resource.waitQ)
+        #     print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Reported Priority: ", \
+        #         self.report_priority, "Pending bugs: ", pending_bugs
 
         # This section relates to the gatekeeper logic.
         if gatekeeper_resource:
@@ -363,8 +363,8 @@ class BugReport(Process):
 
         yield request, self, developer_resource, int(self.report_priority)
 
-        if debug:
-            print now(), ": Report ", self.name, " ready for fixing. "
+        # if debug:
+        #     print now(), ": Report ", self.name, " ready for fixing. "
 
         # This sections applies the quota system process. The Bug Report is holding a Developer resource.
         if inflation_penalty:
@@ -374,14 +374,23 @@ class BugReport(Process):
             devtime_level = quota_manager[self.reporter.name]
 
             if false_report:
-                yield get, self, devtime_level, inflation_penalty
 
-                if debug:
-                    print "Penalty applied: Removing ", inflation_penalty, " from existing quota of ", devtime_level.amount
+                # We can improve this by redistributing the remaining quota instead of depletting.
+                if devtime_level.amount >= inflation_penalty:
+                    yield get, self, devtime_level, inflation_penalty
 
-                for reporter, quota in quota_manager.iteritems():
-                    if reporter != self.reporter.name:
-                        yield put, self, quota, donation
+                    if debug:
+                        print "Penalty applied to", self.reporter.name, " : Removing ", inflation_penalty, " from existing quota of ", devtime_level.amount
+
+                    for reporter, quota in quota_manager.iteritems():
+                        if reporter != self.reporter.name:
+                            if debug:
+                                print "Adding ", donation, " to reporter ", reporter, " quota. Previous value: ", quota.amount
+                            yield put, self, quota, donation
+                else:
+                    if debug:
+                        print "Depliting quota for tester ", self.reporter.name, ". Previous value: ", devtime_level.amount
+                    yield get, self, devtime_level, devtime_level.amount
 
                 # Priority gets corrected and the report is re-entered on the queue
                 self.report_priority = self.real_priority
@@ -391,7 +400,7 @@ class BugReport(Process):
         # Finally, here we're using our development time budget.
         if devtime_level.amount <= 0:
             if debug:
-                print "No more developer time available."
+                print "No more developer time available for ", self.reporter.name
 
             yield release, self, developer_resource
         elif self.fix_effort <= devtime_level.amount:
@@ -408,8 +417,8 @@ class BugReport(Process):
                     monitor.observe(resol_time)
 
             if debug:
-                print now(), ": Report ", self.name, " got fixed after ", resol_time, " of reporting. Fix effort: ", \
-                    self.fix_effort, " Available Dev Time: ", devtime_level.amount
+                print now(), ": Report ", self.name, "by reporter ", self.reporter.name, " got fixed after ", resol_time, \
+                    " of reporting. Fix effort: ", self.fix_effort, " Available Dev Time: ", devtime_level.amount
         else:
             if debug:
                 print "Not enough dev time in quota for fixing ", self.name, " Required: ", self.fix_effort, \
