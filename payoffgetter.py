@@ -44,7 +44,6 @@ FORCE_PENALTY = None
 EMPIRICAL_STRATEGIES = False
 N_CLUSTERS = 5
 
-# TODO: Implement these as regular empirical strategies.
 HEURISTIC_STRATEGIES = True
 
 # Gatekeeper configuration.
