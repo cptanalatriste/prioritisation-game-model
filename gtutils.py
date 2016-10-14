@@ -26,7 +26,7 @@ def get_strategic_game_format(game_desc, reporter_configuration, strategies_cata
 
     nfg_template = Template(template)
     teams = set(['"Team_' + str(team_number) + '"' for team_number in range(players)])
-    actions = " ".join(['"' + strategy['name'] + '"' for strategy in strategies_catalog])
+    actions = " ".join(['"' + strategy.name + '"' for strategy in strategies_catalog])
     action_list = ["{ " + actions + " }" for _ in teams]
 
     profile_lines = []
@@ -96,7 +96,7 @@ def calculate_equilibrium(reporter_configuration, strategies_catalog, gambit_fil
 
         for probability in nash_equilibrium:
             print "Team ", team_index, "-> Strategy: ", \
-                strategies_catalog[strategy_index]['name'], " \t\tProbability", probability
+                strategies_catalog[strategy_index].name, " \t\tProbability", probability
 
             if strategy_index < len(strategies_catalog) - 1:
                 strategy_index += 1

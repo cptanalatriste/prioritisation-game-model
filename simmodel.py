@@ -43,8 +43,8 @@ class EmpiricalInflationStrategy:
 
         return result
 
-    def __getitem__(self, item):
-        return self.strategy_config[item]
+    def __str__(self):
+        return self.name
 
 
 class TestingContext:
@@ -247,13 +247,7 @@ class BugReportSource(Process):
 
                 devtime_level = self.testing_context.devtime_level
 
-                inflation_penalty = None
-                if self.testing_context.quota_system:
-                    # Trying this
-                    inflation_penalty = self.testing_context.inflation_penalty
-
-                    if payoffgetter.FORCE_PENALTY is not None:
-                        inflation_penalty = payoffgetter.FORCE_PENALTY
+                inflation_penalty = self.get_inflation_penalty()
 
                 activate(bug_report,
                          bug_report.arrive(developer_resource=developer_resource,
@@ -273,6 +267,33 @@ class BugReportSource(Process):
 
         self.testing_context.last_report_time = now()
 
+    def get_inflation_penalty(self):
+        """
+        Returns the amount of the developer quota that will be taken in case of inflation.
+        :param devtime_level: List of tester's quotas.
+        :return: Penalty for inflation, None if it is not the case.
+        """
+        inflation_penalty = None
+
+        default_inflation_penalty = self.testing_context.inflation_penalty
+        devtime_level = self.testing_context.devtime_level
+
+        if self.testing_context.quota_system:
+
+            inflation_penalty = 0
+
+            if payoffgetter.FORCE_PENALTY is not None:
+                default_inflation_penalty = payoffgetter.FORCE_PENALTY
+
+            developer_quota = devtime_level[self.name]
+
+            if developer_quota.amount >= default_inflation_penalty:
+                inflation_penalty = default_inflation_penalty
+            elif 0 <= developer_quota.amount < default_inflation_penalty:
+                inflation_penalty = developer_quota.amount
+
+        return inflation_penalty
+
     def get_report_priority(self, real_priority):
         """
         Returns a priority to include in the report, according to the tester strategy.
@@ -280,18 +301,13 @@ class BugReportSource(Process):
         :return: Priority to report.
         """
 
-        if self.strategy is None or (isinstance(self.strategy, dict) and self.strategy['name'] == HONEST_STRATEGY):
+        if self.strategy is None:
             return real_priority
 
         if self.strategy is not None and isinstance(self.strategy, EmpiricalInflationStrategy):
             return self.strategy.priority_to_report(real_priority)
 
         priority_for_report = real_priority
-
-        if real_priority < simdata.SEVERE_PRIORITY:
-
-            if self.strategy is not None and self.strategy['name'] == SIMPLE_INFLATE_STRATEGY:
-                priority_for_report = simdata.SEVERE_PRIORITY
 
         return priority_for_report
 
@@ -348,11 +364,6 @@ class BugReport(Process):
         if self.report_priority != self.real_priority:
             false_report = True
 
-        # if debug:
-        #     pending_bugs = len(developer_resource.waitQ)
-        #     print arrival_time, ": Report ", self.name, " arrived. Effort: ", self.fix_effort, " Reported Priority: ", \
-        #         self.report_priority, "Pending bugs: ", pending_bugs
-
         # This section relates to the gatekeeper logic.
         if gatekeeper_resource:
             yield request, self, gatekeeper_resource
@@ -363,11 +374,8 @@ class BugReport(Process):
 
         yield request, self, developer_resource, int(self.report_priority)
 
-        # if debug:
-        #     print now(), ": Report ", self.name, " ready for fixing. "
-
         # This sections applies the quota system process. The Bug Report is holding a Developer resource.
-        if inflation_penalty:
+        if inflation_penalty is not None:
             quota_manager = devtime_level
 
             donation = float(inflation_penalty) / (len(quota_manager.keys()) - 1)
@@ -375,22 +383,18 @@ class BugReport(Process):
 
             if false_report:
 
-                # We can improve this by redistributing the remaining quota instead of depletting.
-                if devtime_level.amount >= inflation_penalty:
-                    yield get, self, devtime_level, inflation_penalty
-
+                if inflation_penalty > 0:
                     if debug:
-                        print "Penalty applied to", self.reporter.name, " : Removing ", inflation_penalty, " from existing quota of ", devtime_level.amount
+                        print "Penalty to be applied to", self.reporter.name, " : Removing ", inflation_penalty,\
+                            " from existing quota of ", devtime_level.amount
+
+                    yield get, self, devtime_level, inflation_penalty
 
                     for reporter, quota in quota_manager.iteritems():
                         if reporter != self.reporter.name:
                             if debug:
                                 print "Adding ", donation, " to reporter ", reporter, " quota. Previous value: ", quota.amount
                             yield put, self, quota, donation
-                else:
-                    if debug:
-                        print "Depliting quota for tester ", self.reporter.name, ". Previous value: ", devtime_level.amount
-                    yield get, self, devtime_level, devtime_level.amount
 
                 # Priority gets corrected and the report is re-entered on the queue
                 self.report_priority = self.real_priority
@@ -501,7 +505,7 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
         bug_reporter = BugReportSource(reporter_config=reporter_config,
                                        testing_context=testing_context)
 
-        strategy_counters[bug_reporter.strategy['name']] += 1
+        strategy_counters[bug_reporter.strategy.name] += 1
 
         activate(bug_reporter,
                  bug_reporter.start_reporting(developer_resource=developer_resource,

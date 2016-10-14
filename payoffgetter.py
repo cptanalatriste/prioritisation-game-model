@@ -21,8 +21,8 @@ import simutils
 import gtutils
 
 # General game configuration
-REDUCING_FACTOR = 1
-REPLICATIONS_PER_PROFILE = 100  # On the Walsh paper, they do 2500 replications per profile.
+REDUCING_FACTOR = 0.1
+REPLICATIONS_PER_PROFILE = 30  # On the Walsh paper, they do 2500 replications per profile.
 
 # Payoff function parameters
 PRIORITY_SCORING = True
@@ -37,13 +37,14 @@ CLONE_PLAYER = 0  # None to disable cloning
 CLONE_MEDIAN = True
 
 # Throtling configuration parameters.
-THROTTLING_ENABLED = False
+THROTTLING_ENABLED = True
 FORCE_PENALTY = None
 
 # Empirical Strategies parameters.
 EMPIRICAL_STRATEGIES = False
 N_CLUSTERS = 5
 
+# TODO: Implement these as regular empirical strategies.
 HEURISTIC_STRATEGIES = True
 
 # Gatekeeper configuration.
@@ -102,7 +103,7 @@ def consolidate_payoff_results(period, reporter_configuration, completed_per_rep
         for reporter_config in reporter_configuration:
             reporter_name = reporter_config['name']
             reporter_team = reporter_config['team']
-            reporter_strategy = reporter_config['strategy']['name']
+            reporter_strategy = reporter_config['strategy'].name
 
             reported_completed = run_resolved[reporter_name]
 
@@ -251,8 +252,19 @@ def get_heuristic_strategies():
     Returns a set of strategies not related with how users are behaving in data.
     :return:
     """
-    return [{'name': simmodel.HONEST_STRATEGY},
-            {'name': simmodel.SIMPLE_INFLATE_STRATEGY}]
+
+    honest_strategy = simmodel.EmpiricalInflationStrategy(strategy_config={'name': simmodel.HONEST_STRATEGY,
+                                                                           simutils.NONSEVERE_CORRECTION_COLUMN: 0.0,
+                                                                           simutils.SEVERE_CORRECTION_COLUMN: 0.0})
+
+    simple_inflate_strategy = simmodel.EmpiricalInflationStrategy(
+        strategy_config={'name': simmodel.SIMPLE_INFLATE_STRATEGY,
+                         simutils.NONSEVERE_CORRECTION_COLUMN: 1.0,
+                         simutils.NON_SEVERE_INFLATED_COLUMN: 1.0,
+                         simutils.SEVERE_CORRECTION_COLUMN: 0.0})
+
+    return [honest_strategy,
+            simple_inflate_strategy]
 
 
 def get_empirical_strategies(reporter_configuration, n_clusters=3):
@@ -333,10 +345,7 @@ def get_strategy_map(strategy_list, teams):
 
         # To keep the order preferred by Gambit
         for index, strategy in enumerate(reversed(list(profile))):
-            if isinstance(strategy, simmodel.EmpiricalInflationStrategy):
-                strategy_name = strategy.name
-            else:
-                strategy_name = strategy['name']
+            strategy_name = strategy.name
 
             strategy_map['name'] += strategy_name + "_"
             strategy_map['map'][index] = strategy
@@ -414,7 +423,7 @@ def check_simulation_history(overall_dataframes, player_configuration):
                                              team_key: set()})
 
     for player in player_configuration:
-        strategy_name = player['strategy']['name']
+        strategy_name = player['strategy'].name
         strategy_counters[strategy_name][counter_key] += 1
 
         strategy_counters[strategy_name][team_key].add(player[team_key])
