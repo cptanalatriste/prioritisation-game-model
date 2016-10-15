@@ -61,13 +61,12 @@ def get_strategic_game_format(game_desc, reporter_configuration, strategies_cata
     return file_name
 
 
-def calculate_equilibrium(reporter_configuration, strategies_catalog, gambit_file):
+def calculate_equilibrium(strategies_catalog, gambit_file):
     """
     Executes Gambit for equilibrium calculation.
     :param strategies_catalog: Catalog of available strategies.
-    :param reporter_configuration: List of reporter configurations.
     :param gambit_file:
-    :return:
+    :return: None
     """
 
     process = GAMBIT_FOLDER + ENUMERATE_EQUILIBRIA_SOLVER

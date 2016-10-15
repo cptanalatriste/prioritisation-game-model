@@ -21,40 +21,41 @@ import simutils
 import simcruncher
 import gtutils
 
-# General game configuration
-REDUCING_FACTOR = 0.1
-REPLICATIONS_PER_PROFILE = 30  # On the Walsh paper, they do 2500 replications per profile.
+DEFAULT_CONFIGURATION = {
+    # General game configuration
+    'REDUCING_FACTOR': 1,
+    'REPLICATIONS_PER_PROFILE': 30,  # On the Walsh paper, they do 2500 replications per profile.
 
-# Payoff function parameters
-PRIORITY_SCORING = True
-SCORE_MAP = {
-    simdata.NON_SEVERE_PRIORITY: 10,
-    simdata.NORMAL_PRIORITY: 10 * 2,
-    simdata.SEVERE_PRIORITY: 10 * 5
+    # Payoff function parameters
+    'PRIORITY_SCORING': True,
+    'SCORE_MAP': {
+        simdata.NON_SEVERE_PRIORITY: 10,
+        simdata.NORMAL_PRIORITY: 10 * 2,
+        simdata.SEVERE_PRIORITY: 10 * 5
+    },
+    'N_PLAYERS': None,  # None, for not filtering among suitable players.
+    'CLONE_PLAYER': 0,  # None to disable cloning
+    'CLONE_MEDIAN': True,
+
+    # Throtling configuration parameters.
+    'THROTTLING_ENABLED': True,
+    'FORCE_PENALTY': None,
+
+    # Empirical Strategies parameters.
+    'EMPIRICAL_STRATEGIES': False,
+    'N_CLUSTERS': 5,
+
+    'HEURISTIC_STRATEGIES': True,
+
+    # Gatekeeper configuration.
+    # 'GATEKEEPER_CONFIG': {'review_time': 8,  # False to disable the Gatekeeper on the simulation.
+    #                       'capacity': 1},
+    'GATEKEEPER_CONFIG': False,
+
+    # Team Configuration
+    'NUMBER_OF_TEAMS': 2,
+    'AGGREGATE_AGENT_TEAM': -1
 }
-
-N_PLAYERS = None  # None, for not filtering among suitable players.
-CLONE_PLAYER = 0  # None to disable cloning
-CLONE_MEDIAN = True
-
-# Throtling configuration parameters.
-THROTTLING_ENABLED = True
-FORCE_PENALTY = None
-
-# Empirical Strategies parameters.
-EMPIRICAL_STRATEGIES = False
-N_CLUSTERS = 5
-
-HEURISTIC_STRATEGIES = True
-
-# Gatekeeper configuration.
-GATEKEEPER_CONFIG = {'review_time': 8,  # False to disable the Gatekeeper on the simulation.
-                     'capacity': 1}
-GATEKEEPER_CONFIG = False
-
-# Team Configuration
-NUMBER_OF_TEAMS = 2
-AGGREGATE_AGENT_TEAM = -1
 
 
 def select_game_players(reporter_configuration, number_of_players=5, clone_player=None):
@@ -226,7 +227,7 @@ def configure_strategies_per_team(player_configuration, strategy_map):
         config['strategy'] = strategy_map[config['team']]
 
 
-def start_payoff_calculation(enhanced_dataframe, project_keys):
+def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuration):
     """
     Given a strategy profile list, calculates payoffs per player thorugh simulation.
     :param enhanced_dataframe: Report data to gather simulation input.
@@ -235,9 +236,10 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     """
     print "Starting simulation on projects ", project_keys
     total_issues = len(enhanced_dataframe.index)
-    enhanced_dataframe = enhanced_dataframe[:int(total_issues * REDUCING_FACTOR)]
+    enhanced_dataframe = enhanced_dataframe[:int(total_issues * game_configuration["REDUCING_FACTOR"])]
 
-    print "Original issues ", total_issues, "Reduction Factor: ", REDUCING_FACTOR, " Issues remaining after reduction: ", len(
+    print "Original issues ", total_issues, "Reduction Factor: ", game_configuration[
+        "REDUCING_FACTOR"], " Issues remaining after reduction: ", len(
         enhanced_dataframe.index)
 
     valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
@@ -248,14 +250,14 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     simutils.elbow_method_for_reporters(valid_reporters)
 
     empirical_strategies = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config in
-                            get_empirical_strategies(valid_reporters, n_clusters=N_CLUSTERS)]
+                            get_empirical_strategies(valid_reporters, n_clusters=game_configuration["N_CLUSTERS"])]
 
     strategies_catalog = []
 
-    if EMPIRICAL_STRATEGIES:
+    if game_configuration["EMPIRICAL_STRATEGIES"]:
         strategies_catalog.extend(empirical_strategies)
 
-    if HEURISTIC_STRATEGIES:
+    if game_configuration["HEURISTIC_STRATEGIES"]:
         strategies_catalog.extend(get_heuristic_strategies())
 
     print "strategies_catalog: ", strategies_catalog
@@ -264,11 +266,12 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
     reporter_configuration = select_reporters_for_simulation(valid_reporters)
 
     # This is the configuration of the actual game players.
-    clone_player = CLONE_PLAYER
-    if CLONE_MEDIAN:
+    clone_player = game_configuration["CLONE_PLAYER"]
+    if game_configuration["CLONE_MEDIAN"]:
         clone_player = len(reporter_configuration) / 2
 
-    player_configuration = select_game_players(reporter_configuration, number_of_players=N_PLAYERS,
+    player_configuration = select_game_players(reporter_configuration,
+                                               number_of_players=game_configuration["N_PLAYERS"],
                                                clone_player=clone_player)
 
     print "Reporters selected for playing the game ", len(player_configuration)
@@ -277,7 +280,7 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
         # When cloning is configured, distribution fitting happened before.
         simdriver.fit_reporter_distributions(player_configuration)
 
-    teams = NUMBER_OF_TEAMS
+    teams = game_configuration["NUMBER_OF_TEAMS"]
     strategy_maps = get_strategy_map(strategies_catalog, teams)
 
     engaged_testers = [reporter_config['name'] for reporter_config in reporter_configuration]
@@ -304,11 +307,16 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
 
     profile_payoffs = []
 
-    print "Simulation configuration: REPLICATIONS_PER_PROFILE ", REPLICATIONS_PER_PROFILE, " THROTTLING_ENABLED ", \
-        THROTTLING_ENABLED, " FORCE_PENALTY ", FORCE_PENALTY, " PRIORITY_SCORING ", PRIORITY_SCORING, \
-        " REDUCING_FACTOR ", REDUCING_FACTOR, " EMPIRICAL_STRATEGIES ", EMPIRICAL_STRATEGIES, \
-        " HEURISTIC_STRATEGIES ", HEURISTIC_STRATEGIES, " N_CLUSTERS ", N_CLUSTERS, " N_PLAYERS ", N_PLAYERS, \
-        " CLONE_PLAYER ", CLONE_PLAYER, " CLONE_MEDIAN ", CLONE_MEDIAN, " GATEKEEPER_CONFIG ", GATEKEEPER_CONFIG
+    print "Simulation configuration: REPLICATIONS_PER_PROFILE ", game_configuration[
+        "REPLICATIONS_PER_PROFILE"], " THROTTLING_ENABLED ", \
+        game_configuration["THROTTLING_ENABLED"], " FORCE_PENALTY ", game_configuration[
+        "FORCE_PENALTY"], " PRIORITY_SCORING ", game_configuration["PRIORITY_SCORING"], \
+        " REDUCING_FACTOR ", game_configuration["REDUCING_FACTOR"], " EMPIRICAL_STRATEGIES ", game_configuration[
+        "EMPIRICAL_STRATEGIES"], \
+        " HEURISTIC_STRATEGIES ", game_configuration["HEURISTIC_STRATEGIES"], " N_CLUSTERS ", game_configuration[
+        "N_CLUSTERS"], " N_PLAYERS ", game_configuration["N_PLAYERS"], \
+        " CLONE_PLAYER ", game_configuration["CLONE_PLAYER"], " CLONE_MEDIAN ", game_configuration[
+        "CLONE_MEDIAN"], " GATEKEEPER_CONFIG ", game_configuration["GATEKEEPER_CONFIG"]
 
     print "Simulating ", len(strategy_maps), " strategy profiles..."
 
@@ -320,12 +328,13 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
 
         for team, strategy in strategy_map.iteritems():
             print "Getting payoff for team ", team, " on profile ", file_prefix
-            simtwins.aggregate_players(team, player_configuration, AGGREGATE_AGENT_TEAM)
-            twins_strategy_map = simtwins.get_twins_strategy_map(team, strategy_map, AGGREGATE_AGENT_TEAM)
+            simtwins.aggregate_players(team, player_configuration, game_configuration["AGGREGATE_AGENT_TEAM"])
+            twins_strategy_map = simtwins.get_twins_strategy_map(team, strategy_map,
+                                                                 game_configuration["AGGREGATE_AGENT_TEAM"])
 
             configure_strategies_per_team(player_configuration, twins_strategy_map)
             overall_dataframe = simtwins.check_simulation_history(simulation_history, player_configuration,
-                                                                  AGGREGATE_AGENT_TEAM)
+                                                                  game_configuration["AGGREGATE_AGENT_TEAM"])
 
             if overall_dataframe is None:
                 completed_per_reporter, _, bugs_per_reporter, reports_per_reporter, resolved_per_reporter = simutils.launch_simulation(
@@ -334,17 +343,18 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
                     reporters_config=player_configuration,
                     resolution_time_gen=resolution_time_gen,
                     max_time=simulation_time,
-                    max_iterations=REPLICATIONS_PER_PROFILE,
+                    max_iterations=game_configuration["REPLICATIONS_PER_PROFILE"],
                     dev_team_bandwidth=dev_team_bandwith,
-                    quota_system=THROTTLING_ENABLED,
-                    gatekeeper_config=GATEKEEPER_CONFIG)
+                    quota_system=game_configuration["THROTTLING_ENABLED"],
+                    gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
 
                 simulation_result = simcruncher.consolidate_payoff_results("ALL", player_configuration,
                                                                            completed_per_reporter,
                                                                            bugs_per_reporter,
                                                                            reports_per_reporter,
-                                                                           resolved_per_reporter, SCORE_MAP,
-                                                                           PRIORITY_SCORING)
+                                                                           resolved_per_reporter,
+                                                                           game_configuration["SCORE_MAP"],
+                                                                           game_configuration["PRIORITY_SCORING"])
                 overall_dataframe = pd.DataFrame(simulation_result)
                 simulation_history.append(overall_dataframe)
 
@@ -356,18 +366,18 @@ def start_payoff_calculation(enhanced_dataframe, project_keys):
             overall_dataframes.append(overall_dataframe)
 
         payoffs = simcruncher.get_team_metrics(str(index) + "-" + file_prefix, "ALL", teams, overall_dataframes,
-                                               NUMBER_OF_TEAMS)
+                                               game_configuration["NUMBER_OF_TEAMS"])
         profile_payoffs.append((file_prefix, payoffs))
 
-    game_desc = "AS-IS" if not THROTTLING_ENABLED else "THROTTLING"
-    game_desc = "GATEKEEPER" if GATEKEEPER_CONFIG else game_desc
+    game_desc = "AS-IS" if not game_configuration["THROTTLING_ENABLED"] else "THROTTLING"
+    game_desc = "GATEKEEPER" if game_configuration["GATEKEEPER_CONFIG"] else game_desc
 
     print "Generating Gambit NFG file ..."
     gambit_file = gtutils.get_strategic_game_format(game_desc, player_configuration, strategies_catalog,
                                                     profile_payoffs, teams)
 
     print "Executing Gambit for equilibrium calculation..."
-    gtutils.calculate_equilibrium(player_configuration, strategies_catalog, gambit_file)
+    gtutils.calculate_equilibrium(strategies_catalog, gambit_file)
 
 
 def main():
@@ -378,7 +388,7 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
-    start_payoff_calculation(enhanced_dataframe, valid_projects)
+    start_payoff_calculation(enhanced_dataframe, valid_projects, DEFAULT_CONFIGURATION)
 
 
 if __name__ == "__main__":

@@ -282,8 +282,9 @@ class BugReportSource(Process):
 
             inflation_penalty = 0
 
-            if payoffgetter.FORCE_PENALTY is not None:
-                default_inflation_penalty = payoffgetter.FORCE_PENALTY
+            #TODO: Refactor this
+            if payoffgetter.DEFAULT_CONFIGURATION["FORCE_PENALTY"] is not None:
+                default_inflation_penalty = payoffgetter.DEFAULT_CONFIGURATION["FORCE_PENALTY"]
 
             developer_quota = devtime_level[self.name]
 
