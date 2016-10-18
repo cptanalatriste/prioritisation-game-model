@@ -7,6 +7,7 @@ import time
 import sys
 import winsound
 import copy
+import collections
 
 import pandas as pd
 
@@ -232,7 +233,28 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
     Given a strategy profile list, calculates payoffs per player thorugh simulation.
     :param enhanced_dataframe: Report data to gather simulation input.
     :param project_keys: Projects to be considered.
-    :return: Payoffss per player per profile.
+    :return: Payoffs per player per profile.
+    """
+
+    input_params = prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configuration)
+
+    return run_simulation(strategy_maps=input_params.strategy_maps, strategies_catalog=input_params.strategies_catalog,
+                          player_configuration=input_params.player_configuration,
+                          dev_team_size=input_params.dev_team_size,
+                          bugs_by_priority=input_params.bugs_by_priority,
+                          resolution_time_gen=input_params.resolution_time_gen,
+                          dev_team_bandwith=input_params.dev_team_bandwith, teams=input_params.teams,
+                          game_configuration=game_configuration)
+
+
+def prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configuration):
+    """
+    Based on the provided dataframe, this functions produces the simulation inputs.
+
+    :param enhanced_dataframe: Dataframe with bug reports.
+    :param project_keys: Selected projects.
+    :param game_configuration: Game configuration.
+    :return: Simulation inputs
     """
     print "Starting simulation on projects ", project_keys
     total_issues = len(enhanced_dataframe.index)
@@ -302,6 +324,32 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
 
     print "Project ", project_keys, " Test Period: ", "ALL", " Reporters: ", test_team_size, " Developers:", dev_team_size, \
         " Reports: ", bugs_by_priority, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
+
+    input_params = collections.namedtuple('SimulationParams',
+                                          ['strategy_maps', 'strategies_catalog', 'player_configuration',
+                                           'dev_team_size', 'bugs_by_priority', 'resolution_time_gen',
+                                           'dev_team_bandwith', 'teams'])
+
+    return input_params(strategy_maps, strategies_catalog, player_configuration, dev_team_size, bugs_by_priority,
+                        resolution_time_gen, dev_team_bandwith, teams)
+
+
+def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_team_size, bugs_by_priority,
+                   resolution_time_gen,
+                   dev_team_bandwith, teams, game_configuration):
+    """
+
+    :param strategy_maps: Strategy profiles of the game.
+    :param strategies_catalog: List of strategies available for players.
+    :param player_configuration: List of reporters with parameters.
+    :param dev_team_size: Number of developers available for bug fixing.
+    :param bugs_by_priority: Bugs to find in the system, according to their priority.
+    :param resolution_time_gen: Generators for resolution time. Per priority.
+    :param dev_team_bandwith: Number of dev time hours for bug fixing.
+    :param teams: Number of teams available.
+    :param game_configuration: Game configuration parameters.
+    :return: List of equilibrium profiles.
+    """
 
     simulation_time = sys.maxint
 

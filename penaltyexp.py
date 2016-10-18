@@ -30,10 +30,15 @@ def get_profile_for_plotting(equilibrium_list):
     strategy_of_interest = simmodel.SIMPLE_INFLATE_STRATEGY
 
     for profile in equilibrium_list:
+
         if selected_profile is None:
             selected_profile = profile
 
         else:
+            print "profile[sample_team][strategy_of_interest] ", profile[sample_team][strategy_of_interest]
+            print "selected_profile[sample_team][strategy_of_interest] ", selected_profile[sample_team][
+                strategy_of_interest]
+
             if Fraction(profile[sample_team][strategy_of_interest]) > Fraction(
                     selected_profile[sample_team][strategy_of_interest]):
                 selected_profile = profile
@@ -55,17 +60,32 @@ def main():
     valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
 
     experiment_results = []
-    for inflation_factor in range(1, 11):
-        game_configuration = payoffgetter.DEFAULT_CONFIGURATION
-        game_configuration['REDUCING_FACTOR'] = 0.1
-        game_configuration['REPLICATIONS_PER_PROFILE'] = 30
-        game_configuration['INFLATION_FACTOR'] = float(inflation_factor) / 10
-        game_configuration['THROTTLING_ENABLED'] = True
 
-        equilibrium_list = payoffgetter.start_payoff_calculation(enhanced_dataframe, valid_projects,
-                                                                 game_configuration)
+    game_configuration = payoffgetter.DEFAULT_CONFIGURATION
+    game_configuration['REDUCING_FACTOR'] = 0.1
+    game_configuration['REPLICATIONS_PER_PROFILE'] = 100
+    game_configuration['THROTTLING_ENABLED'] = True
+
+    input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
+                                                          game_configuration)
+
+    for inflation_factor in range(0, 11):
+        game_configuration['INFLATION_FACTOR'] = float(inflation_factor) / 10
+
+        print "Current inflation factor: ", game_configuration['INFLATION_FACTOR']
+
+        equilibrium_list = payoffgetter.run_simulation(strategy_maps=input_params.strategy_maps,
+                                                       strategies_catalog=input_params.strategies_catalog,
+                                                       player_configuration=input_params.player_configuration,
+                                                       dev_team_size=input_params.dev_team_size,
+                                                       bugs_by_priority=input_params.bugs_by_priority,
+                                                       resolution_time_gen=input_params.resolution_time_gen,
+                                                       dev_team_bandwith=input_params.dev_team_bandwith,
+                                                       teams=input_params.teams,
+                                                       game_configuration=game_configuration)
 
         symmetric_equilibrium = [profile for profile in equilibrium_list if gtutils.is_symmetric_equilibrium(profile)]
+        print "Symmetric Equilibria: ", len(symmetric_equilibrium)
 
         profile_for_plotting = get_profile_for_plotting(symmetric_equilibrium)
         sample_team = 0
