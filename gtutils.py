@@ -4,6 +4,7 @@ This modules provides functions for equilibrium calculation through the Gambit S
 
 import subprocess
 from string import Template
+from collections import defaultdict
 
 GAMBIT_FOLDER = "C:\Program Files (x86)\Gambit\\"
 
@@ -66,7 +67,7 @@ def calculate_equilibrium(strategies_catalog, gambit_file):
     Executes Gambit for equilibrium calculation.
     :param strategies_catalog: Catalog of available strategies.
     :param gambit_file:
-    :return: None
+    :return: List of equilibrium profiles.
     """
 
     process = GAMBIT_FOLDER + ENUMERATE_EQUILIBRIA_SOLVER
@@ -85,6 +86,7 @@ def calculate_equilibrium(strategies_catalog, gambit_file):
     start_index = 3
     last_index = -2
 
+    equilibrium_list = []
     for index, nash_equilibrium in enumerate(nash_equilibrium_strings):
         print "Equilibrium ", str(index + 1), " of ", len(nash_equilibrium_strings)
 
@@ -93,12 +95,47 @@ def calculate_equilibrium(strategies_catalog, gambit_file):
         team_index = 0
         strategy_index = 0
 
+        equilibrium_profile = defaultdict(defaultdict)
         for probability in nash_equilibrium:
-            print "Team ", team_index, "-> Strategy: ", \
-                strategies_catalog[strategy_index].name, " \t\tProbability", probability
+
+            strategy_name = strategies_catalog[strategy_index].name
+            print "Team ", team_index, "-> Strategy: ", strategy_name, " \t\tProbability", probability
+
+            equilibrium_profile[team_index][strategy_name] = probability
 
             if strategy_index < len(strategies_catalog) - 1:
                 strategy_index += 1
             else:
                 team_index += 1
                 strategy_index = 0
+
+        equilibrium_list.append(equilibrium_profile)
+
+    return equilibrium_list
+
+
+def is_symmetric_equilibrium(profile):
+    """
+    Returns true if the equilibrium profile represents a symmetric equilibrium.
+    :param profile: Map representing the profile.
+    :return:
+    """
+
+    strategy_names = set()
+
+    for team, strategy in profile.iteritems():
+        for strategy_name, probability in strategy.iteritems():
+            strategy_names.add(strategy_name)
+
+    is_symmetric = True
+
+    for strategy_name in strategy_names:
+        current_probability = None
+
+        for team, strategy in profile.iteritems():
+            if current_probability is None:
+                current_probability = strategy[strategy_name]
+            elif strategy[strategy_name] != current_probability:
+                return False
+
+    return is_symmetric

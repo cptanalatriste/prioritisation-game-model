@@ -39,7 +39,7 @@ DEFAULT_CONFIGURATION = {
 
     # Throtling configuration parameters.
     'THROTTLING_ENABLED': True,
-    'FORCE_PENALTY': None,
+    'INFLATION_FACTOR': 1,
 
     # Empirical Strategies parameters.
     'EMPIRICAL_STRATEGIES': False,
@@ -260,7 +260,7 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
     if game_configuration["HEURISTIC_STRATEGIES"]:
         strategies_catalog.extend(get_heuristic_strategies())
 
-    print "strategies_catalog: ", strategies_catalog
+    print "start_payoff_calculation->strategies_catalog: ", strategies_catalog
 
     # This are the reporters whose reported bugs will be used to configure the simulation.
     reporter_configuration = select_reporters_for_simulation(valid_reporters)
@@ -309,14 +309,14 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
 
     print "Simulation configuration: REPLICATIONS_PER_PROFILE ", game_configuration[
         "REPLICATIONS_PER_PROFILE"], " THROTTLING_ENABLED ", \
-        game_configuration["THROTTLING_ENABLED"], " FORCE_PENALTY ", game_configuration[
-        "FORCE_PENALTY"], " PRIORITY_SCORING ", game_configuration["PRIORITY_SCORING"], \
+        game_configuration["THROTTLING_ENABLED"], " PRIORITY_SCORING ", game_configuration["PRIORITY_SCORING"], \
         " REDUCING_FACTOR ", game_configuration["REDUCING_FACTOR"], " EMPIRICAL_STRATEGIES ", game_configuration[
         "EMPIRICAL_STRATEGIES"], \
         " HEURISTIC_STRATEGIES ", game_configuration["HEURISTIC_STRATEGIES"], " N_CLUSTERS ", game_configuration[
         "N_CLUSTERS"], " N_PLAYERS ", game_configuration["N_PLAYERS"], \
         " CLONE_PLAYER ", game_configuration["CLONE_PLAYER"], " CLONE_MEDIAN ", game_configuration[
-        "CLONE_MEDIAN"], " GATEKEEPER_CONFIG ", game_configuration["GATEKEEPER_CONFIG"]
+        "CLONE_MEDIAN"], " GATEKEEPER_CONFIG ", game_configuration["GATEKEEPER_CONFIG"], ' INFLATION_FACTOR ', \
+        game_configuration['INFLATION_FACTOR']
 
     print "Simulating ", len(strategy_maps), " strategy profiles..."
 
@@ -345,6 +345,7 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
                     max_time=simulation_time,
                     max_iterations=game_configuration["REPLICATIONS_PER_PROFILE"],
                     dev_team_bandwidth=dev_team_bandwith,
+                    inflation_factor=game_configuration["INFLATION_FACTOR"],
                     quota_system=game_configuration["THROTTLING_ENABLED"],
                     gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
 
@@ -377,7 +378,10 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
                                                     profile_payoffs, teams)
 
     print "Executing Gambit for equilibrium calculation..."
-    gtutils.calculate_equilibrium(strategies_catalog, gambit_file)
+    equilibrium_list = gtutils.calculate_equilibrium(strategies_catalog, gambit_file)
+
+    print "Equilibria found: ", len(equilibrium_list), equilibrium_list
+    return equilibrium_list
 
 
 def main():

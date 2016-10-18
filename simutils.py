@@ -22,7 +22,6 @@ import matplotlib.pyplot as plt
 
 import simdata
 import simmodel
-import simutils
 
 MINIMUM_OBSERVATIONS = 3
 
@@ -357,6 +356,7 @@ def plot_correlation(total_predicted, total_completed, title, figtext, plot):
 def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen,
                       max_iterations,
                       max_time=sys.maxint, dev_team_bandwidth=sys.maxint, gatekeeper_config=False,
+                      inflation_factor=1,
                       quota_system=False):
     """
     Triggers the simulation according a given configuration. It includes the seed reset behaviour.
@@ -392,7 +392,8 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
                                                                   max_time=max_time,
                                                                   dev_team_bandwith=dev_team_bandwidth,
                                                                   gatekeeper_config=gatekeeper_config,
-                                                                  quota_system=quota_system)
+                                                                  quota_system=quota_system,
+                                                                  inflation_factor=inflation_factor)
 
         result_per_reporter = {reporter_name: reporter_info['resolved_monitor'].count() for reporter_name, reporter_info
                                in

@@ -8,7 +8,6 @@ from SimPy.SimPlot import *
 
 import numpy as np
 
-import payoffgetter
 import simdata
 import simutils
 
@@ -54,7 +53,9 @@ class TestingContext:
 
     def __init__(self, resolution_time_gen, bugs_by_priority, default_review_time,
                  devtime_level,
-                 quota_system):
+                 quota_system,
+                 quota_per_dev,
+                 inflation_factor=1):
         """
         Configures the context of the simulation.
 
@@ -69,6 +70,7 @@ class TestingContext:
         self.devtime_level = devtime_level
         self.default_review_time = default_review_time
         self.last_report_time = None
+        self.quota_per_dev = quota_per_dev
         self.quota_system = quota_system
 
         self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {'completed': Monitor(),
@@ -79,7 +81,7 @@ class TestingContext:
                                                             'reported': 0}}
 
         self.med_resolution_time = self.get_med_resolution_time()
-        self.inflation_penalty = self.get_inflation_penalty()
+        self.inflation_penalty = self.get_default_inflation_penalty() * inflation_factor
 
         self.bug_catalog, self.bug_level = self.config_bug_catalog(bugs_by_priority)
 
@@ -162,19 +164,12 @@ class TestingContext:
 
         return np.median(all_resolution_times)
 
-    def get_inflation_penalty(self):
+    def get_default_inflation_penalty(self):
         """
         Returns the discount from a tester's quota if inflation is detected.
         :return: Inflation penalty.
         """
-        all_resolution_times = []
-
-        for priority in simdata.SUPPORTED_PRIORITIES:
-            generator = self.resolution_time_gen[priority]
-            if generator is not None:
-                all_resolution_times.extend(generator.observations)
-
-        return max(all_resolution_times).item()
+        return self.quota_per_dev
 
 
 class BugReportSource(Process):
@@ -282,10 +277,6 @@ class BugReportSource(Process):
 
             inflation_penalty = 0
 
-            #TODO: Refactor this
-            if payoffgetter.DEFAULT_CONFIGURATION["FORCE_PENALTY"] is not None:
-                default_inflation_penalty = payoffgetter.DEFAULT_CONFIGURATION["FORCE_PENALTY"]
-
             developer_quota = devtime_level[self.name]
 
             if developer_quota.amount >= default_inflation_penalty:
@@ -386,7 +377,7 @@ class BugReport(Process):
 
                 if inflation_penalty > 0:
                     if debug:
-                        print "Penalty to be applied to", self.reporter.name, " : Removing ", inflation_penalty,\
+                        print "Penalty to be applied to", self.reporter.name, " : Removing ", inflation_penalty, \
                             " from existing quota of ", devtime_level.amount
 
                     yield get, self, devtime_level, inflation_penalty
@@ -452,7 +443,7 @@ class SimulationController(Process):
 def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen, max_time,
               dev_team_bandwith,
               gatekeeper_config=False,
-              quota_system=False, debug=False):
+              quota_system=False, inflation_factor=1, debug=False):
     """
     Triggers the simulation, according to the provided parameters.
     :param debug: Enable to got debug information.
@@ -493,7 +484,9 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
     initialize()
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen,
                                      bugs_by_priority=bugs_by_priority, default_review_time=default_review_time,
-                                     devtime_level=devtime_level, quota_system=quota_system)
+                                     devtime_level=devtime_level, quota_system=quota_system,
+                                     quota_per_dev=quota_per_dev,
+                                     inflation_factor=inflation_factor)
 
     controller = SimulationController(testing_context=testing_context)
     activate(controller, controller.control())
