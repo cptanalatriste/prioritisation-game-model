@@ -62,14 +62,14 @@ def main():
     experiment_results = []
 
     game_configuration = payoffgetter.DEFAULT_CONFIGURATION
-    game_configuration['REDUCING_FACTOR'] = 0.1
-    game_configuration['REPLICATIONS_PER_PROFILE'] = 100
-    game_configuration['THROTTLING_ENABLED'] = True
+    game_configuration['REDUCING_FACTOR'] = 1
+    game_configuration['REPLICATIONS_PER_PROFILE'] = 30
+    game_configuration['THROTTLING_ENABLED'] = False
 
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
                                                           game_configuration)
 
-    for inflation_factor in range(0, 11):
+    for inflation_factor in range(0, 1):
         game_configuration['INFLATION_FACTOR'] = float(inflation_factor) / 10
 
         print "Current inflation factor: ", game_configuration['INFLATION_FACTOR']

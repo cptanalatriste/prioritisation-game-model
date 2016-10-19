@@ -5,6 +5,8 @@ This module contains the functions to consolidate simulation output information 
 import simdata
 import pandas as pd
 
+import scipy.stats as st
+
 
 def get_payoff_score(severe_completed, non_severe_completed, normal_completed, score_map, priority_based=True):
     """
@@ -140,9 +142,23 @@ def get_team_metrics(file_prefix, game_period, teams, overall_dataframes, number
     consolidated_dataframe.to_csv("csv/" + file_prefix + "_consolidated_result.csv", index=False)
 
     team_averages = []
+
     for team_index in range(number_of_teams):
         score_column = "team_" + str(team_index + 1) + "_score"
-        team_averages.append(int(consolidated_dataframe[score_column].mean()))
+
+        mean = consolidated_dataframe[score_column].mean()
+        team_averages.append(int(mean))
+
+        # This is the procedure found -and validated- on Chapter 2 of Introduction to Discrete Event Simulation by
+        # Theodore Allen
+        sem = st.sem(consolidated_dataframe[score_column])
+        df = consolidated_dataframe[score_column].count() - 1
+        alpha = 0.95
+
+        interval = st.t.interval(alpha=alpha, df=df, loc=mean, scale=sem)
+        print file_prefix, ": Confidence Interval Analysis for Team ", team_index, " mean=", mean, " sem=", sem, " df=", df, " alpha=", \
+            alpha, " interval=", interval
 
     print "file_prefix: ", file_prefix, " team_averages\t", team_averages, "\n"
+
     return [str(team_avg) for team_avg in team_averages]

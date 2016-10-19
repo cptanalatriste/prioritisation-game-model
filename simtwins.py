@@ -92,7 +92,6 @@ def check_simulation_history(overall_dataframes, player_configuration, aggregate
                 recycled_dataframe.loc[filter, 'reporter_team'] = configured_team
             else:
                 for strategy, strategy_info in strategy_counters.iteritems():
-                    print "strategy ", strategy, "strategy_info ", strategy_info
                     configured_team = strategy_counters[strategy][team_key].pop()
 
                     recycled_dataframe.loc[

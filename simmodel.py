@@ -81,7 +81,9 @@ class TestingContext:
                                                             'reported': 0}}
 
         self.med_resolution_time = self.get_med_resolution_time()
-        self.inflation_penalty = self.get_default_inflation_penalty() * inflation_factor
+
+        if self.quota_per_dev and self.quota_system:
+            self.inflation_penalty = self.get_default_inflation_penalty() * inflation_factor
 
         self.bug_catalog, self.bug_level = self.config_bug_catalog(bugs_by_priority)
 
@@ -270,10 +272,10 @@ class BugReportSource(Process):
         """
         inflation_penalty = None
 
-        default_inflation_penalty = self.testing_context.inflation_penalty
         devtime_level = self.testing_context.devtime_level
 
         if self.testing_context.quota_system:
+            default_inflation_penalty = self.testing_context.inflation_penalty
 
             inflation_penalty = 0
 
@@ -476,6 +478,7 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
 
     devtime_level = Level(capacity=sys.maxint, initialBuffered=dev_team_bandwith, monitored=True)
 
+    quota_per_dev = None
     if quota_system:
         quota_per_dev = dev_team_bandwith / len(reporters_config)
         devtime_level = {config['name']: Level(capacity=sys.maxint, initialBuffered=quota_per_dev, monitored=True) for
