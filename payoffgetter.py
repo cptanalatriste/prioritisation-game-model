@@ -257,12 +257,12 @@ def prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configurati
     :return: Simulation inputs
     """
     print "Starting simulation on projects ", project_keys
-    total_issues = len(enhanced_dataframe.index)
-    enhanced_dataframe = enhanced_dataframe[:int(total_issues * game_configuration["REDUCING_FACTOR"])]
+    total_projects = len(project_keys)
 
-    print "Original issues ", total_issues, "Reduction Factor: ", game_configuration[
-        "REDUCING_FACTOR"], " Issues remaining after reduction: ", len(
-        enhanced_dataframe.index)
+    project_keys = project_keys[:int(total_projects * game_configuration["REDUCING_FACTOR"])]
+
+    print "Original projects ", total_projects, "Reduction Factor: ", game_configuration[
+        "REDUCING_FACTOR"], " Projects remaining after reduction: ", len(project_keys)
 
     valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
     valid_reporters = simdriver.get_reporter_configuration(valid_reports)

@@ -3,8 +3,10 @@ Utility types for supporting the simulation.
 """
 from collections import defaultdict
 
-import numpy as np
 import sys
+
+import scipy.interpolate as interpolate
+import numpy as np
 
 import pandas as pd
 
@@ -47,15 +49,26 @@ class ContinuousEmpiricalDistribution:
                 raise ValueError("Only " + str(len(observations)) + " were provided.")
 
             self.observations = observations
-            self.sorted_observations = sorted(set(self.observations))
-
-            items = float(len(self.observations))
-            self.empirical_cdf = [sum(1 for item in observations if item <= observation) / items
-                                  for observation in self.sorted_observations]
+            self.inverse_cdf = self.inverse_transform_sampling()
 
         if distribution is not None and parameters is not None:
             self.distribution = distribution
             self.parameters = parameters
+
+    def inverse_transform_sampling(self, n_bins=40):
+        """
+        Code inspired from:
+        http://www.nehalemlabs.net/prototype/blog/2013/12/16/how-to-do-inverse-transformation-sampling-in-scipy-and-numpy/
+
+        :param n_bins:Number of bins for the CDF
+        :return: Inverse CDF
+        """
+        hist, bin_edges = np.histogram(self.observations, bins=n_bins, density=True)
+        cum_values = np.zeros(bin_edges.shape)
+        cum_values[1:] = np.cumsum(hist * np.diff(bin_edges))
+        inv_cdf = interpolate.interp1d(cum_values, bin_edges)
+
+        return inv_cdf
 
     def generate_from_scipy(self):
         parameter_tuple = self.parameters
@@ -78,8 +91,6 @@ class ContinuousEmpiricalDistribution:
         """
         Samples from this empirical distribution using the Inverse Transform method.
 
-        Based on: http://sms.victoria.ac.nz/foswiki/pub/Courses/OPRE354_2016T1/Python/bites_of_python.pdf
-
         :return:Random variate
         """
 
@@ -89,23 +100,7 @@ class ContinuousEmpiricalDistribution:
         if self.distribution is not None and self.parameters is not None:
             return self.generate_from_scipy()
 
-        k = 0
-        for index, cdf in enumerate(self.empirical_cdf):
-            if cdf > rand_uniform:
-                if index > 0:
-                    k = index - 1
-                    element_k = self.sorted_observations[k]
-                    cdf_k = self.empirical_cdf[k]
-
-                    element_k_next = self.sorted_observations[k + 1]
-                    cdf_k_next = self.empirical_cdf[k + 1]
-                    break
-                else:
-                    return self.sorted_observations[k]
-
-        rand_variate = element_k + (rand_uniform - cdf_k) / \
-                                   float(cdf_k_next - cdf_k) * (element_k_next - element_k)
-
+        rand_variate = self.inverse_cdf(rand_uniform)
         return rand_variate
 
 
