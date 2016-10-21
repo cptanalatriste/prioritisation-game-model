@@ -4,6 +4,7 @@ Utility types for supporting the simulation.
 from collections import defaultdict
 
 import sys
+from pathos.multiprocessing import ProcessingPool as Pool
 
 import scipy.interpolate as interpolate
 import numpy as np
@@ -13,7 +14,6 @@ import pandas as pd
 from scipy.stats import uniform
 from scipy.stats import rv_discrete
 
-# from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
 from sklearn.metrics import mean_absolute_error
@@ -348,6 +348,93 @@ def plot_correlation(total_predicted, total_completed, title, figtext, plot):
         plt.savefig("img/" + title + ".png", bbox_inches='tight')
 
 
+def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config,
+                               resolution_time_gen,
+                               max_iterations,
+                               max_time=sys.maxint, dev_team_bandwidth=sys.maxint, gatekeeper_config=False,
+                               inflation_factor=1,
+                               quota_system=False,
+                               parallel_blocks=4):
+    """
+    Parallelized version of the simulation launch, to maximize CPU utilization.
+
+    :param team_capacity:
+    :param bugs_by_priority:
+    :param reporters_config:
+    :param resolution_time_gen:
+    :param max_iterations:
+    :param max_time:
+    :param dev_team_bandwidth:
+    :param gatekeeper_config:
+    :param inflation_factor:
+    :param quota_system:
+    :param parallel_blocks:
+    :return:
+    """
+    pool = Pool(processes=parallel_blocks)
+    samples_per_worker = max_iterations / parallel_blocks
+
+    print "Making {} replications per worker...".format(samples_per_worker)
+
+    worker_inputs = []
+
+    completed_per_reporter = []
+    completed_per_priority = []
+    bugs_per_reporter = []
+    reports_per_reporter = []
+    resolved_per_reporter = []
+
+    for _ in range(parallel_blocks):
+        worker_input = {'team_capacity': team_capacity,
+                        'bugs_by_priority': bugs_by_priority,
+                        'reporters_config': reporters_config,
+                        'resolution_time_gen': resolution_time_gen,
+                        'max_iterations': samples_per_worker,
+                        'max_time': max_time,
+                        'dev_team_bandwidth': dev_team_bandwidth,
+                        'gatekeeper_config': gatekeeper_config,
+                        'inflation_factor': inflation_factor,
+                        'quota_system': quota_system}
+
+        worker_inputs.append(worker_input)
+
+    worker_outputs = pool.map(launch_simulation_wrapper, worker_inputs)
+
+    print "Workers in pool finished. Consolidating outputs..."
+
+    for output in worker_outputs:
+        completed_per_reporter += output['completed_per_reporter']
+        completed_per_priority += output['completed_per_priority']
+        bugs_per_reporter += output['bugs_per_reporter']
+        reports_per_reporter += output['reports_per_reporter']
+        resolved_per_reporter += output['resolved_per_reporter']
+
+    return completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, resolved_per_reporter
+
+
+def launch_simulation_wrapper(input_params):
+    """
+    A wrapper for the launch_simulation methods
+    :param input_params: A dict with the input parameters.
+    :return: A dict with the simulation output.
+    """
+    completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, resolved_per_reporter = launch_simulation(
+        team_capacity=input_params['team_capacity'], bugs_by_priority=input_params['bugs_by_priority'],
+        reporters_config=input_params['reporters_config'],
+        resolution_time_gen=input_params['resolution_time_gen'],
+        max_iterations=input_params['max_iterations'],
+        max_time=input_params['max_time'], dev_team_bandwidth=input_params['dev_team_bandwidth'],
+        gatekeeper_config=input_params['gatekeeper_config'],
+        inflation_factor=input_params['inflation_factor'],
+        quota_system=input_params['quota_system'])
+
+    return {'completed_per_reporter': completed_per_reporter,
+            'completed_per_priority': completed_per_priority,
+            'bugs_per_reporter': bugs_per_reporter,
+            'reports_per_reporter': reports_per_reporter,
+            'resolved_per_reporter': resolved_per_reporter}
+
+
 def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen,
                       max_iterations,
                       max_time=sys.maxint, dev_team_bandwidth=sys.maxint, gatekeeper_config=False,
@@ -371,14 +458,13 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
     # TODO(cgavidia): This also screams refactoring.
     completed_per_reporter = []
     completed_per_priority = []
-    reported_per_priotity = []
     bugs_per_reporter = []
     reports_per_reporter = []
     resolved_per_reporter = []
 
-    print "Running ", max_iterations, " replications: ",
+    print "Running ", max_iterations, " replications ... "
     for replication_index in range(max_iterations):
-        print replication_index + 1, " ",
+        # print replication_index + 1, " ",
         np.random.seed()
         reporter_monitors, priority_monitors = simmodel.run_model(team_capacity=team_capacity,
                                                                   bugs_by_priority=bugs_by_priority,
@@ -399,15 +485,12 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
                                priority_monitors.iteritems()}
         completed_per_priority.append(result_per_priority)
 
-        reports_per_priority = {priority: monitors['reported'] for priority, monitors in
-                                priority_monitors.iteritems()}
-        reported_per_priotity.append(reports_per_priority)
-
         bugs_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'priority_counters'))
         reports_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'report_counters'))
         resolved_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'resolved_counters'))
 
-    print
+    print max_iterations, " replications finished."
+
     return completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, resolved_per_reporter
 
 

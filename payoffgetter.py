@@ -24,7 +24,6 @@ import gtutils
 
 DEFAULT_CONFIGURATION = {
     # General game configuration
-    'REDUCING_FACTOR': 1,
     'REPLICATIONS_PER_PROFILE': 30,  # On the Walsh paper, they do 2500 replications per profile.
 
     # Payoff function parameters
@@ -259,10 +258,11 @@ def prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configurati
     print "Starting simulation on projects ", project_keys
     total_projects = len(project_keys)
 
-    project_keys = project_keys[:int(total_projects * game_configuration["REDUCING_FACTOR"])]
+    if game_configuration["PROJECT_FILTER"] is not None and len(game_configuration["PROJECT_FILTER"]) >= 1:
+        project_keys = game_configuration["PROJECT_FILTER"]
 
-    print "Original projects ", total_projects, "Reduction Factor: ", game_configuration[
-        "REDUCING_FACTOR"], " Projects remaining after reduction: ", len(project_keys)
+    print "Original projects ", total_projects, "Project Filter: ", game_configuration["PROJECT_FILTER"], \
+        " Projects remaining after reduction: ", len(project_keys)
 
     valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
     valid_reporters = simdriver.get_reporter_configuration(valid_reports)
@@ -358,7 +358,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
     print "Simulation configuration: REPLICATIONS_PER_PROFILE ", game_configuration[
         "REPLICATIONS_PER_PROFILE"], " THROTTLING_ENABLED ", \
         game_configuration["THROTTLING_ENABLED"], " PRIORITY_SCORING ", game_configuration["PRIORITY_SCORING"], \
-        " REDUCING_FACTOR ", game_configuration["REDUCING_FACTOR"], " EMPIRICAL_STRATEGIES ", game_configuration[
+        " PROJECT_FILTER ", game_configuration["PROJECT_FILTER"], " EMPIRICAL_STRATEGIES ", game_configuration[
         "EMPIRICAL_STRATEGIES"], \
         " HEURISTIC_STRATEGIES ", game_configuration["HEURISTIC_STRATEGIES"], " N_CLUSTERS ", game_configuration[
         "N_CLUSTERS"], " N_PLAYERS ", game_configuration["N_PLAYERS"], \
@@ -385,7 +385,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                                   game_configuration["AGGREGATE_AGENT_TEAM"])
 
             if overall_dataframe is None:
-                completed_per_reporter, _, bugs_per_reporter, reports_per_reporter, resolved_per_reporter = simutils.launch_simulation(
+                completed_per_reporter, _, bugs_per_reporter, reports_per_reporter, resolved_per_reporter = simutils.launch_simulation_parallel(
                     team_capacity=dev_team_size,
                     bugs_by_priority=bugs_by_priority,
                     reporters_config=player_configuration,

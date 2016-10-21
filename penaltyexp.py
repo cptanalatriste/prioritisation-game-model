@@ -62,8 +62,10 @@ def main():
     experiment_results = []
 
     game_configuration = payoffgetter.DEFAULT_CONFIGURATION
-    game_configuration['REDUCING_FACTOR'] = 0.15
-    game_configuration['REPLICATIONS_PER_PROFILE'] = 1000
+    game_configuration['PROJECT_FILTER'] = ['CASSANDRA']
+
+    game_configuration[
+        'REPLICATIONS_PER_PROFILE'] = 1000  # Recomendation taken from Software Process Dynamics by R. Madachy
     game_configuration['THROTTLING_ENABLED'] = True
 
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
