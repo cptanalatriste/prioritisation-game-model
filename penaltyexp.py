@@ -46,48 +46,32 @@ def get_profile_for_plotting(equilibrium_list):
     return profile
 
 
-def main():
-    """
-    Initial execution point
-    :return:
-    """
-    print "Loading information from ", simdata.ALL_ISSUES_CSV
-    all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
+def simulate_and_obtain_equilibria(input_params, game_configuration):
+    equilibrium_list = payoffgetter.run_simulation(strategy_maps=input_params.strategy_maps,
+                                                   strategies_catalog=input_params.strategies_catalog,
+                                                   player_configuration=input_params.player_configuration,
+                                                   dev_team_size=input_params.dev_team_size,
+                                                   bugs_by_priority=input_params.bugs_by_priority,
+                                                   resolution_time_gen=input_params.resolution_time_gen,
+                                                   dev_team_bandwith=input_params.dev_team_bandwith,
+                                                   teams=input_params.teams,
+                                                   game_configuration=game_configuration)
 
-    print "Adding calculated fields..."
-    enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
+    symmetric_equilibrium = [profile for profile in equilibrium_list if gtutils.is_symmetric_equilibrium(profile)]
+    print "Symmetric Equilibria: ", len(symmetric_equilibrium)
 
-    valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
+    return equilibrium_list, symmetric_equilibrium
 
-    experiment_results = []
 
-    game_configuration = payoffgetter.DEFAULT_CONFIGURATION
-    game_configuration['PROJECT_FILTER'] = ['CASSANDRA']
-
-    game_configuration[
-        'REPLICATIONS_PER_PROFILE'] = 1000  # Recomendation taken from Software Process Dynamics by R. Madachy
+def do_penalty_experiments(input_params, game_configuration):
     game_configuration['THROTTLING_ENABLED'] = True
 
-    input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
-                                                          game_configuration)
-
+    experiment_results = []
     for inflation_factor in range(0, 5):
         game_configuration['INFLATION_FACTOR'] = float(inflation_factor) / 20
 
         print "Current inflation factor: ", game_configuration['INFLATION_FACTOR']
-
-        equilibrium_list = payoffgetter.run_simulation(strategy_maps=input_params.strategy_maps,
-                                                       strategies_catalog=input_params.strategies_catalog,
-                                                       player_configuration=input_params.player_configuration,
-                                                       dev_team_size=input_params.dev_team_size,
-                                                       bugs_by_priority=input_params.bugs_by_priority,
-                                                       resolution_time_gen=input_params.resolution_time_gen,
-                                                       dev_team_bandwith=input_params.dev_team_bandwith,
-                                                       teams=input_params.teams,
-                                                       game_configuration=game_configuration)
-
-        symmetric_equilibrium = [profile for profile in equilibrium_list if gtutils.is_symmetric_equilibrium(profile)]
-        print "Symmetric Equilibria: ", len(symmetric_equilibrium)
+        equilibrium_list, symmetric_equilibrium = simulate_and_obtain_equilibria(input_params, game_configuration)
 
         profile_for_plotting = get_profile_for_plotting(symmetric_equilibrium)
         sample_team = 0
@@ -103,7 +87,75 @@ def main():
         experiment_results.append(results)
 
     dataframe = pd.DataFrame(experiment_results)
-    dataframe.to_csv("csv/penalty_experiment_results.csv", index=False)
+    dataframe.to_csv("csv/" + "_".join(game_configuration['PROJECT_FILTER']) + "_penalty_experiment_results.csv",
+                     index=False)
+
+
+def analyse_project(project_list, enhanced_dataframe, valid_projects, replications_per_profile=1000,
+                    use_empirical=False):
+    """
+
+    :param project_list:
+    :param enhanced_dataframe:
+    :param valid_projects:
+    :param replications_per_profile: The default value of 1000 is a recommendation from Software Process Dynamics by R. Madachy
+    :param use_empirical:
+    :return:
+    """
+    print "Analyzing ", valid_projects, " with ", replications_per_profile, " replications and use_empirical=", use_empirical
+
+    game_configuration = payoffgetter.DEFAULT_CONFIGURATION
+    game_configuration['PROJECT_FILTER'] = project_list
+    game_configuration[
+        'REPLICATIONS_PER_PROFILE'] = replications_per_profile
+
+    if use_empirical:
+        game_configuration['HEURISTIC_STRATEGIES'] = False
+        game_configuration['EMPIRICAL_STRATEGIES'] = True
+
+    input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
+                                                          game_configuration)
+    print "Starting AS-IS Game Analysis ..."
+    game_configuration['THROTTLING_ENABLED'] = False
+
+    simulate_and_obtain_equilibria(input_params, game_configuration)
+
+    # print "Starting Throtling penalty experiments..."
+    # game_configuration['THROTTLING_ENABLED'] = True
+    # do_penalty_experiments(input_params, game_configuration)
+
+    inflation_factor = 0.1
+    print "Starting Throttling Game Analysis with an Inflation Factor of ", inflation_factor
+    game_configuration['THROTTLING_ENABLED'] = True
+    game_configuration['INFLATION_FACTOR'] = inflation_factor
+    simulate_and_obtain_equilibria(input_params, game_configuration)
+
+    print "Starting gatekeeper analysis ..."
+    game_configuration['THROTTLING_ENABLED'] = False
+    game_configuration['GATEKEEPER_CONFIG'] = {'review_time': 8,
+                                               'capacity': 1}
+
+    simulate_and_obtain_equilibria(input_params, game_configuration)
+
+
+def main():
+    """
+    Initial execution point
+    :return:
+    """
+    print "Loading information from ", simdata.ALL_ISSUES_CSV
+    all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
+
+    print "Adding calculated fields..."
+    enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
+
+    valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
+
+    for project in valid_projects:
+        analyse_project([project], enhanced_dataframe, valid_projects, replications_per_profile=1000,
+                        use_empirical=True)
+
+    analyse_project(valid_projects, enhanced_dataframe, valid_projects)
 
 
 if __name__ == "__main__":

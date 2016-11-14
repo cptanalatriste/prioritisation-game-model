@@ -19,6 +19,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import median_absolute_error
+from sklearn.metrics import r2_score
 
 import matplotlib.pyplot as plt
 
@@ -190,7 +191,7 @@ def get_reporter_behavior_dataframe(reporters_config):
     return reporter_dataframe
 
 
-def elbow_method_for_reporters(reporter_configuration):
+def elbow_method_for_reporters(reporter_configuration, file_prefix=""):
     """
     Elbow method implementation for estimating the optimal number of clusters for a given task.
     :param reporter_configuration: List of reporter configuration info.
@@ -218,7 +219,7 @@ def elbow_method_for_reporters(reporter_configuration):
     plt.plot(range(1, 11), distortions, marker='o')
     plt.xlabel('Number of Clusters')
     plt.ylabel('Distortion')
-    plt.savefig("img/elbow_for_reporters.png", bbox_inches='tight')
+    plt.savefig("img/" + file_prefix + "_elbow_for_reporters.png", bbox_inches='tight')
 
 
 def assign_strategies(reporters_config, training_issues, n_clusters=3, debug=False):
@@ -383,6 +384,7 @@ def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config
     bugs_per_reporter = []
     reports_per_reporter = []
     resolved_per_reporter = []
+    reported_per_priotity = []
 
     for _ in range(parallel_blocks):
         worker_input = {'team_capacity': team_capacity,
@@ -409,7 +411,12 @@ def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config
         reports_per_reporter += output['reports_per_reporter']
         resolved_per_reporter += output['resolved_per_reporter']
 
-    return completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, resolved_per_reporter
+    return {"completed_per_reporter": completed_per_reporter,
+            "completed_per_priority": completed_per_priority,
+            "bugs_per_reporter": bugs_per_reporter,
+            "reports_per_reporter": reports_per_reporter,
+            "resolved_per_reporter": resolved_per_reporter,
+            "reported_per_priotity": reported_per_priotity}
 
 
 def launch_simulation_wrapper(input_params):
@@ -418,7 +425,7 @@ def launch_simulation_wrapper(input_params):
     :param input_params: A dict with the input parameters.
     :return: A dict with the simulation output.
     """
-    completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, resolved_per_reporter = launch_simulation(
+    simulation_results = launch_simulation(
         team_capacity=input_params['team_capacity'], bugs_by_priority=input_params['bugs_by_priority'],
         reporters_config=input_params['reporters_config'],
         resolution_time_gen=input_params['resolution_time_gen'],
@@ -428,11 +435,12 @@ def launch_simulation_wrapper(input_params):
         inflation_factor=input_params['inflation_factor'],
         quota_system=input_params['quota_system'])
 
-    return {'completed_per_reporter': completed_per_reporter,
-            'completed_per_priority': completed_per_priority,
-            'bugs_per_reporter': bugs_per_reporter,
-            'reports_per_reporter': reports_per_reporter,
-            'resolved_per_reporter': resolved_per_reporter}
+    return {'completed_per_reporter': simulation_results['completed_per_reporter'],
+            'completed_per_priority': simulation_results['completed_per_priority'],
+            'bugs_per_reporter': simulation_results['bugs_per_reporter'],
+            'reports_per_reporter': simulation_results['reports_per_reporter'],
+            'resolved_per_reporter': simulation_results['resolved_per_reporter'],
+            'reported_per_priotity': simulation_results['reported_per_priotity']}
 
 
 def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen,
@@ -458,6 +466,7 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
     # TODO(cgavidia): This also screams refactoring.
     completed_per_reporter = []
     completed_per_priority = []
+    reported_per_priotity = []
     bugs_per_reporter = []
     reports_per_reporter = []
     resolved_per_reporter = []
@@ -485,13 +494,22 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
                                priority_monitors.iteritems()}
         completed_per_priority.append(result_per_priority)
 
+        reports_per_priority = {priority: monitors['reported'] for priority, monitors in
+                                priority_monitors.iteritems()}
+        reported_per_priotity.append(reports_per_priority)
+
         bugs_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'priority_counters'))
         reports_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'report_counters'))
         resolved_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'resolved_counters'))
 
     print max_iterations, " replications finished."
 
-    return completed_per_reporter, completed_per_priority, bugs_per_reporter, reports_per_reporter, resolved_per_reporter
+    return {"completed_per_reporter": completed_per_reporter,
+            "completed_per_priority": completed_per_priority,
+            "bugs_per_reporter": bugs_per_reporter,
+            "reports_per_reporter": reports_per_reporter,
+            "resolved_per_reporter": resolved_per_reporter,
+            "reported_per_priotity": reported_per_priotity}
 
 
 def gather_reporter_statistics(reporter_monitors, metric_name):
@@ -523,8 +541,9 @@ def collect_metrics(true_values, predicted_values):
     mmre = mean_magnitude_relative_error(true_values, predicted_values, balanced=False)
     bmmre = mean_magnitude_relative_error(true_values, predicted_values, balanced=True)
     mdmre = median_magnitude_relative_error(true_values, predicted_values)
+    r_squared = r2_score(true_values, predicted_values)
 
-    return mse, rmse, mar, medar, mmre, bmmre, mdmre
+    return mse, rmse, mar, medar, mmre, bmmre, mdmre, r_squared
 
 
 def collect_and_print(project_key, description, total_completed, total_predicted):
@@ -537,11 +556,11 @@ def collect_and_print(project_key, description, total_completed, total_predicted
     :return:
     """
 
-    mse, rmse, mar, medar, mmre, bmmre, mdmre = collect_metrics(total_completed, total_predicted)
+    mse, rmse, mar, medar, mmre, bmmre, mdmre, r_squared = collect_metrics(total_completed, total_predicted)
 
     print  description, " in Project ", project_key, " on ", len(
         total_predicted), " datapoints ->  Root Mean Squared Error (RMSE):", rmse, " Mean Squared Error (MSE): ", mse, " Mean Absolute Error (MAE): ", \
         mar, " Median Absolute Error (MdAE): ", medar, " Mean Magnitude Relative Error (MMRE): ", mmre, " Balanced MMRE :", \
-        bmmre, "Median Magnitude Relative Error (MdMRE): ", mdmre
+        bmmre, "Median Magnitude Relative Error (MdMRE): ", mdmre, " R-squared ", r_squared
 
     return mmre, mdmre

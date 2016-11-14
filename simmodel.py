@@ -502,7 +502,8 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
         bug_reporter = BugReportSource(reporter_config=reporter_config,
                                        testing_context=testing_context)
 
-        strategy_counters[bug_reporter.strategy.name] += 1
+        if bug_reporter.strategy is not None:
+            strategy_counters[bug_reporter.strategy.name] += 1
 
         activate(bug_reporter,
                  bug_reporter.start_reporting(developer_resource=developer_resource,

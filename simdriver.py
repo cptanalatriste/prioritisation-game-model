@@ -237,6 +237,10 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
 def analyse_results(name="", reporters_config=None, simulation_results=None, project_key=None, debug=False, plot=PLOT):
     """
     Per each tester, it anaysis how close is simulation to real data.
+
+    We are performing a regression-based validation of the simulation model, as suggested by J. Sokolowski in Modeling and
+    Simulation Fundamentals.
+
     :param reporters_config: Tester configuration.
     :param simulation_results: Result from simulation.
     :return: None
@@ -543,6 +547,9 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
     test_issues = simdata.include_batch_information(test_issues)
 
     unique_batches = test_issues[simdata.BATCH_COLUMN].unique()
+    print len(test_issues.index), " where grouped in ", len(
+        unique_batches), " batches of ", simdata.BATCH_SIZE, " reports ..."
+
     for test_period in unique_batches:
         issues_for_period = test_issues[test_issues[simdata.BATCH_COLUMN] == test_period]
 
@@ -561,7 +568,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
 
         if is_valid_period(issues_for_period, resolved_in_period):
 
-            completed_per_reporter, completed_per_priority, _, _, reports_per_priority, _ = simutils.launch_simulation(
+            simulation_result = simutils.launch_simulation_parallel(
                 team_capacity=dev_team_size,
                 bugs_by_priority=bugs_by_priority,
                 reporters_config=reporters_config,
@@ -571,8 +578,9 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
 
             simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
                                                     reporters_config,
-                                                    completed_per_reporter, completed_per_priority,
-                                                    reports_per_priority)
+                                                    simulation_result["completed_per_reporter"],
+                                                    simulation_result["completed_per_priority"],
+                                                    simulation_result["reported_per_priotity"])
 
             if debug:
                 print "simulation_result ", simulation_result
@@ -658,7 +666,7 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
     valid_projects = get_valid_projects(enhanced_dataframe)
 
-    max_iterations = 100
+    max_iterations = 1000
     test_sizes = [.4, .3, .2]
 
     for test_size in test_sizes:

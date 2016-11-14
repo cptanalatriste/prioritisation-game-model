@@ -269,7 +269,7 @@ def prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configurati
     print "Reporters after drive-in tester removal ...", len(valid_reporters)
 
     print "Generating elbow-method plot..."
-    simutils.elbow_method_for_reporters(valid_reporters)
+    simutils.elbow_method_for_reporters(valid_reporters, file_prefix="_".join(project_keys))
 
     empirical_strategies = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config in
                             get_empirical_strategies(valid_reporters, n_clusters=game_configuration["N_CLUSTERS"])]
@@ -385,7 +385,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                                   game_configuration["AGGREGATE_AGENT_TEAM"])
 
             if overall_dataframe is None:
-                completed_per_reporter, _, bugs_per_reporter, reports_per_reporter, resolved_per_reporter = simutils.launch_simulation_parallel(
+                simulation_output = simutils.launch_simulation_parallel(
                     team_capacity=dev_team_size,
                     bugs_by_priority=bugs_by_priority,
                     reporters_config=player_configuration,
@@ -398,10 +398,10 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                     gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
 
                 simulation_result = simcruncher.consolidate_payoff_results("ALL", player_configuration,
-                                                                           completed_per_reporter,
-                                                                           bugs_per_reporter,
-                                                                           reports_per_reporter,
-                                                                           resolved_per_reporter,
+                                                                           simulation_output["completed_per_reporter"],
+                                                                           simulation_output["bugs_per_reporter"],
+                                                                           simulation_output["reports_per_reporter"],
+                                                                           simulation_output["resolved_per_reporter"],
                                                                            game_configuration["SCORE_MAP"],
                                                                            game_configuration["PRIORITY_SCORING"])
                 overall_dataframe = pd.DataFrame(simulation_result)
