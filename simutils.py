@@ -301,6 +301,21 @@ def magnitude_relative_error(estimate, actual, balanced=False):
     return mre
 
 
+def get_mre_values(total_completed, total_predicted, balanced=False):
+    """
+    Returns a list of MRE values.
+    :param total_completed: List of real values.
+    :param total_predicted: List of predictions.
+    :param balanced: True if we're using the balanced version of the MRE
+    :return:
+    """
+
+    mre_values = [magnitude_relative_error(estimate, actual, balanced)
+                  for estimate, actual in zip(total_completed, total_predicted)]
+
+    return mre_values
+
+
 def mean_magnitude_relative_error(total_completed, total_predicted, balanced=False):
     """
     The mean of absolute percentage errors.
@@ -308,9 +323,9 @@ def mean_magnitude_relative_error(total_completed, total_predicted, balanced=Fal
     :param total_predicted: List of predictions.
     :return: MMRE
     """
-    return 100 * np.mean(
-        [magnitude_relative_error(estimate, actual, balanced)
-         for estimate, actual in zip(total_completed, total_predicted)])
+
+    mre_values = get_mre_values(total_completed, total_predicted, balanced)
+    return 100 * np.mean(mre_values)
 
 
 def median_magnitude_relative_error(total_completed, total_predicted):
@@ -320,9 +335,9 @@ def median_magnitude_relative_error(total_completed, total_predicted):
     :param total_predicted: List of predictions.
     :return: MdMRE
     """
-    return 100 * np.median(
-        [magnitude_relative_error(estimate, actual)
-         for estimate, actual in zip(total_completed, total_predicted)])
+
+    mre_values = get_mre_values(total_completed, total_predicted)
+    return 100 * np.median(mre_values)
 
 
 def plot_correlation(total_predicted, total_completed, title, figtext, plot):
@@ -410,6 +425,7 @@ def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config
         bugs_per_reporter += output['bugs_per_reporter']
         reports_per_reporter += output['reports_per_reporter']
         resolved_per_reporter += output['resolved_per_reporter']
+        reported_per_priotity += output['reported_per_priotity']
 
     return {"completed_per_reporter": completed_per_reporter,
             "completed_per_priority": completed_per_priority,
@@ -526,7 +542,7 @@ def gather_reporter_statistics(reporter_monitors, metric_name):
     return metric_per_reporter
 
 
-def collect_metrics(true_values, predicted_values):
+def collect_metrics(true_values, predicted_values, store_metrics=False, file_prefix=""):
     """
     Returns a list of regression quality metrics.
     :param true_values: The list containing the true values.
@@ -543,6 +559,14 @@ def collect_metrics(true_values, predicted_values):
     mdmre = median_magnitude_relative_error(true_values, predicted_values)
     r_squared = r2_score(true_values, predicted_values)
 
+    if store_metrics:
+        mre_values = get_mre_values(true_values, predicted_values)
+
+        metrics_dataframe = pd.DataFrame({'true_values': true_values,
+                                          'predicted_values': predicted_values,
+                                          'mre_values': mre_values})
+
+        metrics_dataframe.to_csv("csv/pred_metrics_" + file_prefix + ".csv", index=False)
     return mse, rmse, mar, medar, mmre, bmmre, mdmre, r_squared
 
 
@@ -556,7 +580,9 @@ def collect_and_print(project_key, description, total_completed, total_predicted
     :return:
     """
 
-    mse, rmse, mar, medar, mmre, bmmre, mdmre, r_squared = collect_metrics(total_completed, total_predicted)
+    mse, rmse, mar, medar, mmre, bmmre, mdmre, r_squared = collect_metrics(total_completed, total_predicted,
+                                                                           store_metrics=True, file_prefix="_".join(
+            project_key) + "_" + description)
 
     print  description, " in Project ", project_key, " on ", len(
         total_predicted), " datapoints ->  Root Mean Squared Error (RMSE):", rmse, " Mean Squared Error (MSE): ", mse, " Mean Absolute Error (MAE): ", \

@@ -174,12 +174,6 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
                          "results_per_reporter": [],
                          "results_per_priority": [],
                          "true_resolved": len(resolved_in_month.index)}
-
-    # print "Period: ", year_month, "Issues reported: ", len(issues_for_period.index), " Detail: ", issues_for_period[
-    #     "Issue Key"].values
-    # print "Period: ", year_month, "Issues resolved: ", len(resolved_in_month.index), " Detail: ", resolved_in_month[
-    #     "Issue Key"].values
-
     results = []
     for report in completed_per_reporter:
         total_resolved = 0
@@ -276,7 +270,7 @@ def analyse_results(name="", reporters_config=None, simulation_results=None, pro
         print "total_completed ", total_completed
         print "total_predicted ", total_predicted
 
-    mmre, mdmre = simutils.collect_and_print(project_key, "Total bugs resolved-" + name, total_completed,
+    mmre, mdmre = simutils.collect_and_print(project_key, "Total_bugs_resolved-" + name, total_completed,
                                              total_predicted)
     simutils.plot_correlation(total_predicted, total_completed, "_".join(project_key) + "-Total Resolved-" + name,
                               "Points:{} MMRE:{} MdMRE:{}".format(len(total_predicted), int(mmre), int(mdmre)),
@@ -314,7 +308,7 @@ def analyse_results(name="", reporters_config=None, simulation_results=None, pro
                  result['priority'] == priority][0]
             reported_predicted.append(priority_reported_predicted)
 
-        mmre, mdmre = simutils.collect_and_print(project_key, "Priority " + str(priority) + "-" + name, completed_true,
+        mmre, mdmre = simutils.collect_and_print(project_key, "Priority_" + str(priority) + "-" + name, completed_true,
                                                  completed_predicted)
 
         priority_dataframe = pd.DataFrame({
@@ -325,7 +319,8 @@ def analyse_results(name="", reporters_config=None, simulation_results=None, pro
             "periods": periods
         })
 
-        priority_dataframe.to_csv("csv/" + "_".join(project_key) + "_Priority_" + str(priority) + ".csv", index=False)
+        priority_dataframe.to_csv("csv/pred_results_" + "_".join(project_key) + "_Priority_" + str(priority) + ".csv",
+                                  index=False)
 
         if debug:
             print " completed_true ", completed_true
@@ -442,7 +437,19 @@ def get_continuous_chunks(periods_train):
     return chunks
 
 
-def get_dev_team_production(issues_for_period):
+def get_resolution_times(issues_for_period):
+    """
+    From an issues dataframe, it returns the list of resolution times contained, excluding NaN
+    :param issues_for_period: Dataframe with issues.
+    :return: Resolution time series
+    """
+    resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False,
+                                              only_valid_resolution=False)
+
+    return resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
+
+
+def get_dev_team_production(issues_for_period, time_after_last=None):
     """
     Returns the production of the development team for a specific period.
     :return: Developer Team Size and Developer Team Production.
@@ -456,12 +463,8 @@ def get_dev_team_production(issues_for_period):
     resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False,
                                               only_valid_resolution=False)
 
-    resolution_times = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
-
-    time_after_last = 0
-
-    if len(resolution_times.index) > 0:
-        time_after_last = resolution_times.median()
+    if time_after_last is None:
+        time_after_last = get_resolution_times(issues_for_period).median()
 
     margin = datetime.timedelta(hours=time_after_last)
 
@@ -477,8 +480,12 @@ def get_dev_team_production(issues_for_period):
     bug_resolvers = resolved_in_period['JIRA Resolved By']
     dev_team_size = bug_resolvers.nunique()
     issues_resolved = len(resolved_in_period.index)
-    dev_team_bandwith = resolved_in_period[simdata.RESOLUTION_TIME_COLUMN].sum()
+    dev_team_bandwith = resolved_in_period[simdata.RESOLUTION_TIME_COLUMN]
 
+    print "time_after_last ", time_after_last
+    print "Developer Bandwith Information: ", dev_team_bandwith.describe()
+
+    dev_team_bandwith = dev_team_bandwith.sum()
     return dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith
 
 
@@ -550,6 +557,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
     print len(test_issues.index), " where grouped in ", len(
         unique_batches), " batches of ", simdata.BATCH_SIZE, " reports ..."
 
+    time_after_last = get_resolution_times(training_issues).median()
     for test_period in unique_batches:
         issues_for_period = test_issues[test_issues[simdata.BATCH_COLUMN] == test_period]
 
@@ -558,7 +566,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
                             issues_for_period[simdata.SIMPLE_PRIORITY_COLUMN].value_counts().iteritems()}
 
         dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(
-            issues_for_period)
+            issues_for_period, time_after_last=time_after_last)
 
         bug_reporters = issues_for_period['Reported By']
         test_team_size = bug_reporters.nunique()
