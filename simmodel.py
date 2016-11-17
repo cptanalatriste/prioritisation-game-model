@@ -442,8 +442,28 @@ class SimulationController(Process):
                 stopSimulation()
 
 
+def get_bugs_per_priority(priority_generator, catalog_size):
+    """
+    Gives the counts per priority for a bug catalog, according to the provided generator.
+    :param priority_generator: Priority generator.
+    :return: Map with the priorities.
+    """
+
+    priority_counters = defaultdict(int)
+
+    for _ in range(catalog_size):
+        priority = priority_generator.generate()[0]
+        priority_counters[priority] += np.int64(1)
+
+    return priority_counters
+
+
 def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen, max_time,
               dev_team_bandwith,
+              priority_generator=None,
+              catalog_size=None,
+              dev_size_generator=None,
+              dev_bandwith_generator=None,
               gatekeeper_config=False,
               quota_system=False, inflation_factor=1, debug=False):
     """
@@ -473,6 +493,12 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
     preemptable = False
 
+    if dev_size_generator is not None:
+        team_capacity = dev_size_generator.generate()[0]
+
+    if dev_bandwith_generator is not None:
+        dev_team_bandwith = int(dev_bandwith_generator.generate())
+
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
 
@@ -485,6 +511,10 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
                          config in reporters_config}
 
     initialize()
+
+    if priority_generator is not None and catalog_size is not None:
+        bugs_by_priority = get_bugs_per_priority(priority_generator, catalog_size)
+
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen,
                                      bugs_by_priority=bugs_by_priority, default_review_time=default_review_time,
                                      devtime_level=devtime_level, quota_system=quota_system,

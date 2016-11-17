@@ -367,13 +367,21 @@ def plot_correlation(total_predicted, total_completed, title, figtext, plot):
 def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config,
                                resolution_time_gen,
                                max_iterations,
-                               max_time=sys.maxint, dev_team_bandwidth=sys.maxint, gatekeeper_config=False,
+                               max_time=sys.maxint,
+                               dev_team_bandwidth=sys.maxint,
+                               priority_generator=None,
+                               catalog_size=None,
+                               dev_size_generator=None,
+                               dev_bandwith_generator=None,
+                               gatekeeper_config=False,
                                inflation_factor=1,
                                quota_system=False,
                                parallel_blocks=4):
     """
     Parallelized version of the simulation launch, to maximize CPU utilization.
 
+    :param catalog_size: Number of defects present on the system.
+    :param priority_generator: Generator for the priority of the defects.
     :param team_capacity:
     :param bugs_by_priority:
     :param reporters_config:
@@ -411,6 +419,10 @@ def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config
                         'dev_team_bandwidth': dev_team_bandwidth,
                         'gatekeeper_config': gatekeeper_config,
                         'inflation_factor': inflation_factor,
+                        'priority_generator': priority_generator,
+                        'catalog_size': catalog_size,
+                        'dev_size_generator': dev_size_generator,
+                        'dev_bandwith_generator': dev_bandwith_generator,
                         'quota_system': quota_system}
 
         worker_inputs.append(worker_input)
@@ -447,6 +459,10 @@ def launch_simulation_wrapper(input_params):
         resolution_time_gen=input_params['resolution_time_gen'],
         max_iterations=input_params['max_iterations'],
         max_time=input_params['max_time'], dev_team_bandwidth=input_params['dev_team_bandwidth'],
+        priority_generator=input_params['priority_generator'],
+        catalog_size=input_params['catalog_size'],
+        dev_size_generator=input_params['dev_size_generator'],
+        dev_bandwith_generator=input_params['dev_bandwith_generator'],
         gatekeeper_config=input_params['gatekeeper_config'],
         inflation_factor=input_params['inflation_factor'],
         quota_system=input_params['quota_system'])
@@ -461,7 +477,12 @@ def launch_simulation_wrapper(input_params):
 
 def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen,
                       max_iterations,
-                      max_time=sys.maxint, dev_team_bandwidth=sys.maxint, gatekeeper_config=False,
+                      max_time=sys.maxint, dev_team_bandwidth=sys.maxint,
+                      priority_generator=None,
+                      catalog_size=None,
+                      dev_size_generator=None,
+                      dev_bandwith_generator=None,
+                      gatekeeper_config=False,
                       inflation_factor=1,
                       quota_system=False):
     """
@@ -497,6 +518,10 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
                                                                   resolution_time_gen=resolution_time_gen,
                                                                   max_time=max_time,
                                                                   dev_team_bandwith=dev_team_bandwidth,
+                                                                  priority_generator=priority_generator,
+                                                                  catalog_size=catalog_size,
+                                                                  dev_size_generator=dev_size_generator,
+                                                                  dev_bandwith_generator=dev_bandwith_generator,
                                                                   gatekeeper_config=gatekeeper_config,
                                                                   quota_system=quota_system,
                                                                   inflation_factor=inflation_factor)

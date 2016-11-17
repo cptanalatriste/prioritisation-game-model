@@ -130,7 +130,7 @@ def week_of_month(dt):
     return 1 if dt.day <= 15 else 2
 
 
-def period_identifier(report_series):
+def period_identifier(report_series, batch_size=BATCH_SIZE):
     """
     Generates a period identifier based on report information.
     :param report_series: Bug report information.
@@ -138,8 +138,12 @@ def period_identifier(report_series):
     """
 
     index_value = report_series.name
-    batch_size = BATCH_SIZE
-    batch_identifier = int(index_value) / int(batch_size)
+
+    if batch_size > 0:
+        batch_identifier = int(index_value) / int(batch_size)
+    else:
+        batch_identifier = 1
+
     return batch_identifier
 
 

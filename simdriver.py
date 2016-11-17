@@ -3,8 +3,6 @@ This modules triggers the bug report simulation.
 """
 import time
 import datetime
-import pytz
-import sys
 
 from scipy import stats
 import numpy as np
@@ -15,13 +13,13 @@ from sklearn.cross_validation import KFold
 
 import defaultabuse
 import simdata
+import simvalid
 import simutils
 import siminput
 
 import winsound
 
 DEBUG = False
-PLOT = False
 
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
 MINIMUM_P_VALUE = 0.05
@@ -155,6 +153,37 @@ def fit_reporter_distributions(reporters_config):
         config['interarrival_time_gen'] = inter_arrival_time_gen
 
 
+def get_reporting_metrics(reported_dataset, resolved_dataset, reporters_config):
+    """
+    Gathers data metrics from a list of resolved issues.
+    :param resolved_dataset: Dataframe with resolved issues.
+    :return: Map with the resolved metrics.
+    """
+
+    resolution_metrics = {"results_per_priority": [],
+                          "results_per_reporter": [],
+                          'true_resolved': len(resolved_dataset.index)}
+
+    for priority in simdata.SUPPORTED_PRIORITIES:
+        resolved_per_priority = resolved_dataset[resolved_dataset[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+        reported_per_priority = reported_dataset[reported_dataset[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+
+        resolution_metrics['results_per_priority'].append({'priority': priority,
+                                                           'true_resolved': len(resolved_per_priority.index),
+                                                           'true_reported': len(reported_per_priority.index)})
+
+    for reporter_config in reporters_config:
+        reporter_name = reporter_config['name']
+        true_resolved = simdata.filter_by_reporter(resolved_dataset, reporter_config['reporter_list'])
+        true_reported = simdata.filter_by_reporter(reported_dataset, reporter_config['reporter_list'])
+
+        resolution_metrics["results_per_reporter"].append({"reporter_name": reporter_name,
+                                                           "true_resolved": len(true_resolved.index),
+                                                           'true_reported': len(true_reported.index)})
+
+    return resolution_metrics
+
+
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_per_reporter,
                         completed_per_priority, reports_per_priority,
                         debug=False):
@@ -170,10 +199,17 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     :param completed_per_priority: Simulation results per priority.
     :return:
     """
+
+    resolution_metrics = None
+    true_resolved = None
+    if issues_for_period is not None and resolved_in_month is not None:
+        resolution_metrics = get_reporting_metrics(issues_for_period, resolved_in_month, reporters_config)
+        true_resolved = resolution_metrics['true_resolved']
+
     simulation_result = {"period": year_month,
                          "results_per_reporter": [],
                          "results_per_priority": [],
-                         "true_resolved": len(resolved_in_month.index)}
+                         "true_resolved": true_resolved}
     results = []
     for report in completed_per_reporter:
         total_resolved = 0
@@ -181,12 +217,20 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
             total_resolved += report[reporter_config['name']]
         results.append(total_resolved)
 
+    simulation_result["resolved_samples"] = results
     simulation_result["predicted_resolved"] = np.mean(results)
 
     # TODO: This reporter/priority logic can be refactored.
     for priority in simdata.SUPPORTED_PRIORITIES:
-        resolved_per_priority = resolved_in_month[resolved_in_month[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
-        reported_per_priority = issues_for_period[issues_for_period[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+
+        true_resolved = None
+        true_reported = None
+        if resolution_metrics is not None:
+            true_results = [result for result in resolution_metrics['results_per_priority'] if
+                            result['priority'] == priority][0]
+
+            true_resolved = true_results['true_resolved']
+            true_reported = true_results['true_reported']
 
         resolved_on_simulation = [report[priority] for report in completed_per_priority]
         predicted_resolved = np.mean(resolved_on_simulation)
@@ -195,15 +239,23 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
         predicted_reported = np.mean(reported_on_simulation)
 
         simulation_result['results_per_priority'].append({'priority': priority,
-                                                          'true_resolved': len(resolved_per_priority.index),
-                                                          'true_reported': len(reported_per_priority.index),
+                                                          'true_resolved': true_resolved,
+                                                          'true_reported': true_reported,
                                                           'predicted_resolved': predicted_resolved,
                                                           'predicted_reported': predicted_reported})
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
-        true_resolved = simdata.filter_by_reporter(resolved_in_month, reporter_config['reporter_list'])
-        true_reported = simdata.filter_by_reporter(issues_for_period, reporter_config['reporter_list'])
+
+        true_resolved = None
+        true_reported = None
+
+        if resolution_metrics is not None:
+            true_results = [result for result in resolution_metrics['results_per_reporter'] if
+                            result['reporter_name'] == reporter_name][0]
+
+            true_resolved = true_results['true_resolved']
+            true_reported = true_results['true_reported']
 
         resolved_on_simulation = [report[reporter_name] for report in completed_per_reporter]
         predicted_resolved = np.mean(resolved_on_simulation)
@@ -219,119 +271,14 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
                 true_reported.index)
 
         simulation_result["results_per_reporter"].append({"reporter_name": reporter_name,
-                                                          "true_resolved": len(true_resolved.index),
+                                                          "true_resolved": true_resolved,
+                                                          "true_reported": true_reported,
                                                           "predicted_resolved": predicted_resolved})
 
     if debug:
         print "simulation_result ", simulation_result
 
     return simulation_result
-
-
-def analyse_results(name="", reporters_config=None, simulation_results=None, project_key=None, debug=False, plot=PLOT):
-    """
-    Per each tester, it anaysis how close is simulation to real data.
-
-    We are performing a regression-based validation of the simulation model, as suggested by J. Sokolowski in Modeling and
-    Simulation Fundamentals.
-
-    :param reporters_config: Tester configuration.
-    :param simulation_results: Result from simulation.
-    :return: None
-    """
-
-    # TODO: This reporter/priority logic can be refactored.
-    if reporters_config:
-        for reporter_config in reporters_config:
-            reporter_name = reporter_config['name']
-            completed_true = []
-            completed_predicted = []
-
-            for simulation_result in simulation_results:
-                reporter_true = [result['true_resolved'] for result in simulation_result["results_per_reporter"] if
-                                 result["reporter_name"] == reporter_name][0]
-                completed_true.append(reporter_true)
-
-                reporter_predicted = \
-                    [result['predicted_resolved'] for result in simulation_result["results_per_reporter"] if
-                     result["reporter_name"] == reporter_name][0]
-                completed_predicted.append(reporter_predicted)
-
-                if debug:
-                    print "period: ", simulation_result[
-                        "period"], " reporter ", reporter_name, " predicted ", reporter_predicted, " true ", reporter_true
-
-            simutils.collect_and_print(project_key, "Tester " + reporter_name, completed_true, completed_predicted)
-
-    total_completed = [result['true_resolved'] for result in simulation_results]
-    total_predicted = [result['predicted_resolved'] for result in simulation_results]
-
-    if debug:
-        print "total_completed ", total_completed
-        print "total_predicted ", total_predicted
-
-    mmre, mdmre = simutils.collect_and_print(project_key, "Total_bugs_resolved-" + name, total_completed,
-                                             total_predicted)
-    simutils.plot_correlation(total_predicted, total_completed, "_".join(project_key) + "-Total Resolved-" + name,
-                              "Points:{} MMRE:{} MdMRE:{}".format(len(total_predicted), int(mmre), int(mdmre)),
-                              plot)
-
-    for priority in simdata.SUPPORTED_PRIORITIES:
-        completed_true = []
-        completed_predicted = []
-
-        reported_true = []
-        reported_predicted = []
-
-        periods = []
-
-        for simulation_result in simulation_results:
-            periods.append(simulation_result['period'])
-
-            priority_resolved_true = [result['true_resolved'] for result in simulation_result['results_per_priority'] if
-                                      result['priority'] == priority][0]
-            completed_true.append(priority_resolved_true)
-
-            priority_resolved_predicted = \
-                [result['predicted_resolved'] for result in simulation_result['results_per_priority']
-                 if
-                 result['priority'] == priority][0]
-            completed_predicted.append(priority_resolved_predicted)
-
-            priority_reported_true = [result['true_reported'] for result in simulation_result['results_per_priority'] if
-                                      result['priority'] == priority][0]
-            reported_true.append(priority_reported_true)
-
-            priority_reported_predicted = \
-                [result['predicted_reported'] for result in simulation_result['results_per_priority']
-                 if
-                 result['priority'] == priority][0]
-            reported_predicted.append(priority_reported_predicted)
-
-        mmre, mdmre = simutils.collect_and_print(project_key, "Priority_" + str(priority) + "-" + name, completed_true,
-                                                 completed_predicted)
-
-        priority_dataframe = pd.DataFrame({
-            "completed_true": completed_true,
-            "completed_predicted": completed_predicted,
-            "reported_true": reported_true,
-            "reported_predicted": reported_predicted,
-            "periods": periods
-        })
-
-        priority_dataframe.to_csv("csv/pred_results_" + "_".join(project_key) + "_Priority_" + str(priority) + ".csv",
-                                  index=False)
-
-        if debug:
-            print " completed_true ", completed_true
-            print " completed_predicted ", completed_predicted
-            print " reported_true ", reported_true
-            print " reported_predicted ", reported_predicted
-
-        simutils.plot_correlation(completed_predicted, completed_true,
-                                  "-".join(project_key) + "-Priority " + str(priority) + "-" + name,
-                                  "Points:{} MMRE:{} MdMRE:{}".format(len(completed_predicted), int(mmre), int(mdmre)),
-                                  plot)
 
 
 def get_simulation_input(training_issues=None, fold=1):
@@ -449,6 +396,17 @@ def get_resolution_times(issues_for_period):
     return resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
 
 
+def is_valid_period(issues_for_period):
+    """
+    Determines the rule for launching the simulation for that period.
+
+    :param issues_for_period: Total issues in the period.
+    :param resolved_in_period: Resolved issues in the period.
+    :return: True if valid for simulation. False otherwise.
+    """
+    return len(issues_for_period.index) == simdata.BATCH_SIZE
+
+
 def get_dev_team_production(issues_for_period, time_after_last=None):
     """
     Returns the production of the development team for a specific period.
@@ -482,30 +440,44 @@ def get_dev_team_production(issues_for_period, time_after_last=None):
     issues_resolved = len(resolved_in_period.index)
     dev_team_bandwith = resolved_in_period[simdata.RESOLUTION_TIME_COLUMN]
 
-    print "time_after_last ", time_after_last
-    print "Developer Bandwith Information: ", dev_team_bandwith.describe()
-
     dev_team_bandwith = dev_team_bandwith.sum()
     return dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith
 
 
-def is_valid_period(issues_for_period, resolved_in_period):
+def get_dev_team_training(training_issues, time_after_last):
     """
-    Determines the rule for launching the simulation for that period.
+    Extracts development team information from the training dataset.
 
-    :param issues_for_period: Total issues in the period.
-    :param resolved_in_period: Resolved issues in the period.
-    :return: True if valid for simulation. False otherwise.
+    :param training_issues: Dataframe with the issues for training
+    :return: A develoment team size generator, and another one for the bandwith.
     """
-    reports_per_month = len(issues_for_period.index)
-    issues_resolved = len(resolved_in_period.index)
 
-    fix_ratio = 0.0
-    if reports_per_month > 0:
-        issues_resolved / float(reports_per_month)
-    threshold = 0.8
+    training_in_batches = simdata.include_batch_information(training_issues)
+    dev_team_sizes = []
+    dev_team_bandwiths = []
 
-    return fix_ratio < threshold
+    unique_batches = training_in_batches[simdata.BATCH_COLUMN].unique()
+    print len(training_in_batches.index), " training issues where grouped in ", len(
+        unique_batches), " batches of ", simdata.BATCH_SIZE, " reports ..."
+
+    for train_batch in unique_batches:
+        issues_for_batch = training_in_batches[training_in_batches[simdata.BATCH_COLUMN] == train_batch]
+
+        dev_team_size, _, _, dev_team_bandwith = get_dev_team_production(issues_for_batch, time_after_last)
+        dev_team_sizes.append(dev_team_size)
+        dev_team_bandwiths.append(dev_team_bandwith)
+
+    dev_team_series = pd.Series(data=dev_team_sizes)
+    dev_bandwith_series = pd.Series(data=dev_team_bandwiths)
+
+    # TODO: Maybe fit theoretical distributions?
+    dev_team_size_training = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series)
+    dev_team_bandwith_training = simutils.ContinuousEmpiricalDistribution(observations=dev_bandwith_series)
+
+    print "Training - Development Team Size: ", dev_team_series.describe()
+    print "Training - Development Team Bandwith: ", dev_bandwith_series.describe()
+
+    return dev_team_size_training, dev_team_bandwith_training
 
 
 def train_test_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_test, fold=0,
@@ -522,8 +494,6 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
     :param periods_test: Periods for testing.
     :return: Consolidated simulation results.
     """
-
-    simulation_results = []
 
     training_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_train)]
     print "Issues in training: ", len(training_issues.index)
@@ -558,6 +528,35 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
         unique_batches), " batches of ", simdata.BATCH_SIZE, " reports ..."
 
     time_after_last = get_resolution_times(training_issues).median()
+
+    priorities_in_training = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
+    print "Priorities for defects in training: ", priorities_in_training.describe()
+
+    priority_generator = simutils.DiscreteEmpiricalDistribution(observations=priorities_in_training)
+    print "Training Priority Map : ", priority_generator.get_probabilities()
+
+    dev_team_size_training, dev_team_bandwith_training = get_dev_team_training(training_issues, time_after_last)
+
+    simulation_output = simutils.launch_simulation_parallel(
+        reporters_config=reporters_config,
+        resolution_time_gen=resolution_time_gen,
+        max_iterations=max_iterations,
+        bugs_by_priority=None,
+        priority_generator=priority_generator,
+        catalog_size=simdata.BATCH_SIZE,
+        team_capacity=None,
+        dev_size_generator=dev_team_size_training,
+        dev_team_bandwidth=None,
+        dev_bandwith_generator=dev_team_bandwith_training)
+
+    simulation_result = consolidate_results("SIMULATION", None, None,
+                                            reporters_config,
+                                            simulation_output["completed_per_reporter"],
+                                            simulation_output["completed_per_priority"],
+                                            simulation_output["reported_per_priotity"])
+
+    metrics_on_test = []
+
     for test_period in unique_batches:
         issues_for_period = test_issues[test_issues[simdata.BATCH_COLUMN] == test_period]
 
@@ -574,30 +573,13 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
         print "Project ", project_key, " Test Period: ", test_period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
             " Reports: ", bugs_by_priority, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
 
-        if is_valid_period(issues_for_period, resolved_in_period):
-
-            simulation_result = simutils.launch_simulation_parallel(
-                team_capacity=dev_team_size,
-                bugs_by_priority=bugs_by_priority,
-                reporters_config=reporters_config,
-                resolution_time_gen=resolution_time_gen,
-                max_iterations=max_iterations,
-                dev_team_bandwidth=dev_team_bandwith)
-
-            simulation_result = consolidate_results(test_period, issues_for_period, resolved_in_period,
-                                                    reporters_config,
-                                                    simulation_result["completed_per_reporter"],
-                                                    simulation_result["completed_per_priority"],
-                                                    simulation_result["reported_per_priotity"])
-
-            if debug:
-                print "simulation_result ", simulation_result
-
-            simulation_results.append(simulation_result)
+        if is_valid_period(issues_for_period):
+            reporting_metrics = get_reporting_metrics(issues_for_period, resolved_in_period, reporters_config)
+            metrics_on_test.append(reporting_metrics)
         else:
             print "PERIOD EXCLUDED!!! "
 
-    return simulation_results
+    return metrics_on_test, simulation_result
 
 
 def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, test_size=None, max_iterations=1000):
@@ -628,10 +610,12 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
         print "Training simulation and validating: ", name, " Keys in Train: ", len(
             keys_train), " Keys in Test: ", len(keys_test)
 
-        fold_results = train_test_simulation(project_key, issues_in_range, max_iterations, keys_train,
-                                             keys_test,
-                                             fold=None)
-        simulation_results.extend(fold_results)
+        metrics_on_test, simulation_result = train_test_simulation(project_key, issues_in_range, max_iterations,
+                                                                   keys_train,
+                                                                   keys_test,
+                                                                   fold=None)
+
+        simulation_results.extend((metrics_on_test, simulation_result))
     else:
         k_fold = KFold(len(keys_in_range), n_folds=n_folds)
 
@@ -646,8 +630,10 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
             simulation_results.extend(fold_results)
 
     if len(simulation_results) > 0:
-        analyse_results(name=name, reporters_config=None, simulation_results=simulation_results,
-                        project_key=project_key)
+        # simvalid.analyse_results_regression(name=name, reporters_config=None, simulation_results=simulation_results,
+        #                 project_key=project_key)
+
+        simvalid.analyse_input_output(simulation_results[0], simulation_results[1])
 
 
 def get_valid_projects(enhanced_dataframe):
@@ -672,10 +658,13 @@ def main():
 
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
-    valid_projects = get_valid_projects(enhanced_dataframe)
 
-    max_iterations = 1000
+    max_iterations = 200
+    valid_projects = get_valid_projects(enhanced_dataframe)
     test_sizes = [.4, .3, .2]
+
+    # TODO: Remove later. Only for speeding testing
+    test_sizes = [.5]
 
     for test_size in test_sizes:
         simulate_project(valid_projects, enhanced_dataframe, test_size=test_size, max_iterations=max_iterations)
