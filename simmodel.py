@@ -69,6 +69,7 @@ class TestingContext:
         self.resolution_time_gen = resolution_time_gen
         self.devtime_level = devtime_level
         self.default_review_time = default_review_time
+        self.first_report_time = None
         self.last_report_time = None
         self.quota_per_dev = quota_per_dev
         self.quota_system = quota_system
@@ -116,6 +117,17 @@ class TestingContext:
         """
         return self.bug_catalog.pop()
 
+    def get_reporting_time(self):
+        """
+        Returns the time spent on reporting activities,
+        :return: Reporting time in hours.
+        """
+
+        if self.first_report_time is not None and self.last_report_time is not None:
+            return self.last_report_time - self.first_report_time
+
+        return 0
+
     def stop_simulation(self, current_time):
         """
         Returns True if the simulation must be stopped.
@@ -136,7 +148,6 @@ class TestingContext:
         Return the time required for a bug to be fixed.
         :return: Effort required to fix a bug.
         """
-
         generator = self.resolution_time_gen[int(report_priority)]
 
         fix_effort = 0.0
@@ -220,7 +231,7 @@ class BugReportSource(Process):
 
         batch_size = self.get_batch_size()
         while bug_level.amount >= batch_size:
-            yield get, self, bug_level, batch_size
+            yield get, self, bug_level, abs(batch_size)
 
             if self.testing_context.last_report_time is None and bug_level.amount <= 0:
                 self.testing_context.last_report_time = now()
@@ -246,6 +257,9 @@ class BugReportSource(Process):
 
                 inflation_penalty = self.get_inflation_penalty()
 
+                if self.testing_context.first_report_time is None:
+                    self.testing_context.first_report_time = now()
+
                 activate(bug_report,
                          bug_report.arrive(developer_resource=developer_resource,
                                            gatekeeper_resource=gatekeeper_resource,
@@ -258,7 +272,7 @@ class BugReportSource(Process):
                 self.testing_context.priority_monitors[report_priority]['reported'] += 1
 
             interarrival_time = self.get_interarrival_time()
-            yield hold, self, interarrival_time
+            yield hold, self, abs(interarrival_time)
 
             batch_size = self.get_batch_size()
 
@@ -361,12 +375,13 @@ class BugReport(Process):
         # This section relates to the gatekeeper logic.
         if gatekeeper_resource:
             yield request, self, gatekeeper_resource
-            yield hold, self, self.review_time
+            yield hold, self, abs(self.review_time)
 
             self.report_priority = self.real_priority
             yield release, self, gatekeeper_resource
 
-        yield request, self, developer_resource, int(self.report_priority)
+        priority_for_resource = int(self.report_priority)
+        yield request, self, developer_resource, priority_for_resource
 
         # This sections applies the quota system process. The Bug Report is holding a Developer resource.
         if inflation_penalty is not None:
@@ -382,7 +397,7 @@ class BugReport(Process):
                         print "Penalty to be applied to", self.reporter.name, " : Removing ", inflation_penalty, \
                             " from existing quota of ", devtime_level.amount
 
-                    yield get, self, devtime_level, inflation_penalty
+                    yield get, self, devtime_level, abs(inflation_penalty)
 
                     for reporter, quota in quota_manager.iteritems():
                         if reporter != self.reporter.name:
@@ -402,8 +417,8 @@ class BugReport(Process):
 
             yield release, self, developer_resource
         elif self.fix_effort <= devtime_level.amount:
-            yield get, self, devtime_level, self.fix_effort
-            yield hold, self, self.fix_effort
+            yield get, self, devtime_level, abs(self.fix_effort)
+            yield hold, self, abs(self.fix_effort)
             yield release, self, developer_resource
 
             resol_time = now() - arrival_time
@@ -550,7 +565,7 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
             reporters_config)
 
     simulation_result = simulate(until=max_time)
-    return reporter_monitors, testing_context.priority_monitors
+    return reporter_monitors, testing_context.priority_monitors, testing_context.get_reporting_time()
 
 
 def main():
@@ -564,7 +579,6 @@ def main():
     mean_arrival_time = 10
     mean_fix_effort = 12.0
 
-    # TODO The team capacity should also come from a probability distribution.
     team_capacity = 1
 
     # random_seeds = [393939, 31555999, 777999555, 319999771]

@@ -160,9 +160,15 @@ def get_reporting_metrics(reported_dataset, resolved_dataset, reporters_config):
     :return: Map with the resolved metrics.
     """
 
+    first_report = reported_dataset[simdata.CREATED_DATE_COLUMN].min()
+    last_report = reported_dataset[simdata.CREATED_DATE_COLUMN].max()
+
+    reporting_time = ((last_report - first_report).total_seconds()) / simdata.TIME_FACTOR
+
     resolution_metrics = {"results_per_priority": [],
                           "results_per_reporter": [],
-                          'true_resolved': len(resolved_dataset.index)}
+                          'true_resolved': len(resolved_dataset.index),
+                          'reporting_time': reporting_time}
 
     for priority in simdata.SUPPORTED_PRIORITIES:
         resolved_per_priority = resolved_dataset[resolved_dataset[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
@@ -185,7 +191,7 @@ def get_reporting_metrics(reported_dataset, resolved_dataset, reporters_config):
 
 
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_per_reporter,
-                        completed_per_priority, reports_per_priority,
+                        completed_per_priority, reports_per_priority, reporting_times,
                         debug=False):
     """
     It consolidates the results from the simulation with the information contained in the data.
@@ -218,9 +224,13 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
         results.append(total_resolved)
 
     simulation_result["resolved_samples"] = results
+    simulation_result["reporting_times_samples"] = reporting_times
     simulation_result["predicted_resolved"] = np.mean(results)
 
     # TODO: This reporter/priority logic can be refactored.
+
+    simulation_details = {}
+
     for priority in simdata.SUPPORTED_PRIORITIES:
 
         true_resolved = None
@@ -242,7 +252,14 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
                                                           'true_resolved': true_resolved,
                                                           'true_reported': true_reported,
                                                           'predicted_resolved': predicted_resolved,
+                                                          'resolved_samples': resolved_on_simulation,
                                                           'predicted_reported': predicted_reported})
+
+        simulation_details["Resolved_Pri_" + str(priority)] = resolved_on_simulation
+        simulation_details["Reported_Pri_" + str(priority)] = reported_on_simulation
+
+    details_dataframe = pd.DataFrame(data=simulation_details)
+    details_dataframe.to_csv("csv/sim_details.csv")
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
@@ -281,7 +298,37 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     return simulation_result
 
 
-def get_simulation_input(training_issues=None, fold=1):
+def get_resolution_time_gen(resolved_issues, desc=""):
+    """
+    Generates a sample generator for resolution time.
+    :param resolution_time_sample:
+    :param desc: Description of the sample
+    :return: Resolution time generator.
+    """
+
+    resolution_time_sample = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
+
+    print "Resolution times in Training Range for ", desc, ": \n", resolution_time_sample.describe()
+
+    best_fit = siminput.launch_input_analysis(resolution_time_sample, "RESOL_TIME_" + desc,
+                                              show_data_plot=False, save_plot=False)
+    resolution_time_gen = None
+
+    # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
+    if best_fit["ks_p_value"] >= MINIMUM_P_VALUE:
+        print "Using ", best_fit["dist_name"], " for ", desc, " Resolution Time with parameters ", \
+            best_fit["parameters"], " with p-value ", best_fit["ks_p_value"]
+        resolution_time_gen = simutils.ContinuousEmpiricalDistribution(distribution=best_fit["distribution"],
+                                                                       parameters=best_fit["parameters"],
+                                                                       observations=resolution_time_sample)
+    elif len(resolution_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
+        print "Using an Empirical Distribution for ", desc, " Resolution Time"
+        resolution_time_gen = simutils.ContinuousEmpiricalDistribution(observations=resolution_time_sample)
+
+    return resolution_time_gen
+
+
+def get_simulation_input(training_issues=None, per_priority=True):
     """
     Extract the simulation paramaters from the training dataset.
     :param training_issues: Training data set.
@@ -297,25 +344,13 @@ def get_simulation_input(training_issues=None, fold=1):
                                                   only_valid_resolution=False)
     for priority in priority_sample.unique():
         if not np.isnan(priority):
-            priority_resolved = all_resolved_issues[all_resolved_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
-            resolution_time_sample = priority_resolved[simdata.RESOLUTION_TIME_COLUMN].dropna()
+            if per_priority:
+                priority_resolved = all_resolved_issues[all_resolved_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+            else:
+                print "NOTE: We are not a Priority differentiated resolution time generator!!!!"
+                priority_resolved = all_resolved_issues
 
-            print "Resolution times in Training Range for Priority", priority, ": \n", resolution_time_sample.describe()
-
-            best_fit = siminput.launch_input_analysis(resolution_time_sample, "RESOL_TIME_" + str(fold),
-                                                      show_data_plot=False, save_plot=False)
-            resolution_time_gen = None
-
-            # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
-            if best_fit["ks_p_value"] >= MINIMUM_P_VALUE:
-                print "Using ", best_fit["dist_name"], " for Priority ", priority, " Resolution Time with parameters ", \
-                    best_fit["parameters"], " with p-value ", best_fit["ks_p_value"]
-                resolution_time_gen = simutils.ContinuousEmpiricalDistribution(distribution=best_fit["distribution"],
-                                                                               parameters=best_fit["parameters"],
-                                                                               observations=resolution_time_sample)
-            elif len(resolution_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
-                print "Using an Empirical Distribution for Priority ", priority, " Resolution Time"
-                resolution_time_gen = simutils.ContinuousEmpiricalDistribution(observations=resolution_time_sample)
+            resolution_time_gen = get_resolution_time_gen(priority_resolved, desc="Priority_" + str(priority))
 
             resolution_per_priority[priority] = resolution_time_gen
 
@@ -352,6 +387,11 @@ def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None):
 
 
 def get_continuous_chunks(periods_train):
+    """
+    TODO: Check if this is still relevant.
+    :param periods_train:
+    :return:
+    """
     inflection_points = []
 
     last_period = None
@@ -413,9 +453,6 @@ def get_dev_team_production(issues_for_period, time_after_last=None):
     :return: Developer Team Size and Developer Team Production.
     """
 
-    print "Retrieving dev team parameters from ", len(issues_for_period), " reports by ", \
-        issues_for_period['Reported By'].nunique(), " testers "
-
     start_date = issues_for_period[simdata.CREATED_DATE_COLUMN].min()
 
     resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False,
@@ -444,7 +481,7 @@ def get_dev_team_production(issues_for_period, time_after_last=None):
     return dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith
 
 
-def get_dev_team_training(training_issues, time_after_last):
+def get_team_training_data(training_issues, time_after_last, reporters_config):
     """
     Extracts development team information from the training dataset.
 
@@ -460,24 +497,26 @@ def get_dev_team_training(training_issues, time_after_last):
     print len(training_in_batches.index), " training issues where grouped in ", len(
         unique_batches), " batches of ", simdata.BATCH_SIZE, " reports ..."
 
+    metrics_on_training = []
     for train_batch in unique_batches:
         issues_for_batch = training_in_batches[training_in_batches[simdata.BATCH_COLUMN] == train_batch]
 
-        dev_team_size, _, _, dev_team_bandwith = get_dev_team_production(issues_for_batch, time_after_last)
+        dev_team_size, _, resolved_batch, dev_team_bandwith = get_dev_team_production(issues_for_batch, time_after_last)
         dev_team_sizes.append(dev_team_size)
         dev_team_bandwiths.append(dev_team_bandwith)
+
+        reporting_metrics = get_reporting_metrics(issues_for_batch, resolved_batch, reporters_config)
+        metrics_on_training.append(reporting_metrics)
 
     dev_team_series = pd.Series(data=dev_team_sizes)
     dev_bandwith_series = pd.Series(data=dev_team_bandwiths)
 
     # TODO: Maybe fit theoretical distributions?
-    dev_team_size_training = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series)
-    dev_team_bandwith_training = simutils.ContinuousEmpiricalDistribution(observations=dev_bandwith_series)
 
     print "Training - Development Team Size: ", dev_team_series.describe()
     print "Training - Development Team Bandwith: ", dev_bandwith_series.describe()
 
-    return dev_team_size_training, dev_team_bandwith_training
+    return dev_team_series, dev_bandwith_series, metrics_on_training
 
 
 def train_test_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_test, fold=0,
@@ -511,7 +550,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
     training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
     print "Issues in training after reporter filtering: ", len(training_issues.index)
 
-    resolution_time_gen = get_simulation_input(training_issues, fold=fold)
+    resolution_time_gen = get_simulation_input(training_issues, per_priority=True)
     if resolution_time_gen is None:
         print "Not enough resolution time info! ", project_key
         return
@@ -535,7 +574,11 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
     priority_generator = simutils.DiscreteEmpiricalDistribution(observations=priorities_in_training)
     print "Training Priority Map : ", priority_generator.get_probabilities()
 
-    dev_team_size_training, dev_team_bandwith_training = get_dev_team_training(training_issues, time_after_last)
+    dev_team_series, dev_bandwith_series, training_metrics = get_team_training_data(training_issues, time_after_last,
+                                                                                    reporters_config)
+
+    dev_team_size_training = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series)
+    dev_team_bandwith_training = simutils.ContinuousEmpiricalDistribution(observations=dev_bandwith_series)
 
     simulation_output = simutils.launch_simulation_parallel(
         reporters_config=reporters_config,
@@ -553,25 +596,21 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
                                             reporters_config,
                                             simulation_output["completed_per_reporter"],
                                             simulation_output["completed_per_priority"],
-                                            simulation_output["reported_per_priotity"])
+                                            simulation_output["reported_per_priotity"],
+                                            simulation_output["reporting_times"])
+
+    print "Project ", project_key, " - Assessing simulation on TRAINING DATASET: "
+    training_results = pd.DataFrame(
+        simvalid.analyse_input_output(training_metrics, simulation_result, prefix="TRAINING"))
+    training_results.to_csv("csv/" + "_".join(project_key) + "_training_val_results.csv")
 
     metrics_on_test = []
 
     for test_period in unique_batches:
         issues_for_period = test_issues[test_issues[simdata.BATCH_COLUMN] == test_period]
 
-        bugs_by_priority = {index: value
-                            for index, value in
-                            issues_for_period[simdata.SIMPLE_PRIORITY_COLUMN].value_counts().iteritems()}
-
         dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(
             issues_for_period, time_after_last=time_after_last)
-
-        bug_reporters = issues_for_period['Reported By']
-        test_team_size = bug_reporters.nunique()
-
-        print "Project ", project_key, " Test Period: ", test_period, " Testers: ", test_team_size, " Developers:", dev_team_size, \
-            " Reports: ", bugs_by_priority, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
 
         if is_valid_period(issues_for_period):
             reporting_metrics = get_reporting_metrics(issues_for_period, resolved_in_period, reporters_config)
@@ -579,7 +618,26 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
         else:
             print "PERIOD EXCLUDED!!! "
 
-    return metrics_on_test, simulation_result
+    return metrics_on_test, simulation_result, training_results
+
+
+def run_project_analysis(project_keys, issues_in_range):
+    """
+    Gathers project-related metrics
+
+    :param project_keys: List of keys of the projects to analyse.
+    :param issues_in_range:  Dataframe with the issues.
+    :return: None
+    """
+    for project_key in project_keys:
+        project_issues = simdata.filter_by_project(issues_in_range, [project_key])
+
+        issues = len(project_issues.index)
+        reporting_start = project_issues[simdata.CREATED_DATE_COLUMN].min()
+        reporting_end = project_issues[simdata.CREATED_DATE_COLUMN].max()
+
+        print "Project ", project_key, ": Issues ", issues, " Reporting Start: ", reporting_start, " Reporting End: ", \
+            reporting_end
 
 
 def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, test_size=None, max_iterations=1000):
@@ -591,6 +649,8 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
     """
     issues_in_range = get_valid_reports(project_key, enhanced_dataframe, exclude_priority=None)
     issues_in_range = issues_in_range.sort(simdata.CREATED_DATE_COLUMN, ascending=True)
+
+    run_project_analysis(project_key, issues_in_range)
 
     keys_in_range = issues_in_range[simdata.ISSUE_KEY_COLUMN].unique()
     print "Original number of issue keys: ", len(keys_in_range)
@@ -610,10 +670,11 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
         print "Training simulation and validating: ", name, " Keys in Train: ", len(
             keys_train), " Keys in Test: ", len(keys_test)
 
-        metrics_on_test, simulation_result = train_test_simulation(project_key, issues_in_range, max_iterations,
-                                                                   keys_train,
-                                                                   keys_test,
-                                                                   fold=None)
+        metrics_on_test, simulation_result, training_results = train_test_simulation(project_key, issues_in_range,
+                                                                                     max_iterations,
+                                                                                     keys_train,
+                                                                                     keys_test,
+                                                                                     fold=None)
 
         simulation_results.extend((metrics_on_test, simulation_result))
     else:
@@ -630,13 +691,15 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
             simulation_results.extend(fold_results)
 
     if len(simulation_results) > 0:
-        # simvalid.analyse_results_regression(name=name, reporters_config=None, simulation_results=simulation_results,
-        #                 project_key=project_key)
+        print "Project ", project_key, " - Assessing simulation on TESTING DATASET: "
+        testing_results = pd.DataFrame(
+            simvalid.analyse_input_output(simulation_results[0], simulation_results[1], prefix="TESTING"))
+        testing_results.to_csv("csv/" + "_".join(project_key) + "_testing_val_results.csv")
 
-        simvalid.analyse_input_output(simulation_results[0], simulation_results[1])
+    return training_results, testing_results
 
 
-def get_valid_projects(enhanced_dataframe):
+def get_valid_projects(enhanced_dataframe, threshold=0.3):
     """
     Selects the projects that will be considered in analysis.
     :param enhanced_dataframe: Bug Report dataframe.
@@ -645,7 +708,6 @@ def get_valid_projects(enhanced_dataframe):
 
     project_dataframe = defaultabuse.get_default_usage_data(enhanced_dataframe)
 
-    threshold = 0.3
     using_priorities = project_dataframe[project_dataframe['non_default_ratio'] >= threshold]
     project_keys = using_priorities['project_key'].unique()
 
@@ -660,14 +722,42 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     max_iterations = 200
-    valid_projects = get_valid_projects(enhanced_dataframe)
     test_sizes = [.4, .3, .2]
 
     # TODO: Remove later. Only for speeding testing
-    test_sizes = [.5]
+    valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
 
-    for test_size in test_sizes:
-        simulate_project(valid_projects, enhanced_dataframe, test_size=test_size, max_iterations=max_iterations)
+    test_sizes = [.5]
+    # valid_projects = ['CASSANDRA']
+
+    consolidated_results = []
+    # for project in valid_projects:
+    #     valid_projects = [project]
+        # There seems to be an issue on Phoenix for Distribution Fitting: Memory usage rises.
+
+    project = "ALL_VALID"
+    try:
+        # if project not in ['PHOENIX']:
+        for test_size in test_sizes:
+            training_results, testing_results = simulate_project(valid_projects, enhanced_dataframe,
+                                                                 test_size=test_size,
+                                                                 max_iterations=max_iterations)
+
+            passed_tests_training = training_results[
+                training_results['ci_accept_simulation'] | ~training_results['t_test_reject_null']]
+
+            passed_tests_testing = testing_results[
+                testing_results['ci_accept_simulation'] | ~testing_results['t_test_reject_null']]
+
+            consolidated_results.append({'project': project,
+                                         'passed_tests_training': len(passed_tests_training.index),
+                                         'passed_tests_testing': len(passed_tests_testing.index)})
+
+    except:
+        print "ERROR!!!!: Could not simulate ", project
+
+    results_dataframe = pd.DataFrame(consolidated_results)
+    results_dataframe.to_csv("csv/validation_per_project.csv")
 
 
 if __name__ == "__main__":

@@ -39,7 +39,7 @@ SIMPLIFIED_PRIORITIES = {"Blocker": SEVERE_PRIORITY,
                          "Trivial": NON_SEVERE_PRIORITY}
 SUPPORTED_PRIORITIES = [NON_SEVERE_PRIORITY, SEVERE_PRIORITY]
 
-BATCH_SIZE = 50
+BATCH_SIZE = 20
 
 
 def launch_histogram(data_points, config=None):

@@ -13,7 +13,7 @@ from statsmodels.stats import power
 PLOT = None
 
 
-def analyse_input_output(metrics_on_test, simulation_result):
+def analyse_input_output(metrics_on_test, simulation_result, prefix=""):
     """
     Validate the results applying hypothesis testing, according to Discrete-Event Simulation by Jerry Banks.
 
@@ -22,27 +22,93 @@ def analyse_input_output(metrics_on_test, simulation_result):
     :return: None
     """
 
+    validation_results = []
+
     resolved_bugs = [data['true_resolved'] for data in metrics_on_test]
-    resolved_bugs_mean = np.mean(resolved_bugs)
-    resolved_bugs_std = np.std(resolved_bugs)
-
-    print "Resolved Bugs data information: len ", len(
-        resolved_bugs), " mean ", resolved_bugs_mean, " std ", resolved_bugs_std
-
     resolved_samples = simulation_result['resolved_samples']
-    sample_mean = np.mean(resolved_samples)
-    sample_size = len(resolved_samples)
-    sample_std = np.std(resolved_samples)
-    print "Resolved Bugs samples from simulation: len ", sample_size, " mean ", sample_mean, " std ", sample_std
+    desc = prefix + "_" + "RESOLVED_BUGS"
+    print "Response variable: ", desc
+    validation_results.append(statistical_validation(resolved_bugs, resolved_samples, desc=desc))
 
-    alpha = 0.05
-    difference = 1.0
+    # TODO: Now this screams refactoring
+    reporting_times = [data['reporting_time'] for data in metrics_on_test]
+    reporting_times_samples = simulation_result['reporting_times_samples']
+    desc = prefix + "_" + "REPORTING_TIME"
+    print "Response variable: ", desc
+    validation_results.append(statistical_validation(reporting_times, reporting_times_samples, desc=desc))
 
-    apply_t_test(resolved_samples, resolved_bugs_mean, alpha=alpha, difference=difference)
-    analyze_confidence_interval(resolved_samples, resolved_bugs_mean, alpha=alpha, difference=difference)
+    for target_priority in simdata.SUPPORTED_PRIORITIES:
+        results_per_priority = [data['results_per_priority'] for data in metrics_on_test]
+
+        resolved_bugs = []
+        for priority_list in results_per_priority:
+            resolved_bugs.append(
+                [data['true_resolved'] for data in priority_list if data['priority'] == target_priority][0])
+
+        resolved_samples = [data['resolved_samples'] for data in simulation_result['results_per_priority'] if
+                            data['priority'] == target_priority][0]
+
+        desc = prefix + "_" + "RESOLVED_BUGS_FROM_PRIORITY_" + str(target_priority)
+        print "Response variable: ", desc
+        validation_results.append(statistical_validation(resolved_bugs, resolved_samples, desc=desc))
+
+    return validation_results
 
 
-def apply_t_test(samples, population_mean, alpha=0.05, difference=1.0):
+def statistical_validation(population_data, sample_data, alpha=0.05, difference=1.0, desc="", plot=True):
+    """
+    Triggers the statistical validation procedures: t-test and confidence interval.
+    :param population_data: Data points gathered from the system.
+    :param sample_data: Data points gathered from the simulation.
+    :param alpha: Significance Level.
+    :param difference: Difference for obtaining the power of the test.
+    :return:
+    """
+
+    if plot:
+        config = {'title': 'Population: ' + desc,
+                  'xlabel': desc,
+                  'ylabel': 'counts',
+                  'file_name': 'population_' + desc + '.png'}
+        simdata.launch_histogram(population_data, config=config)
+
+        config = {'title': 'Sample: ' + desc,
+                  'xlabel': desc,
+                  'ylabel': 'counts',
+                  'file_name': 'sample_' + desc + '.png'}
+
+        simdata.launch_histogram(sample_data, config=config)
+
+    population_mean = np.mean(population_data)
+    population_std = np.std(population_data)
+
+    print desc, ": Population data information: len ", len(
+        population_data), " mean ", population_mean, " std ", population_std
+
+    sample_mean = np.mean(sample_data)
+    sample_size = len(sample_data)
+    sample_std = np.std(sample_data)
+    print desc, ": Samples from simulation: len ", sample_size, " mean ", sample_mean, " std ", sample_std
+
+    reject_null, test_power = apply_t_test(sample_data, population_mean, alpha=alpha, difference=difference, desc=desc)
+    accept_simulation, more_replications, lower_bound, upper_bound = analyze_confidence_interval(sample_data,
+                                                                                                 population_mean,
+                                                                                                 alpha=alpha,
+                                                                                                 difference=difference,
+                                                                                                 desc=desc)
+
+    return {'desc': desc,
+            'population_mean': population_mean,
+            'sample_mean': sample_mean,
+            't_test_reject_null': reject_null,
+            't_test_test_power': test_power,
+            'ci_accept_simulation': accept_simulation,
+            'ci_more_replications': more_replications,
+            'ci_lower_bound': lower_bound,
+            'ci_upper_bound': upper_bound}
+
+
+def apply_t_test(samples, population_mean, alpha=0.05, difference=1.0, desc=""):
     """
     Applies a t-test, considering test power also.
     :param samples: Samples from simulation.
@@ -52,7 +118,7 @@ def apply_t_test(samples, population_mean, alpha=0.05, difference=1.0):
     :return: None
     """
     t_stat, two_tail_prob = stats.ttest_1samp(samples, population_mean)
-    print "Two-Sample T-test: t-statistic ", t_stat, " p-value ", two_tail_prob
+    print desc, ": Two-Sample T-test: t-statistic ", t_stat, " p-value ", two_tail_prob
 
     sample_mean = np.mean(samples)
     sample_size = len(samples)
@@ -61,24 +127,29 @@ def apply_t_test(samples, population_mean, alpha=0.05, difference=1.0):
 
     # FYI: The examples on Discrete-Event Simulation by Jerry Banks were replicated using the following python code.
     threshold = stats.t.ppf(1 - alpha / 2, df)
-    print "Critical value of t: ", threshold, " for a level of significance (alpha) ", alpha, " and degrees of freedom ", df
+    print desc, ": Critical value of t: ", threshold, " for a level of significance (alpha) ", alpha, " and degrees of freedom ", df
 
     null_hypothesis = "The mean of the sample (" + str(sample_mean) + ") is equal to the population mean ( " + str(
         population_mean) + ")"
 
+    reject_null = None
     if abs(t_stat) > threshold:
-        print "We REJECT the null hypothesis: ", null_hypothesis
+        reject_null = True
+        print desc, ": We REJECT the null hypothesis: ", null_hypothesis
     else:
-        print "We CANNOT REJECT the null hypothesis ", null_hypothesis
+        reject_null = False
+        print desc, ": We CANNOT REJECT the null hypothesis ", null_hypothesis
 
     effect_size = difference / sample_std
-    print "Efect size for a difference of ", difference, ": ", effect_size
+    print desc, ": Efect size for a difference of ", difference, ": ", effect_size
 
     test_power = power.tt_solve_power(effect_size=effect_size, alpha=alpha, nobs=sample_size)
-    print "Test power: ", test_power
+    print desc, ": Test power: ", test_power
+
+    return reject_null, test_power
 
 
-def analyze_confidence_interval(samples, population_mean, alpha=0.05, difference=1.0):
+def analyze_confidence_interval(samples, population_mean, alpha=0.05, difference=1.0, desc=""):
     """
     Performs an analysis based on confidence intervals
 
@@ -96,7 +167,7 @@ def analyze_confidence_interval(samples, population_mean, alpha=0.05, difference
 
     df = sample_size - 1
     lower_bound, upper_bound = stats.t.interval(alpha=conf_alpha, df=df, loc=sample_mean, scale=sample_sem)
-    print "confidence_interval: ( ", lower_bound, ", ", upper_bound, ")"
+    print desc, " : confidence_interval: ( ", lower_bound, ", ", upper_bound, ")"
 
     one_error = abs(population_mean - lower_bound)
     other_error = abs(population_mean - upper_bound)
@@ -104,26 +175,37 @@ def analyze_confidence_interval(samples, population_mean, alpha=0.05, difference
     best_case_error = min(one_error, other_error)
     worst_case_error = max(one_error, other_error)
 
-    accept_msg = "Accept simulation. Close enough to be considered valid."
-    more_simulation_msg = "Additional simulation replications are necessary until a conclussion can be reached."
-    refine_msg = "We need to refine the simulation model :("
+    accept_msg = desc + ": Accept simulation. Close enough to be considered valid."
+    more_simulation_msg = desc + ": Additional simulation replications are necessary until a conclussion can be reached"
+    refine_msg = desc + ": We need to refine the simulation model :("
 
-    print "Difference: ", difference, " best-case error ", best_case_error, " worst-case error ", worst_case_error
+    print desc, ": Difference: ", difference, " best-case error ", best_case_error, " worst-case error ", worst_case_error
+
+    accept_simulation = False
+    more_replications = None
+
     if lower_bound <= population_mean <= upper_bound:
         if best_case_error > difference or worst_case_error > difference:
             print more_simulation_msg
+            more_replications = True
 
         if worst_case_error <= difference:
             print accept_msg
+            accept_simulation = True
     else:
         if best_case_error > difference:
             print refine_msg
+            accept_simulation = False
 
         if worst_case_error <= difference:
             print accept_msg
+            accept_simulation = True
 
         if best_case_error <= difference < worst_case_error:
             print more_simulation_msg
+            more_replications = True
+
+    return accept_simulation, more_replications, lower_bound, upper_bound
 
 
 def analyse_results_regression(name="", reporters_config=None, simulation_results=None, project_key=None, debug=False,

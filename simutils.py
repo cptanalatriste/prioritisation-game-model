@@ -408,6 +408,7 @@ def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config
     reports_per_reporter = []
     resolved_per_reporter = []
     reported_per_priotity = []
+    reporting_times = []
 
     for _ in range(parallel_blocks):
         worker_input = {'team_capacity': team_capacity,
@@ -438,13 +439,15 @@ def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config
         reports_per_reporter += output['reports_per_reporter']
         resolved_per_reporter += output['resolved_per_reporter']
         reported_per_priotity += output['reported_per_priotity']
+        reporting_times += output['reporting_times']
 
     return {"completed_per_reporter": completed_per_reporter,
             "completed_per_priority": completed_per_priority,
             "bugs_per_reporter": bugs_per_reporter,
             "reports_per_reporter": reports_per_reporter,
             "resolved_per_reporter": resolved_per_reporter,
-            "reported_per_priotity": reported_per_priotity}
+            "reported_per_priotity": reported_per_priotity,
+            "reporting_times": reporting_times}
 
 
 def launch_simulation_wrapper(input_params):
@@ -454,11 +457,13 @@ def launch_simulation_wrapper(input_params):
     :return: A dict with the simulation output.
     """
     simulation_results = launch_simulation(
-        team_capacity=input_params['team_capacity'], bugs_by_priority=input_params['bugs_by_priority'],
+        team_capacity=input_params['team_capacity'],
+        bugs_by_priority=input_params['bugs_by_priority'],
         reporters_config=input_params['reporters_config'],
         resolution_time_gen=input_params['resolution_time_gen'],
         max_iterations=input_params['max_iterations'],
-        max_time=input_params['max_time'], dev_team_bandwidth=input_params['dev_team_bandwidth'],
+        max_time=input_params['max_time'],
+        dev_team_bandwidth=input_params['dev_team_bandwidth'],
         priority_generator=input_params['priority_generator'],
         catalog_size=input_params['catalog_size'],
         dev_size_generator=input_params['dev_size_generator'],
@@ -467,12 +472,7 @@ def launch_simulation_wrapper(input_params):
         inflation_factor=input_params['inflation_factor'],
         quota_system=input_params['quota_system'])
 
-    return {'completed_per_reporter': simulation_results['completed_per_reporter'],
-            'completed_per_priority': simulation_results['completed_per_priority'],
-            'bugs_per_reporter': simulation_results['bugs_per_reporter'],
-            'reports_per_reporter': simulation_results['reports_per_reporter'],
-            'resolved_per_reporter': simulation_results['resolved_per_reporter'],
-            'reported_per_priotity': simulation_results['reported_per_priotity']}
+    return simulation_results
 
 
 def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen,
@@ -507,24 +507,24 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
     bugs_per_reporter = []
     reports_per_reporter = []
     resolved_per_reporter = []
+    reporting_times = []
 
     print "Running ", max_iterations, " replications ... "
     for replication_index in range(max_iterations):
-        # print replication_index + 1, " ",
         np.random.seed()
-        reporter_monitors, priority_monitors = simmodel.run_model(team_capacity=team_capacity,
-                                                                  bugs_by_priority=bugs_by_priority,
-                                                                  reporters_config=reporters_config,
-                                                                  resolution_time_gen=resolution_time_gen,
-                                                                  max_time=max_time,
-                                                                  dev_team_bandwith=dev_team_bandwidth,
-                                                                  priority_generator=priority_generator,
-                                                                  catalog_size=catalog_size,
-                                                                  dev_size_generator=dev_size_generator,
-                                                                  dev_bandwith_generator=dev_bandwith_generator,
-                                                                  gatekeeper_config=gatekeeper_config,
-                                                                  quota_system=quota_system,
-                                                                  inflation_factor=inflation_factor)
+        reporter_monitors, priority_monitors, reporting_time = simmodel.run_model(team_capacity=team_capacity,
+                                                                                  bugs_by_priority=bugs_by_priority,
+                                                                                  reporters_config=reporters_config,
+                                                                                  resolution_time_gen=resolution_time_gen,
+                                                                                  max_time=max_time,
+                                                                                  dev_team_bandwith=dev_team_bandwidth,
+                                                                                  priority_generator=priority_generator,
+                                                                                  catalog_size=catalog_size,
+                                                                                  dev_size_generator=dev_size_generator,
+                                                                                  dev_bandwith_generator=dev_bandwith_generator,
+                                                                                  gatekeeper_config=gatekeeper_config,
+                                                                                  quota_system=quota_system,
+                                                                                  inflation_factor=inflation_factor)
 
         result_per_reporter = {reporter_name: reporter_info['resolved_monitor'].count() for reporter_name, reporter_info
                                in
@@ -543,6 +543,8 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
         reports_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'report_counters'))
         resolved_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'resolved_counters'))
 
+        reporting_times.append(reporting_time)
+
     print max_iterations, " replications finished."
 
     return {"completed_per_reporter": completed_per_reporter,
@@ -550,7 +552,8 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
             "bugs_per_reporter": bugs_per_reporter,
             "reports_per_reporter": reports_per_reporter,
             "resolved_per_reporter": resolved_per_reporter,
-            "reported_per_priotity": reported_per_priotity}
+            "reported_per_priotity": reported_per_priotity,
+            "reporting_times": reporting_times}
 
 
 def gather_reporter_statistics(reporter_monitors, metric_name):
