@@ -3,6 +3,7 @@ This modules triggers the bug report simulation.
 """
 import time
 import datetime
+import traceback
 
 from scipy import stats
 import numpy as np
@@ -519,8 +520,8 @@ def get_team_training_data(training_issues, time_after_last, reporters_config):
     return dev_team_series, dev_bandwith_series, metrics_on_training
 
 
-def train_test_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_test, fold=0,
-                          debug=False):
+def train_validate_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_valid, fold=0,
+                              debug=False):
     """
 
     Train the simulation model on a dataset and test it in another dataset.
@@ -555,15 +556,15 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
         print "Not enough resolution time info! ", project_key
         return
 
-    test_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_test)]
-    print "Issues in test: ", len(test_issues.index)
-    test_issues = simdata.filter_by_reporter(test_issues, engaged_testers)
-    print "Issues in test after reporter filtering: ", len(test_issues.index)
-    print "Assigning Batch information to training dataset ..."
-    test_issues = simdata.include_batch_information(test_issues)
+    valid_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_valid)]
+    print "Issues in Validation: ", len(valid_issues.index)
+    valid_issues = simdata.filter_by_reporter(valid_issues, engaged_testers)
+    print "Issues in validation after reporter filtering: ", len(valid_issues.index)
+    print "Assigning Batch information to validation dataset ..."
+    valid_issues = simdata.include_batch_information(valid_issues)
 
-    unique_batches = test_issues[simdata.BATCH_COLUMN].unique()
-    print len(test_issues.index), " where grouped in ", len(
+    unique_batches = valid_issues[simdata.BATCH_COLUMN].unique()
+    print len(valid_issues.index), " where grouped in ", len(
         unique_batches), " batches of ", simdata.BATCH_SIZE, " reports ..."
 
     time_after_last = get_resolution_times(training_issues).median()
@@ -580,7 +581,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
     dev_team_size_training = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series)
     dev_team_bandwith_training = simutils.ContinuousEmpiricalDistribution(observations=dev_bandwith_series)
 
-    simulation_output = simutils.launch_simulation_parallel(
+    simulation_output = simutils.launch_simulation(
         reporters_config=reporters_config,
         resolution_time_gen=resolution_time_gen,
         max_iterations=max_iterations,
@@ -591,6 +592,19 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
         dev_size_generator=dev_team_size_training,
         dev_team_bandwidth=None,
         dev_bandwith_generator=dev_team_bandwith_training)
+
+    # TODO (cgavidia): The parallel code is not working anymore.
+    # simulation_output = simutils.launch_simulation_parallel(
+    #     reporters_config=reporters_config,
+    #     resolution_time_gen=resolution_time_gen,
+    #     max_iterations=max_iterations,
+    #     bugs_by_priority=None,
+    #     priority_generator=priority_generator,
+    #     catalog_size=simdata.BATCH_SIZE,
+    #     team_capacity=None,
+    #     dev_size_generator=dev_team_size_training,
+    #     dev_team_bandwidth=None,
+    #     dev_bandwith_generator=dev_team_bandwith_training)
 
     simulation_result = consolidate_results("SIMULATION", None, None,
                                             reporters_config,
@@ -607,7 +621,7 @@ def train_test_simulation(project_key, issues_in_range, max_iterations, keys_tra
     metrics_on_test = []
 
     for test_period in unique_batches:
-        issues_for_period = test_issues[test_issues[simdata.BATCH_COLUMN] == test_period]
+        issues_for_period = valid_issues[valid_issues[simdata.BATCH_COLUMN] == test_period]
 
         dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(
             issues_for_period, time_after_last=time_after_last)
@@ -640,6 +654,26 @@ def run_project_analysis(project_keys, issues_in_range):
             reporting_end
 
 
+def split_dataset(dataframe, set_size):
+    """
+    Splits a dataframe in two sets.
+
+    :param dataframe: Dataframe to split.
+    :param set_size: Size of the set located at the end. It is a number between 0 and 1.
+    :return: The dataframe split in two sets.
+    """
+    if set_size:
+        other_set_size = 1 - set_size
+        split_point = int(len(dataframe) * other_set_size)
+
+        set_keys = dataframe[:split_point]
+        other_set_keys = dataframe[split_point:]
+
+        return set_keys, other_set_keys
+
+    return None, None
+
+
 def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, test_size=None, max_iterations=1000):
     """
     Launches simulation analysis for an specific project.
@@ -657,26 +691,20 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
 
     simulation_results = []
 
-    name = ""
     if test_size is not None:
-        name = "Test_Size_" + str(test_size)
+        keys_train, keys_test = split_dataset(keys_in_range, test_size)
+        keys_train, keys_valid = split_dataset(keys_train, test_size)
 
-        train_size = 1 - test_size
-        split_point = int(len(keys_in_range) * train_size)
+        print "Training simulation and validating: Keys in Train: ", len(
+            keys_train), "Keys in Validation ", len(keys_valid), " Keys in Test: ", len(keys_test)
 
-        keys_train = keys_in_range[:split_point]
-        keys_test = keys_in_range[split_point:]
+        metrics_on_valid, simulation_result, training_results = train_validate_simulation(project_key, issues_in_range,
+                                                                                          max_iterations,
+                                                                                          keys_train,
+                                                                                          keys_valid,
+                                                                                          fold=None)
 
-        print "Training simulation and validating: ", name, " Keys in Train: ", len(
-            keys_train), " Keys in Test: ", len(keys_test)
-
-        metrics_on_test, simulation_result, training_results = train_test_simulation(project_key, issues_in_range,
-                                                                                     max_iterations,
-                                                                                     keys_train,
-                                                                                     keys_test,
-                                                                                     fold=None)
-
-        simulation_results.extend((metrics_on_test, simulation_result))
+        simulation_results.extend((metrics_on_valid, simulation_result))
     else:
         k_fold = KFold(len(keys_in_range), n_folds=n_folds)
 
@@ -685,16 +713,16 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
 
             periods_train, periods_test = keys_in_range[train_index], keys_in_range[test_index]
 
-            fold_results = train_test_simulation(project_key, issues_in_range, max_iterations, periods_train,
-                                                 periods_test,
-                                                 fold=fold)
+            fold_results = train_validate_simulation(project_key, issues_in_range, max_iterations, periods_train,
+                                                     periods_test,
+                                                     fold=fold)
             simulation_results.extend(fold_results)
 
     if len(simulation_results) > 0:
-        print "Project ", project_key, " - Assessing simulation on TESTING DATASET: "
+        print "Project ", project_key, " - Assessing simulation on VALIDATION DATASET: "
         testing_results = pd.DataFrame(
-            simvalid.analyse_input_output(simulation_results[0], simulation_results[1], prefix="TESTING"))
-        testing_results.to_csv("csv/" + "_".join(project_key) + "_testing_val_results.csv")
+            simvalid.analyse_input_output(simulation_results[0], simulation_results[1], prefix="VALIDATION"))
+        testing_results.to_csv("csv/" + "_".join(project_key) + "_validation_val_results.csv")
 
     return training_results, testing_results
 
@@ -733,7 +761,7 @@ def main():
     consolidated_results = []
     # for project in valid_projects:
     #     valid_projects = [project]
-        # There seems to be an issue on Phoenix for Distribution Fitting: Memory usage rises.
+    # There seems to be an issue on Phoenix for Distribution Fitting: Memory usage rises.
 
     project = "ALL_VALID"
     try:
@@ -755,6 +783,7 @@ def main():
 
     except:
         print "ERROR!!!!: Could not simulate ", project
+        traceback.print_exc()
 
     results_dataframe = pd.DataFrame(consolidated_results)
     results_dataframe.to_csv("csv/validation_per_project.csv")
