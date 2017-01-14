@@ -5,6 +5,7 @@ import time
 import datetime
 import traceback
 
+import pytz
 from scipy import stats
 import numpy as np
 
@@ -653,6 +654,8 @@ def run_project_analysis(project_keys, issues_in_range):
         print "Project ", project_key, ": Issues ", issues, " Reporting Start: ", reporting_start, " Reporting End: ", \
             reporting_end
 
+    print "Total issues: ", len(issues_in_range)
+
 
 def split_dataset(dataframe, set_size):
     """
@@ -686,8 +689,13 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
 
     run_project_analysis(project_key, issues_in_range)
 
+    starting_date = pytz.utc.localize(datetime.datetime(2014, 1, 1))
+    ending_date = issues_in_range[simdata.CREATED_DATE_COLUMN].max()
+    print "Setting an starting point for analysis: ", starting_date
+    issues_in_range = simdata.filter_by_create_date(issues_in_range, starting_date, ending_date)
+
     keys_in_range = issues_in_range[simdata.ISSUE_KEY_COLUMN].unique()
-    print "Original number of issue keys: ", len(keys_in_range)
+    print "Number of issue keys after starting point filtering: ", len(keys_in_range)
 
     simulation_results = []
 
@@ -749,13 +757,13 @@ def main():
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-    max_iterations = 200
+    max_iterations = 250
     test_sizes = [.4, .3, .2]
 
     # TODO: Remove later. Only for speeding testing
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
 
-    test_sizes = [.5]
+    test_sizes = [.25]
     # valid_projects = ['CASSANDRA']
 
     consolidated_results = []
