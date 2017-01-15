@@ -11,8 +11,7 @@ import numpy as np
 
 import pandas as pd
 
-from sklearn.cross_validation import KFold
-
+import analytics
 import defaultabuse
 import simdata
 import simvalid
@@ -388,44 +387,6 @@ def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None):
     return project_bugs
 
 
-def get_continuous_chunks(periods_train):
-    """
-    TODO: Check if this is still relevant.
-    :param periods_train:
-    :return:
-    """
-    inflection_points = []
-
-    last_period = None
-    for index, period in enumerate(periods_train):
-        if last_period:
-            year, month = period.split("-")
-            year, month = int(year), int(month)
-
-            previous_year, previous_month = last_period.split("-")
-            previous_year, previous_month = int(previous_year), int(previous_month)
-
-            same_year = (year == previous_year) and (month - previous_month == 1)
-            different_year = (year - previous_year == 1) and (previous_month == 12) and (month == 1)
-
-            if not same_year and not different_year:
-                inflection_points.append(index)
-                last_period = None
-            else:
-                last_period = period
-        else:
-            last_period = period
-
-    chunks = []
-    chunk_start = 0
-    for point in inflection_points:
-        chunks.append(periods_train[chunk_start: point])
-        chunk_start = point
-
-    chunks.append(periods_train[chunk_start:])
-    return chunks
-
-
 def get_resolution_times(issues_for_period):
     """
     From an issues dataframe, it returns the list of resolution times contained, excluding NaN
@@ -582,7 +543,7 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     dev_team_size_training = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series)
     dev_team_bandwith_training = simutils.ContinuousEmpiricalDistribution(observations=dev_bandwith_series)
 
-    simulation_output = simutils.launch_simulation(
+    simulation_output = simutils.launch_simulation_parallel(
         reporters_config=reporters_config,
         resolution_time_gen=resolution_time_gen,
         max_iterations=max_iterations,
@@ -593,19 +554,6 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
         dev_size_generator=dev_team_size_training,
         dev_team_bandwidth=None,
         dev_bandwith_generator=dev_team_bandwith_training)
-
-    # TODO (cgavidia): The parallel code is not working anymore.
-    # simulation_output = simutils.launch_simulation_parallel(
-    #     reporters_config=reporters_config,
-    #     resolution_time_gen=resolution_time_gen,
-    #     max_iterations=max_iterations,
-    #     bugs_by_priority=None,
-    #     priority_generator=priority_generator,
-    #     catalog_size=simdata.BATCH_SIZE,
-    #     team_capacity=None,
-    #     dev_size_generator=dev_team_size_training,
-    #     dev_team_bandwidth=None,
-    #     dev_bandwith_generator=dev_team_bandwith_training)
 
     simulation_result = consolidate_results("SIMULATION", None, None,
                                             reporters_config,
@@ -634,27 +582,6 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
             print "PERIOD EXCLUDED!!! "
 
     return metrics_on_test, simulation_result, training_results
-
-
-def run_project_analysis(project_keys, issues_in_range):
-    """
-    Gathers project-related metrics
-
-    :param project_keys: List of keys of the projects to analyse.
-    :param issues_in_range:  Dataframe with the issues.
-    :return: None
-    """
-    for project_key in project_keys:
-        project_issues = simdata.filter_by_project(issues_in_range, [project_key])
-
-        issues = len(project_issues.index)
-        reporting_start = project_issues[simdata.CREATED_DATE_COLUMN].min()
-        reporting_end = project_issues[simdata.CREATED_DATE_COLUMN].max()
-
-        print "Project ", project_key, ": Issues ", issues, " Reporting Start: ", reporting_start, " Reporting End: ", \
-            reporting_end
-
-    print "Total issues: ", len(issues_in_range)
 
 
 def split_dataset(dataframe, set_size):
@@ -687,12 +614,12 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
     issues_in_range = get_valid_reports(project_key, enhanced_dataframe, exclude_priority=None)
     issues_in_range = issues_in_range.sort(simdata.CREATED_DATE_COLUMN, ascending=True)
 
-    run_project_analysis(project_key, issues_in_range)
+    analytics.run_project_analysis(project_key, issues_in_range)
 
     starting_date = pytz.utc.localize(datetime.datetime(2014, 1, 1))
     ending_date = issues_in_range[simdata.CREATED_DATE_COLUMN].max()
-    print "Setting an starting point for analysis: ", starting_date
-    issues_in_range = simdata.filter_by_create_date(issues_in_range, starting_date, ending_date)
+    # print "Setting an starting point for analysis: ", starting_date
+    # issues_in_range = simdata.filter_by_create_date(issues_in_range, starting_date, ending_date)
 
     keys_in_range = issues_in_range[simdata.ISSUE_KEY_COLUMN].unique()
     print "Number of issue keys after starting point filtering: ", len(keys_in_range)
@@ -713,18 +640,6 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
                                                                                           fold=None)
 
         simulation_results.extend((metrics_on_valid, simulation_result))
-    else:
-        k_fold = KFold(len(keys_in_range), n_folds=n_folds)
-
-        for fold, (train_index, test_index) in enumerate(k_fold):
-            print "Fold number: ", fold
-
-            periods_train, periods_test = keys_in_range[train_index], keys_in_range[test_index]
-
-            fold_results = train_validate_simulation(project_key, issues_in_range, max_iterations, periods_train,
-                                                     periods_test,
-                                                     fold=fold)
-            simulation_results.extend(fold_results)
 
     if len(simulation_results) > 0:
         print "Project ", project_key, " - Assessing simulation on VALIDATION DATASET: "

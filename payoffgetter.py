@@ -385,7 +385,8 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                                   game_configuration["AGGREGATE_AGENT_TEAM"])
 
             if overall_dataframe is None:
-                simulation_output = simutils.launch_simulation(
+
+                simulation_output = simutils.launch_simulation_parallel(
                     team_capacity=dev_team_size,
                     bugs_by_priority=bugs_by_priority,
                     reporters_config=player_configuration,
@@ -396,18 +397,6 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                     inflation_factor=game_configuration["INFLATION_FACTOR"],
                     quota_system=game_configuration["THROTTLING_ENABLED"],
                     gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
-
-                # simulation_output = simutils.launch_simulation_parallel(
-                #     team_capacity=dev_team_size,
-                #     bugs_by_priority=bugs_by_priority,
-                #     reporters_config=player_configuration,
-                #     resolution_time_gen=resolution_time_gen,
-                #     max_time=simulation_time,
-                #     max_iterations=game_configuration["REPLICATIONS_PER_PROFILE"],
-                #     dev_team_bandwidth=dev_team_bandwith,
-                #     inflation_factor=game_configuration["INFLATION_FACTOR"],
-                #     quota_system=game_configuration["THROTTLING_ENABLED"],
-                #     gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
 
                 simulation_result = simcruncher.consolidate_payoff_results("ALL", player_configuration,
                                                                            simulation_output["completed_per_reporter"],

@@ -207,7 +207,7 @@ def enhace_report_dataframe(bug_reports):
     return bug_reports
 
 
-def filter_by_create_date(bug_reports, start_date, end_date):
+def filter_by_create_date(bug_reports, start_date, end_date, is_bucket=False):
     """
     Filters a bug report dataframe according to a range for creation date.
     :param bug_reports: Bug report dataframe.
@@ -215,12 +215,13 @@ def filter_by_create_date(bug_reports, start_date, end_date):
     :param end_date: End date.
     :return: Filtered dataframe.
     """
-    return filter_by_date_range(CREATED_DATE_COLUMN, bug_reports, start_date, end_date)
+    return filter_by_date_range(CREATED_DATE_COLUMN, bug_reports, start_date, end_date, is_bucket)
 
 
-def filter_by_date_range(column_name, bug_reports, start_date, end_date):
+def filter_by_date_range(column_name, bug_reports, start_date, end_date, is_bucket=False):
     """
     Filters by a column and a specific date range.
+    :param is_bucket: If its true, the inequality regardind the end date is < instead of <=
     :param column_name: Column name.
     :param bug_reports: Bug dataframe.
     :param start_date: Range start.
@@ -229,6 +230,10 @@ def filter_by_date_range(column_name, bug_reports, start_date, end_date):
     """
     date_filter = (bug_reports[column_name] <= end_date) & (
         bug_reports[column_name] >= start_date)
+
+    if is_bucket:
+        date_filter = (bug_reports[column_name] < end_date) & (
+            bug_reports[column_name] >= start_date)
 
     issues_for_analysis = bug_reports[date_filter]
     return issues_for_analysis
