@@ -1,5 +1,6 @@
 """
-This modules triggers the bug report simulation.
+This modules triggers the bug report simulation. Launch this module to trigger the simulation validation per
+project dataset.
 """
 import time
 import datetime
