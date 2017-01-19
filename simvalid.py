@@ -23,19 +23,21 @@ def analyse_input_output(metrics_on_test, simulation_result, prefix=""):
     """
 
     validation_results = []
+    difference = 2.0
 
     resolved_bugs = [data['true_resolved'] for data in metrics_on_test]
     resolved_samples = simulation_result['resolved_samples']
     desc = prefix + "_" + "RESOLVED_BUGS"
     print "Response variable: ", desc
-    validation_results.append(statistical_validation(resolved_bugs, resolved_samples, desc=desc))
+    validation_results.append(statistical_validation(resolved_bugs, resolved_samples, desc=desc, difference=difference))
 
     # TODO: Now this screams refactoring
     reporting_times = [data['reporting_time'] for data in metrics_on_test]
     reporting_times_samples = simulation_result['reporting_times_samples']
     desc = prefix + "_" + "REPORTING_TIME"
     print "Response variable: ", desc
-    validation_results.append(statistical_validation(reporting_times, reporting_times_samples, desc=desc))
+    validation_results.append(
+        statistical_validation(reporting_times, reporting_times_samples, desc=desc, difference=difference))
 
     for target_priority in simdata.SUPPORTED_PRIORITIES:
         results_per_priority = [data['results_per_priority'] for data in metrics_on_test]
@@ -50,7 +52,8 @@ def analyse_input_output(metrics_on_test, simulation_result, prefix=""):
 
         desc = prefix + "_" + "RESOLVED_BUGS_FROM_PRIORITY_" + str(target_priority)
         print "Response variable: ", desc
-        validation_results.append(statistical_validation(resolved_bugs, resolved_samples, desc=desc))
+        validation_results.append(
+            statistical_validation(resolved_bugs, resolved_samples, desc=desc, difference=difference))
 
     return validation_results
 
@@ -141,7 +144,7 @@ def apply_t_test(samples, population_mean, alpha=0.05, difference=1.0, desc=""):
         print desc, ": We CANNOT REJECT the null hypothesis ", null_hypothesis
 
     effect_size = difference / sample_std
-    print desc, ": Efect size for a difference of ", difference, ": ", effect_size
+    print desc, ": Effect size for a difference of ", difference, ": ", effect_size
 
     test_power = power.tt_solve_power(effect_size=effect_size, alpha=alpha, nobs=sample_size)
     print desc, ": Test power: ", test_power

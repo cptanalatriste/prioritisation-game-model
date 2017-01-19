@@ -148,7 +148,7 @@ def fit_reporter_distributions(reporters_config):
                                                                               parameters=best_fit["parameters"],
                                                                               observations=inter_arrival_sample)
         elif len(inter_arrival_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
-            print "Using an Empirical Distribution for Tester ", str(reporter_list), " Resolution Time"
+            print "Using an Empirical Distribution for Tester ", str(reporter_list), " Interarrival time"
             inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(observations=inter_arrival_sample)
 
         config['interarrival_time_gen'] = inter_arrival_time_gen
@@ -192,7 +192,7 @@ def get_reporting_metrics(reported_dataset, resolved_dataset, reporters_config):
 
 
 def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_per_reporter,
-                        completed_per_priority, reports_per_priority, reporting_times,
+                        completed_per_priority, reports_per_priority, reporting_times, project_keys,
                         debug=False):
     """
     It consolidates the results from the simulation with the information contained in the data.
@@ -260,7 +260,7 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
         simulation_details["Reported_Pri_" + str(priority)] = reported_on_simulation
 
     details_dataframe = pd.DataFrame(data=simulation_details)
-    details_dataframe.to_csv("csv/sim_details.csv")
+    details_dataframe.to_csv("csv/" + "_".join(project_keys) + "_sim_details.csv")
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
@@ -492,8 +492,8 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     :param max_iterations: Iterations for the simulation.
     :param issues_in_range: Bug report dataframe.
     :param project_key:List of projects key.
-    :param periods_train:Periods for training.
-    :param periods_test: Periods for testing.
+    :param keys_train:Issues in training dataset.
+    :param keys_valid: Issues in the validation dataset.
     :return: Consolidated simulation results.
     """
 
@@ -560,28 +560,29 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
                                             simulation_output["completed_per_reporter"],
                                             simulation_output["completed_per_priority"],
                                             simulation_output["reported_per_priotity"],
-                                            simulation_output["reporting_times"])
+                                            simulation_output["reporting_times"],
+                                            project_key)
 
     print "Project ", project_key, " - Assessing simulation on TRAINING DATASET: "
     training_results = pd.DataFrame(
         simvalid.analyse_input_output(training_metrics, simulation_result, prefix="TRAINING"))
     training_results.to_csv("csv/" + "_".join(project_key) + "_training_val_results.csv")
 
-    metrics_on_test = []
+    metrics_on_validation = []
 
-    for test_period in unique_batches:
-        issues_for_period = valid_issues[valid_issues[simdata.BATCH_COLUMN] == test_period]
+    for valid_period in unique_batches:
+        issues_for_period = valid_issues[valid_issues[simdata.BATCH_COLUMN] == valid_period]
 
         dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(
             issues_for_period, time_after_last=time_after_last)
 
         if is_valid_period(issues_for_period):
             reporting_metrics = get_reporting_metrics(issues_for_period, resolved_in_period, reporters_config)
-            metrics_on_test.append(reporting_metrics)
+            metrics_on_validation.append(reporting_metrics)
         else:
             print "PERIOD EXCLUDED!!! "
 
-    return metrics_on_test, simulation_result, training_results
+    return metrics_on_validation, simulation_result, training_results
 
 
 def split_dataset(dataframe, set_size):
@@ -604,7 +605,7 @@ def split_dataset(dataframe, set_size):
     return None, None
 
 
-def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, test_size=None, max_iterations=1000):
+def simulate_project(project_key, enhanced_dataframe, test_size=None, max_iterations=1000):
     """
     Launches simulation analysis for an specific project.
     :param project_key: Project identifier.
@@ -643,11 +644,11 @@ def simulate_project(project_key, enhanced_dataframe, debug=False, n_folds=5, te
 
     if len(simulation_results) > 0:
         print "Project ", project_key, " - Assessing simulation on VALIDATION DATASET: "
-        testing_results = pd.DataFrame(
+        valid_results = pd.DataFrame(
             simvalid.analyse_input_output(simulation_results[0], simulation_results[1], prefix="VALIDATION"))
-        testing_results.to_csv("csv/" + "_".join(project_key) + "_validation_val_results.csv")
+        valid_results.to_csv("csv/" + "_".join(project_key) + "_validation_val_results.csv")
 
-    return training_results, testing_results
+    return training_results, valid_results
 
 
 def get_valid_projects(enhanced_dataframe, threshold=0.3):
@@ -672,37 +673,29 @@ def main():
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-    max_iterations = 250
-    test_sizes = [.4, .3, .2]
-
-    # TODO: Remove later. Only for speeding testing
+    max_iterations = 200
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
-
     test_sizes = [.25]
-    # valid_projects = ['CASSANDRA']
+    # test_sizes = [.4, .3, .2]
 
     consolidated_results = []
-    # for project in valid_projects:
-    #     valid_projects = [project]
-    # There seems to be an issue on Phoenix for Distribution Fitting: Memory usage rises.
 
-    project = "ALL_VALID"
     try:
-        # if project not in ['PHOENIX']:
-        for test_size in test_sizes:
-            training_results, testing_results = simulate_project(valid_projects, enhanced_dataframe,
-                                                                 test_size=test_size,
-                                                                 max_iterations=max_iterations)
+        for project in valid_projects:
 
-            passed_tests_training = training_results[
-                training_results['ci_accept_simulation'] | ~training_results['t_test_reject_null']]
+            for test_size in test_sizes:
+                training_results, validation_results = simulate_project([project], enhanced_dataframe,
+                                                                        test_size=test_size,
+                                                                        max_iterations=max_iterations)
+                passed_tests_training = training_results[
+                    training_results['ci_accept_simulation'] | ~training_results['t_test_reject_null']]
 
-            passed_tests_testing = testing_results[
-                testing_results['ci_accept_simulation'] | ~testing_results['t_test_reject_null']]
+                passed_tests_testing = validation_results[
+                    validation_results['ci_accept_simulation'] | ~validation_results['t_test_reject_null']]
 
-            consolidated_results.append({'project': project,
-                                         'passed_tests_training': len(passed_tests_training.index),
-                                         'passed_tests_testing': len(passed_tests_testing.index)})
+                consolidated_results.append({'project': project,
+                                             'passed_tests_training': len(passed_tests_training.index),
+                                             'passed_tests_testing': len(passed_tests_testing.index)})
 
     except:
         print "ERROR!!!!: Could not simulate ", project
