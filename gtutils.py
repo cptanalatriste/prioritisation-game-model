@@ -55,7 +55,8 @@ def get_strategic_game_format(game_desc, reporter_configuration, strategies_cata
                                             'payoff_per_profile': payoff_per_profile,
                                             'profile_ordering': profile_ordering})
 
-    file_name = str(num_reporters) + "_players_" + str(num_strategies) + "_strategies_" + game_desc + "_game.nfg"
+    file_name = "nfg/" + str(num_reporters) + "_players_" + str(
+        num_strategies) + "_strategies_" + game_desc + "_game.nfg"
     with open(file_name, "w") as gambit_file:
         gambit_file.write(file_content)
 
@@ -110,6 +111,9 @@ def calculate_equilibrium(strategies_catalog, gambit_file):
                 strategy_index = 0
 
         equilibrium_list.append(equilibrium_profile)
+
+        if is_symmetric_equilibrium(equilibrium_profile):
+            print "This is a SYMMETRIC EQUILIBRIUM PROFILE!!"
 
     return equilibrium_list
 

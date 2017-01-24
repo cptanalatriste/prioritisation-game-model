@@ -38,7 +38,7 @@ DEFAULT_CONFIGURATION = {
     'CLONE_MEDIAN': True,
 
     # Throtling configuration parameters.
-    'THROTTLING_ENABLED': True,
+    'THROTTLING_ENABLED': False,
     'INFLATION_FACTOR': 1,
 
     # Empirical Strategies parameters.
@@ -101,8 +101,13 @@ def select_reporters_for_simulation(reporter_configuration):
     reporters_with_corrections = [config for config in reporter_configuration if
                                   config['with_modified_priority'] > 0]
 
-    print "Original Reporters: ", len(reporter_configuration), " Reporters with corrected priorities: ", len(
-        reporters_with_corrections)
+    corrections_size = len(reporters_with_corrections)
+    print "Original Reporters: ", len(
+        reporter_configuration), " Reporters with corrected priorities: ", corrections_size
+
+    if corrections_size == 0:
+        print "In the current dataset there is NO THIRD PARTY CORRECTIONS. Using the unfiltered reporters for simulation"
+        return reporter_configuration
 
     return reporters_with_corrections
 
@@ -136,7 +141,7 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
     """
 
     print "Gathering strategies from reporter behaviour ..."
-    print "Original number of reporters: ", len(reporter_configuration)
+    print "Original number of reporters: ", len(reporter_configuration), " grouping in ", n_clusters, " clusters "
 
     reporters_with_corrections = [config for config in reporter_configuration if
                                   config['with_modified_priority'] > 0]
@@ -246,7 +251,7 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
                           game_configuration=game_configuration)
 
 
-def prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configuration):
+def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configuration):
     """
     Based on the provided dataframe, this functions produces the simulation inputs.
 
@@ -255,7 +260,9 @@ def prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configurati
     :param game_configuration: Game configuration.
     :return: Simulation inputs
     """
-    print "Starting simulation on projects ", project_keys
+
+    project_keys = all_project_keys
+    print "Project catalog: ", project_keys
     total_projects = len(project_keys)
 
     if game_configuration["PROJECT_FILTER"] is not None and len(game_configuration["PROJECT_FILTER"]) >= 1:
@@ -268,15 +275,20 @@ def prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configurati
     valid_reporters = simdriver.get_reporter_configuration(valid_reports)
     print "Reporters after drive-in tester removal ...", len(valid_reporters)
 
-    print "Generating elbow-method plot..."
-    simutils.elbow_method_for_reporters(valid_reporters, file_prefix="_".join(project_keys))
-
-    empirical_strategies = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config in
-                            get_empirical_strategies(valid_reporters, n_clusters=game_configuration["N_CLUSTERS"])]
-
     strategies_catalog = []
 
     if game_configuration["EMPIRICAL_STRATEGIES"]:
+        print "Empirical Strategy extraction over ", len(all_project_keys), " project datasets ..."
+        all_reports = simdriver.get_valid_reports(all_project_keys, enhanced_dataframe)
+        all_reporters = simdriver.get_reporter_configuration(all_reports)
+
+        print "Generating elbow-method plot..."
+        simutils.elbow_method_for_reporters(all_reporters, file_prefix="_".join(all_project_keys))
+
+        empirical_strategies = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config
+                                in
+                                get_empirical_strategies(all_reporters, n_clusters=game_configuration["N_CLUSTERS"])]
+
         strategies_catalog.extend(empirical_strategies)
 
     if game_configuration["HEURISTIC_STRATEGIES"]:
@@ -370,6 +382,8 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
 
     simulation_history = []
     for index, map_info in enumerate(strategy_maps):
+        print "Simulating profile ", (index + 1), " of ", len(strategy_maps)
+
         file_prefix, strategy_map = map_info['name'], map_info['map']
 
         overall_dataframes = []
@@ -421,6 +435,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
 
     game_desc = "AS-IS" if not game_configuration["THROTTLING_ENABLED"] else "THROTTLING"
     game_desc = "GATEKEEPER" if game_configuration["GATEKEEPER_CONFIG"] else game_desc
+    game_desc = "_".join(game_configuration["PROJECT_FILTER"]) + "_" + game_desc
 
     print "Generating Gambit NFG file ..."
     gambit_file = gtutils.get_strategic_game_format(game_desc, player_configuration, strategies_catalog,
@@ -441,7 +456,17 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
-    start_payoff_calculation(enhanced_dataframe, valid_projects, DEFAULT_CONFIGURATION)
+
+    for project in valid_projects:
+        print "Calculating equilibria for project ", project
+
+        simulation_configuration = dict(DEFAULT_CONFIGURATION)
+        simulation_configuration['PROJECT_FILTER'] = [project]
+        simulation_configuration['REPLICATIONS_PER_PROFILE'] = 200
+        simulation_configuration['EMPIRICAL_STRATEGIES'] = True
+        simulation_configuration['N_CLUSTERS'] = 5
+
+        equilibrium_list = start_payoff_calculation(enhanced_dataframe, valid_projects, simulation_configuration)
 
 
 if __name__ == "__main__":

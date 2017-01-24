@@ -76,6 +76,6 @@ def run_project_analysis(project_keys, issues_in_range):
 
     print "Total issues: ", len(issues_in_range)
 
-    history_file = "csv/" + "_".join(project_keys) + "project_report_history.csv"
+    history_file = "csv/" + "_".join(project_keys) + "_project_report_history.csv"
     print "Saving reporting history to ", history_file
     history_dataframe.to_csv(history_file)

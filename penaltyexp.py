@@ -92,7 +92,7 @@ def do_penalty_experiments(input_params, game_configuration):
 
 
 def analyse_project(project_list, enhanced_dataframe, valid_projects, replications_per_profile=1000,
-                    use_empirical=False):
+                    use_empirical=False, use_heuristic=True):
     """
 
     :param project_list:
@@ -104,38 +104,37 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
     """
     print "Analyzing ", valid_projects, " with ", replications_per_profile, " replications and use_empirical=", use_empirical
 
-    game_configuration = payoffgetter.DEFAULT_CONFIGURATION
+    game_configuration = dict(payoffgetter.DEFAULT_CONFIGURATION)
     game_configuration['PROJECT_FILTER'] = project_list
     game_configuration[
         'REPLICATIONS_PER_PROFILE'] = replications_per_profile
 
-    if use_empirical:
-        game_configuration['HEURISTIC_STRATEGIES'] = False
-        game_configuration['EMPIRICAL_STRATEGIES'] = True
+    game_configuration['HEURISTIC_STRATEGIES'] = use_heuristic
+    game_configuration['EMPIRICAL_STRATEGIES'] = use_empirical
 
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
                                                           game_configuration)
-    print "Starting AS-IS Game Analysis ..."
-    game_configuration['THROTTLING_ENABLED'] = False
+    # print "Starting AS-IS Game Analysis ..."
+    # game_configuration['THROTTLING_ENABLED'] = False
+    #
+    # simulate_and_obtain_equilibria(input_params, game_configuration)
 
-    simulate_and_obtain_equilibria(input_params, game_configuration)
-
-    # print "Starting Throtling penalty experiments..."
-    # game_configuration['THROTTLING_ENABLED'] = True
-    # do_penalty_experiments(input_params, game_configuration)
-
-    inflation_factor = 0.1
-    print "Starting Throttling Game Analysis with an Inflation Factor of ", inflation_factor
+    print "Starting Throtling penalty experiments..."
     game_configuration['THROTTLING_ENABLED'] = True
-    game_configuration['INFLATION_FACTOR'] = inflation_factor
-    simulate_and_obtain_equilibria(input_params, game_configuration)
+    do_penalty_experiments(input_params, game_configuration)
 
-    print "Starting gatekeeper analysis ..."
-    game_configuration['THROTTLING_ENABLED'] = False
-    game_configuration['GATEKEEPER_CONFIG'] = {'review_time': 8,
-                                               'capacity': 1}
-
-    simulate_and_obtain_equilibria(input_params, game_configuration)
+    # inflation_factor = 0.1
+    # print "Starting Throttling Game Analysis with an Inflation Factor of ", inflation_factor
+    # game_configuration['THROTTLING_ENABLED'] = True
+    # game_configuration['INFLATION_FACTOR'] = inflation_factor
+    # simulate_and_obtain_equilibria(input_params, game_configuration)
+    #
+    # print "Starting gatekeeper analysis ..."
+    # game_configuration['THROTTLING_ENABLED'] = False
+    # game_configuration['GATEKEEPER_CONFIG'] = {'review_time': 8,
+    #                                            'capacity': 1}
+    #
+    # simulate_and_obtain_equilibria(input_params, game_configuration)
 
 
 def main():
@@ -152,10 +151,8 @@ def main():
     valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
 
     for project in valid_projects:
-        analyse_project([project], enhanced_dataframe, valid_projects, replications_per_profile=1000,
+        analyse_project([project], enhanced_dataframe, valid_projects, replications_per_profile=200,
                         use_empirical=True)
-
-    analyse_project(valid_projects, enhanced_dataframe, valid_projects)
 
 
 if __name__ == "__main__":

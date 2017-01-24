@@ -542,7 +542,10 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
                                                                                     reporters_config)
 
     dev_team_size_training = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series)
+    print "Using an DISCRETE EMPIRICAL DISTRIBUTION for the Development Team Size ..."
+
     dev_team_bandwith_training = simutils.ContinuousEmpiricalDistribution(observations=dev_bandwith_series)
+    print "Using an CONTINUOUS EMPIRICAL DISTRIBUTION for the Development Bandwidth Available ..."
 
     simulation_output = simutils.launch_simulation_parallel(
         reporters_config=reporters_config,

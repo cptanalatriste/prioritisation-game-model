@@ -202,6 +202,7 @@ def elbow_method_for_reporters(reporter_configuration, file_prefix=""):
     reporters_with_corrections = [config for config in reporter_configuration if
                                   config['with_modified_priority'] > 0]
     reporter_dataframe = get_reporter_behavior_dataframe(reporters_with_corrections)
+    print "Extracting strategies from ", len(reporter_dataframe.index), " reporters with third-party corrections"
 
     report_features = reporter_dataframe.values
 
@@ -219,7 +220,10 @@ def elbow_method_for_reporters(reporter_configuration, file_prefix=""):
     plt.plot(range(1, 11), distortions, marker='o')
     plt.xlabel('Number of Clusters')
     plt.ylabel('Distortion')
-    plt.savefig("img/" + file_prefix + "_elbow_for_reporters.png", bbox_inches='tight')
+
+    file_name = "img/" + file_prefix + "_elbow_for_reporters.png"
+    plt.savefig(file_name, bbox_inches='tight')
+    print "Elbow-method plot saved at ", file_name
 
 
 def assign_strategies(reporters_config, training_issues, n_clusters=3, debug=False):
