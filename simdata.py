@@ -28,6 +28,7 @@ RESOLVER_COLUMN = 'JIRA Resolved By'
 
 TIME_FACTOR = 60.0 * 60.0
 VALID_RESOLUTION_VALUES = ['Done', 'Implemented', 'Fixed']
+RESOLUTION_STATUS = ['Closed', 'Resolved']
 
 SEVERE_PRIORITY = 3
 NORMAL_PRIORITY = 2
@@ -130,23 +131,6 @@ def week_of_month(dt):
     return 1 if dt.day <= 15 else 2
 
 
-def period_identifier(report_series, batch_size=BATCH_SIZE):
-    """
-    Generates a period identifier based on report information.
-    :param report_series: Bug report information.
-    :return: Period identifier.
-    """
-
-    index_value = report_series.name
-
-    if batch_size > 0:
-        batch_identifier = int(index_value) / int(batch_size)
-    else:
-        batch_identifier = 1
-
-    return batch_identifier
-
-
 def date_as_string(report_series):
     """
     Returns a string representation of the created
@@ -174,7 +158,24 @@ def filter_by_reporter(bug_reports, reporters):
     return bug_reports.loc[reporter_filter]
 
 
-def include_batch_information(bug_reports):
+def period_identifier(report_series, batch_size=BATCH_SIZE):
+    """
+    Generates a period identifier based on report information.
+    :param report_series: Bug report information.
+    :return: Period identifier.
+    """
+
+    index_value = report_series.name
+
+    if batch_size > 0:
+        batch_identifier = int(index_value) / int(batch_size)
+    else:
+        batch_identifier = 1
+
+    return batch_identifier
+
+
+def include_batch_information(bug_reports, target_fixes=20):
     """
     Includes the column for grouping bug reports in batches.
     :param bug_reports:
@@ -182,8 +183,24 @@ def include_batch_information(bug_reports):
     """
     with_refreshed_index = bug_reports.sort(columns=[CREATED_DATE_COLUMN], ascending=[1])
     with_refreshed_index = with_refreshed_index.reset_index()
-    with_refreshed_index[BATCH_COLUMN] = with_refreshed_index.apply(period_identifier, axis=1)
 
+    current_batch = 0
+    current_fixes = 0
+    batches = []
+
+    for _, report_series in with_refreshed_index.iterrows():
+
+        batches.append(current_batch)
+        is_resolved = report_series['Status'] in RESOLUTION_STATUS
+
+        if is_resolved:
+            current_fixes += 1
+
+        if current_fixes == target_fixes:
+            current_batch += 1
+            current_fixes = 0
+
+    with_refreshed_index[BATCH_COLUMN] = pd.Series(batches, index=with_refreshed_index.index)
     return with_refreshed_index
 
 
@@ -258,7 +275,7 @@ def filter_resolved(bug_reports, only_with_commits=True, only_valid_resolution=T
     :param bug_reports: Original dataframe
     :return: Only resolved issues.
     """
-    resolved_issues = bug_reports[bug_reports['Status'].isin(['Closed', 'Resolved'])]
+    resolved_issues = bug_reports[bug_reports['Status'].isin(RESOLUTION_STATUS)]
 
     if only_valid_resolution:
         resolved_issues = resolved_issues[resolved_issues['Resolution'].isin(VALID_RESOLUTION_VALUES)]

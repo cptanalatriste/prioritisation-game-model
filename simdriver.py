@@ -23,25 +23,28 @@ import winsound
 
 DEBUG = False
 
+TARGET_FIXES = 10
+
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
 MINIMUM_P_VALUE = 0.05
 
 from collections import defaultdict
 
 
-def get_period_start(bug_dataset):
+def get_reporter_groups(bug_dataset):
     """
-    Returns the period start date, for interrival time calculation.
-    :param period_identifier: List of periods to consider.
+    Given a bug dataset, it returns a list of diferent bug reporters in order of activity.
     :param bug_dataset: Bug report dataset.
-    :return: Date for the starting period.
+    :return: List of reporters, sorted by activity.
     """
+    issues_by_tester = bug_dataset[simdata.REPORTER_COLUMN].value_counts()
+    testers_in_order = [index for index, _ in issues_by_tester.iteritems()]
+    tester_groups = [[tester] for tester in testers_in_order]
 
-    period_start = bug_dataset[simdata.CREATED_DATE_COLUMN].min()
-    return period_start
+    return tester_groups
 
 
-def get_reporter_configuration(training_dataset, debug=False):
+def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_filter=True, debug=False):
     """
     Returns the reporting information required for the simulation to run.
 
@@ -51,14 +54,17 @@ def get_reporter_configuration(training_dataset, debug=False):
     :return: List containing reporter information.
     """
 
-    issues_by_tester = training_dataset[simdata.REPORTER_COLUMN].value_counts()
-    testers_in_order = [index for index, _ in issues_by_tester.iteritems()]
-
     reporters_config = []
-    period_start = get_period_start(training_dataset)
+    period_start = training_dataset[simdata.CREATED_DATE_COLUMN].min()
 
-    for index, reporter_list in enumerate([[tester] for tester in testers_in_order]):
+    if tester_groups is None or len(tester_groups) == 0:
+        tester_groups = get_reporter_groups(training_dataset)
+
+    for index, reporter_list in enumerate(tester_groups):
+        print "Getting information for testers: ", reporter_list
+
         bug_reports = simdata.filter_by_reporter(training_dataset, reporter_list)
+        reports = len(bug_reports.index)
 
         batches = simdata.get_report_batches(bug_reports)
         arrival_times = [batch["batch_head"] for batch in batches]
@@ -99,7 +105,7 @@ def get_reporter_configuration(training_dataset, debug=False):
                 inflation_records["priority_" + str(priority) + "_false"] = len(inflated_reports.index)
 
             if debug:
-                print "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
+                print "Reports made ", reports, "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
                     inter_arrival_sample), " std: ", np.std(
                     inter_arrival_sample), "Batch-size", reporter_name, " mean: ", np.mean(
                     batch_sizes_sample), " std: ", np.std(
@@ -111,7 +117,8 @@ def get_reporter_configuration(training_dataset, debug=False):
                       'reporter_list': reporter_list,
                       'reports_per_priority': reports_per_priority,
                       'with_modified_priority': with_modified_priority,
-                      'modified_details': inflation_records}
+                      'modified_details': inflation_records,
+                      'reports': reports}
 
             reporters_config.append(config)
 
@@ -119,10 +126,13 @@ def get_reporter_configuration(training_dataset, debug=False):
             if debug:
                 print "Reporters ", reporter_list, " could not be added. Possible because insufficient samples."
 
-    original_reporters = len(reporters_config)
-    reporters_config = simutils.remove_drive_in_testers(reporters_config, min_reports=10)
-    print "Original reporters: ", original_reporters, "Number of reporters after drive-by filtering: ", len(
-        reporters_config)
+    if drive_by_filter:
+        original_reporters = len(reporters_config)
+        reporters_config = simutils.remove_drive_in_testers(reporters_config, min_reports=10)
+        print "Original reporters: ", original_reporters, "Number of reporters after drive-by filtering: ", len(
+            reporters_config)
+    else:
+        print "No drive-by filtering was performed."
 
     return reporters_config
 
@@ -261,7 +271,9 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
         simulation_details["Reported_Pri_" + str(priority)] = reported_on_simulation
 
     details_dataframe = pd.DataFrame(data=simulation_details)
-    details_dataframe.to_csv("csv/" + "_".join(project_keys) + "_sim_details.csv")
+    filename = "csv/" + "_".join(project_keys) + "_sim_details.csv"
+    details_dataframe.to_csv(filename)
+    print "Simulation results by priority are stored in ", filename
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
@@ -330,7 +342,7 @@ def get_resolution_time_gen(resolved_issues, desc=""):
     return resolution_time_gen
 
 
-def get_simulation_input(training_issues=None, per_priority=True):
+def get_simulation_input(training_issues=None):
     """
     Extract the simulation paramaters from the training dataset.
     :param training_issues: Training data set.
@@ -344,19 +356,27 @@ def get_simulation_input(training_issues=None, per_priority=True):
     resolution_per_priority = defaultdict(lambda: None)
     all_resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False,
                                                   only_valid_resolution=False)
+
+    all_ignored_issues = training_issues[training_issues['Status'].isin(['Open'])]
+    ignored_per_priority = defaultdict(lambda: None)
+
     for priority in priority_sample.unique():
         if not np.isnan(priority):
-            if per_priority:
-                priority_resolved = all_resolved_issues[all_resolved_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
-            else:
-                print "NOTE: We are not a Priority differentiated resolution time generator!!!!"
-                priority_resolved = all_resolved_issues
-
+            priority_resolved = all_resolved_issues[all_resolved_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
             resolution_time_gen = get_resolution_time_gen(priority_resolved, desc="Priority_" + str(priority))
-
             resolution_per_priority[priority] = resolution_time_gen
 
-    return resolution_per_priority
+            priority_ignored = all_ignored_issues[all_ignored_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+            ignored_probability = len(priority_ignored.index) / float(len(all_ignored_issues.index))
+
+            print "Ignored probability for Priority ", priority, " is ", ignored_probability
+            ignored_per_priority[priority] = simutils.DiscreteEmpiricalDistribution(name="Ignored_" + str(priority),
+                                                                                    values=[True, False],
+                                                                                    probabilities=[ignored_probability,
+                                                                                                   (
+                                                                                                       1 - ignored_probability)])
+
+    return resolution_per_priority, ignored_per_priority
 
 
 def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None):
@@ -403,38 +423,23 @@ def get_resolution_times(issues_for_period):
 def is_valid_period(issues_for_period):
     """
     Determines the rule for launching the simulation for that period.
-
     :param issues_for_period: Total issues in the period.
     :param resolved_in_period: Resolved issues in the period.
     :return: True if valid for simulation. False otherwise.
     """
-    return len(issues_for_period.index) == simdata.BATCH_SIZE
+
+    resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False, only_valid_resolution=False)
+    return len(resolved_issues.index) == TARGET_FIXES
 
 
-def get_dev_team_production(issues_for_period, time_after_last=None):
+def get_dev_team_production(issues_for_period):
     """
     Returns the production of the development team for a specific period.
     :return: Developer Team Size and Developer Team Production.
     """
 
-    start_date = issues_for_period[simdata.CREATED_DATE_COLUMN].min()
-
-    resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False,
-                                              only_valid_resolution=False)
-
-    if time_after_last is None:
-        time_after_last = get_resolution_times(issues_for_period).median()
-
-    margin = datetime.timedelta(hours=time_after_last)
-
-    # The commented line is when considering a month as simulation period.
-    # period_end = start_date
-    period_end = issues_for_period[simdata.CREATED_DATE_COLUMN].max()
-    end_date = period_end + margin
-
-    resolved_in_period = simdata.filter_by_date_range(simdata.RESOLUTION_DATE_COLUMN, resolved_issues,
-                                                      start_date,
-                                                      end_date)
+    resolved_in_period = simdata.filter_resolved(issues_for_period, only_with_commits=False,
+                                                 only_valid_resolution=False)
 
     bug_resolvers = resolved_in_period['JIRA Resolved By']
     dev_team_size = bug_resolvers.nunique()
@@ -445,7 +450,7 @@ def get_dev_team_production(issues_for_period, time_after_last=None):
     return dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith
 
 
-def get_team_training_data(training_issues, time_after_last, reporters_config):
+def get_team_training_data(training_issues, reporters_config):
     """
     Extracts development team information from the training dataset.
 
@@ -453,19 +458,19 @@ def get_team_training_data(training_issues, time_after_last, reporters_config):
     :return: A develoment team size generator, and another one for the bandwith.
     """
 
-    training_in_batches = simdata.include_batch_information(training_issues)
+    training_in_batches = simdata.include_batch_information(training_issues, target_fixes=TARGET_FIXES)
     dev_team_sizes = []
     dev_team_bandwiths = []
 
     unique_batches = training_in_batches[simdata.BATCH_COLUMN].unique()
     print len(training_in_batches.index), " training issues where grouped in ", len(
-        unique_batches), " batches of ", simdata.BATCH_SIZE, " reports ..."
+        unique_batches), " batches with ", TARGET_FIXES, " fixed reports ..."
 
     metrics_on_training = []
     for train_batch in unique_batches:
         issues_for_batch = training_in_batches[training_in_batches[simdata.BATCH_COLUMN] == train_batch]
 
-        dev_team_size, _, resolved_batch, dev_team_bandwith = get_dev_team_production(issues_for_batch, time_after_last)
+        dev_team_size, _, resolved_batch, dev_team_bandwith = get_dev_team_production(issues_for_batch)
         dev_team_sizes.append(dev_team_size)
         dev_team_bandwiths.append(dev_team_bandwith)
 
@@ -483,8 +488,25 @@ def get_team_training_data(training_issues, time_after_last, reporters_config):
     return dev_team_series, dev_bandwith_series, metrics_on_training
 
 
-def train_validate_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_valid, fold=0,
-                              debug=False):
+def get_reporter_generator(reporters_config):
+    """
+    Generates a probability distribution for bug reporters.
+    :param reporters_config: List with reporter behaviour information.
+    :return: A DiscreteEmpiricalDistribution instance
+    """
+    report_values = [config['reports'] for config in reporters_config]
+    total_reports = float(sum(report_values))
+    probability_values = [reports / total_reports for reports in report_values]
+
+    print "sum(probability_values) ", sum(probability_values)
+
+    reporter_gen = simutils.DiscreteEmpiricalDistribution(name="Reporter_Generator",
+                                                          values=[config['name'] for config in reporters_config],
+                                                          probabilities=probability_values)
+    return reporter_gen
+
+
+def train_validate_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_valid):
     """
 
     Train the simulation model on a dataset and test it in another dataset.
@@ -501,20 +523,19 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     training_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_train)]
     print "Issues in training: ", len(training_issues.index)
 
-    reporters_config = get_reporter_configuration(training_issues)
+    reporters_config = get_reporter_configuration(training_issues, drive_by_filter=True)
+    reporter_gen = get_reporter_generator(reporters_config)
 
     try:
         simutils.assign_strategies(reporters_config, training_issues)
     except ValueError as e:
         print "Cannot perform strategy assignment for this project..."
 
-    fit_reporter_distributions(reporters_config)
-
     engaged_testers = [reporter_config['name'] for reporter_config in reporters_config]
     training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
     print "Issues in training after reporter filtering: ", len(training_issues.index)
 
-    resolution_time_gen = get_simulation_input(training_issues, per_priority=True)
+    resolution_time_gen, ignored_gen = get_simulation_input(training_issues)
     if resolution_time_gen is None:
         print "Not enough resolution time info! ", project_key
         return
@@ -524,13 +545,12 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     valid_issues = simdata.filter_by_reporter(valid_issues, engaged_testers)
     print "Issues in validation after reporter filtering: ", len(valid_issues.index)
     print "Assigning Batch information to validation dataset ..."
-    valid_issues = simdata.include_batch_information(valid_issues)
+
+    valid_issues = simdata.include_batch_information(valid_issues, target_fixes=TARGET_FIXES)
 
     unique_batches = valid_issues[simdata.BATCH_COLUMN].unique()
-    print len(valid_issues.index), " where grouped in ", len(
-        unique_batches), " batches of ", simdata.BATCH_SIZE, " reports ..."
-
-    time_after_last = get_resolution_times(training_issues).median()
+    print len(valid_issues.index), " reports where grouped in ", len(
+        unique_batches), " batches with ", TARGET_FIXES, " fixed reports ..."
 
     priorities_in_training = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
     print "Priorities for defects in training: ", priorities_in_training.describe()
@@ -538,26 +558,32 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     priority_generator = simutils.DiscreteEmpiricalDistribution(observations=priorities_in_training)
     print "Training Priority Map : ", priority_generator.get_probabilities()
 
-    dev_team_series, dev_bandwith_series, training_metrics = get_team_training_data(training_issues, time_after_last,
+    dev_team_series, dev_bandwith_series, training_metrics = get_team_training_data(training_issues,
                                                                                     reporters_config)
 
     dev_team_size_training = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series)
     print "Using an DISCRETE EMPIRICAL DISTRIBUTION for the Development Team Size ..."
 
-    dev_team_bandwith_training = simutils.ContinuousEmpiricalDistribution(observations=dev_bandwith_series)
-    print "Using an CONTINUOUS EMPIRICAL DISTRIBUTION for the Development Bandwidth Available ..."
+    print "Getting global reporting information ..."
+    all_reporters = [config['name'] for config in reporters_config]
+    global_reporter_config = get_reporter_configuration(training_issues, [all_reporters], drive_by_filter=False)
+    fit_reporter_distributions(global_reporter_config)
 
-    simulation_output = simutils.launch_simulation_parallel(
+    # TODO(cgavidia): Only used for testing purposes
+    max_iterations = 3
+    simulation_output = simutils.launch_simulation(
+        # simulation_output = simutils.launch_simulation_parallel(
         reporters_config=reporters_config,
         resolution_time_gen=resolution_time_gen,
+        batch_size_gen=global_reporter_config[0]['batch_size_gen'],
+        interarrival_time_gen=global_reporter_config[0]['interarrival_time_gen'],
+        ignored_gen=ignored_gen,
+        reporter_gen=reporter_gen,
         max_iterations=max_iterations,
-        bugs_by_priority=None,
         priority_generator=priority_generator,
-        catalog_size=simdata.BATCH_SIZE,
+        target_fixes=TARGET_FIXES,
         team_capacity=None,
-        dev_size_generator=dev_team_size_training,
-        dev_team_bandwidth=None,
-        dev_bandwith_generator=dev_team_bandwith_training)
+        dev_size_generator=dev_team_size_training)
 
     simulation_result = consolidate_results("SIMULATION", None, None,
                                             reporters_config,
@@ -578,13 +604,13 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
         issues_for_period = valid_issues[valid_issues[simdata.BATCH_COLUMN] == valid_period]
 
         dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(
-            issues_for_period, time_after_last=time_after_last)
+            issues_for_period)
 
         if is_valid_period(issues_for_period):
             reporting_metrics = get_reporting_metrics(issues_for_period, resolved_in_period, reporters_config)
             metrics_on_validation.append(reporting_metrics)
         else:
-            print "PERIOD EXCLUDED!!! "
+            print "VALIDATION PERIOD EXCLUDED!!! "
 
     return metrics_on_validation, simulation_result, training_results
 
@@ -641,16 +667,17 @@ def simulate_project(project_key, enhanced_dataframe, test_size=None, max_iterat
         metrics_on_valid, simulation_result, training_results = train_validate_simulation(project_key, issues_in_range,
                                                                                           max_iterations,
                                                                                           keys_train,
-                                                                                          keys_valid,
-                                                                                          fold=None)
+                                                                                          keys_valid)
 
         simulation_results.extend((metrics_on_valid, simulation_result))
 
     if len(simulation_results) > 0:
-        print "Project ", project_key, " - Assessing simulation on VALIDATION DATASET: "
         valid_results = pd.DataFrame(
             simvalid.analyse_input_output(simulation_results[0], simulation_results[1], prefix="VALIDATION"))
-        valid_results.to_csv("csv/" + "_".join(project_key) + "_validation_val_results.csv")
+        file_name = "csv/" + "_".join(project_key) + "_validation_val_results.csv"
+        valid_results.to_csv(file_name)
+
+        print "Project ", project_key, " - Assessing simulation on VALIDATION DATASET. Results written in ", file_name
 
     return training_results, valid_results
 
@@ -679,6 +706,10 @@ def main():
 
     max_iterations = 200
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
+
+    # TODO(cgavidia): Remove later. Only for testing purposes:
+    valid_projects = ['OFBIZ']
+
     test_sizes = [.25]
     # test_sizes = [.4, .3, .2]
 

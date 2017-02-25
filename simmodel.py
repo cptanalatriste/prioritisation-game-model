@@ -51,10 +51,12 @@ class TestingContext:
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, resolution_time_gen, bugs_by_priority, default_review_time,
-                 devtime_level,
+    def __init__(self, resolution_time_gen, ignored_gen, reporter_gen, default_review_time, priority_generator,
                  quota_system,
                  quota_per_dev,
+                 review_time_gen,
+                 target_fixes,
+                 views_to_discard,
                  inflation_factor=1):
         """
         Configures the context of the simulation.
@@ -67,12 +69,17 @@ class TestingContext:
         """
 
         self.resolution_time_gen = resolution_time_gen
-        self.devtime_level = devtime_level
+        self.ignored_gen = ignored_gen
+        self.reporter_gen = reporter_gen
+        self.priority_generator = priority_generator
         self.default_review_time = default_review_time
+        self.review_time_gen = review_time_gen
         self.first_report_time = None
         self.last_report_time = None
+        self.target_fixes = target_fixes
         self.quota_per_dev = quota_per_dev
         self.quota_system = quota_system
+        self.views_to_discard = views_to_discard
 
         self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {'completed': Monitor(),
                                                                 'reported': 0},
@@ -81,41 +88,28 @@ class TestingContext:
                                   simdata.SEVERE_PRIORITY: {'completed': Monitor(),
                                                             'reported': 0}}
 
-        self.med_resolution_time = self.get_med_resolution_time()
+        self.bug_counter = 0
 
         if self.quota_per_dev and self.quota_system:
             self.inflation_penalty = self.get_default_inflation_penalty() * inflation_factor
-
-        self.bug_catalog, self.bug_level = self.config_bug_catalog(bugs_by_priority)
-
-    def config_bug_catalog(self, bugs_by_priority):
-        """
-        Initializes the randomized catalog of bugs and the bug level.
-        :param bugs_by_priority: Map with number of defects per priority.
-        :return: A list of defects and the bug level.
-        """
-        report_number = 0
-        bug_catalog = []
-
-        for priority, bugs in bugs_by_priority.iteritems():
-            report_number += bugs
-
-            for index in range(bugs):
-                bug_catalog.append({'report_key': 'Priotity_' + str(priority) + "_Index_" + str(index),
-                                    'real_priority': priority,
-                                    'fix_effort': self.get_fix_effort(priority)})
-
-        bug_level = Level(capacity=sys.maxint, initialBuffered=int(np.asscalar(report_number)), monitored=True)
-        np.random.shuffle(bug_catalog)
-
-        return bug_catalog, bug_level
 
     def catch_bug(self):
         """
         Removes an item from the bug catalog.
         :return: The removed item.
         """
-        return self.bug_catalog.pop()
+
+        priority = self.priority_generator.generate()[0]
+        reporter = self.reporter_gen.generate()
+        index = self.bug_counter
+
+        bug_config = {'report_key': 'Priotity_' + str(priority) + "_Index_" + str(index),
+                      'real_priority': priority,
+                      'fix_effort': self.get_fix_effort(priority),
+                      'reporter': reporter}
+
+        self.bug_counter += 1
+        return bug_config
 
     def get_reporting_time(self):
         """
@@ -128,20 +122,19 @@ class TestingContext:
 
         return 0
 
-    def stop_simulation(self, current_time):
+    def stop_simulation(self):
         """
         Returns True if the simulation must be stopped.
         :param current_time: Current simulation time.
         :return: True if we should stop. False otherwise.
         """
 
-        if self.last_report_time:
-            elapsed_time = (current_time - self.last_report_time)
+        total_fixed = sum([monitors['completed'].count() for priority, monitors in self.priority_monitors.iteritems()])
 
-        if self.last_report_time is not None and elapsed_time >= self.med_resolution_time:
-            return True
+        if total_fixed < self.target_fixes:
+            return False
 
-        return False
+        return True
 
     def get_fix_effort(self, report_priority):
         """
@@ -156,26 +149,36 @@ class TestingContext:
 
         return fix_effort
 
+    def ignore(self, reported_priority):
+        """
+        Returns if the reported removed from the queue should be fixed.
+        :param reported_priority: Priority in the report.
+        :return: True if it should be ignored, false otherwise.
+        """
+        generator = self.ignored_gen[int(reported_priority)]
+        generator_output = generator.generate()
+        return generator_output
+
+    def discard(self, report):
+        """
+        Returns True if an ignored report should not be returned to the reports queue.
+        :param report:  Report to evaluate.
+        :return: True to discard, false otherwise.
+        """
+        return report.views_counter >= self.views_to_discard
+
     def get_review_time(self):
         """
         Returns the review time required by the gatekeeper to correct the priority.
         :return:
         """
-        return self.default_review_time
 
-    def get_med_resolution_time(self):
-        """
-        Returns the median of all the resolution times, of all priorities.
-        :return: Median resolution time.
-        """
-        all_resolution_times = []
+        review_time = self.default_review_time
 
-        for priority in simdata.SUPPORTED_PRIORITIES:
-            generator = self.resolution_time_gen[priority]
-            if generator is not None:
-                all_resolution_times.extend(generator.observations)
+        if self.review_time_gen is not None:
+            review_time = self.review_time_gen.generate().item()
 
-        return np.median(all_resolution_times)
+        return review_time
 
     def get_default_inflation_penalty(self):
         """
@@ -190,33 +193,29 @@ class BugReportSource(Process):
     Represents a Tester, who generates Bug Reports.
     """
 
-    def __init__(self, reporter_config=None, testing_context=None):
-        Process.__init__(self, reporter_config['name'])
-        self.interarrival_time_gen = reporter_config['interarrival_time_gen']
-        self.batch_size_gen = reporter_config['batch_size_gen']
+    def __init__(self, interarrival_time_gen=None, batch_size_gen=None, reporters_config=None, testing_context=None):
+        Process.__init__(self, "Reporting_Process")
+        self.interarrival_time_gen = interarrival_time_gen
+        self.batch_size_gen = batch_size_gen
+        self.reporters_config = reporters_config
         self.testing_context = testing_context
 
+    def get_reporter_strategy(self, reporter_name):
+        """
+        Gets the strategy associated to a specific report
+        :param reporter_name: Reporter name
+        :return: Associated strategy.
+        """
         strategy_key = 'strategy'
-        if strategy_key in reporter_config:
-            self.strategy = reporter_config[strategy_key]
-        else:
-            self.strategy = None
 
-        self.priority_counters = self.start_priority_counter()
-        self.report_counters = self.start_priority_counter()
-        self.resolved_counters = self.start_priority_counter()
+        for config in self.reporters_config:
 
-    @staticmethod
-    def start_priority_counter():
-        """
-        Returns a priority-based counter.
-        :return: A map, with an entry per priority.
-        """
-        return {simdata.NON_SEVERE_PRIORITY: 0,
-                simdata.NORMAL_PRIORITY: 0,
-                simdata.SEVERE_PRIORITY: 0}
+            if config['name'] == reporter_name and strategy_key in config:
+                return config[strategy_key]
 
-    def start_reporting(self, developer_resource, gatekeeper_resource, reporter_monitor):
+        return None
+
+    def start_reporting(self, developer_resource, gatekeeper_resource, reporter_monitors):
         """
         Activates a number of bug reports according to an inter-arrival time.
         :param gatekeeper_resource: The Gatekeeping Team Resource.
@@ -227,48 +226,50 @@ class BugReportSource(Process):
         interarrival_time = self.get_interarrival_time()
         yield hold, self, interarrival_time
 
-        bug_level = self.testing_context.bug_level
-
         batch_size = self.get_batch_size()
-        while bug_level.amount >= batch_size:
-            yield get, self, bug_level, abs(batch_size)
+        arrival_time = now()
+        self.testing_context.last_report_time = arrival_time
 
-            if self.testing_context.last_report_time is None and bug_level.amount <= 0:
-                self.testing_context.last_report_time = now()
+        while True:
 
             for index in range(batch_size):
                 bug_info = self.testing_context.catch_bug()
                 report_key = bug_info['report_key']
                 real_priority = bug_info['real_priority']
                 fix_effort = bug_info['fix_effort']
+                reporter = bug_info['reporter']
 
-                report_priority = self.get_report_priority(real_priority)
+                report_priority = self.get_report_priority(reporter_name=reporter, real_priority=real_priority)
                 review_time = self.testing_context.get_review_time()
 
-                bug_report = BugReport(name=report_key, reporter=self,
+                bug_report = BugReport(name=report_key, reporter=reporter,
                                        fix_effort=fix_effort,
                                        report_priority=report_priority,
                                        real_priority=real_priority,
-                                       review_time=review_time)
+                                       review_time=review_time,
+                                       arrival_time=arrival_time)
 
                 reported_priority_monitor = self.testing_context.priority_monitors[report_priority]['completed']
 
-                devtime_level = self.testing_context.devtime_level
+                reporter_metrics = reporter_monitors[reporter]
+                reporter_monitor = reporter_metrics['resolved_monitor']
+                resolved_counters = reporter_metrics['resolved_counters']
 
                 inflation_penalty = self.get_inflation_penalty()
 
                 if self.testing_context.first_report_time is None:
-                    self.testing_context.first_report_time = now()
+                    self.testing_context.first_report_time = arrival_time
 
                 activate(bug_report,
                          bug_report.arrive(developer_resource=developer_resource,
                                            gatekeeper_resource=gatekeeper_resource,
                                            resolution_monitors=[reporter_monitor, reported_priority_monitor,
-                                                                self.resolved_counters],
-                                           devtime_level=devtime_level, inflation_penalty=inflation_penalty))
+                                                                resolved_counters],
+                                           testing_context=self.testing_context,
+                                           inflation_penalty=inflation_penalty))
 
-                self.priority_counters[real_priority] += 1
-                self.report_counters[report_priority] += 1
+                reporter_metrics['priority_counters'][real_priority] += 1
+                reporter_metrics['report_counters'][report_priority] += 1
                 self.testing_context.priority_monitors[report_priority]['reported'] += 1
 
             interarrival_time = self.get_interarrival_time()
@@ -276,7 +277,26 @@ class BugReportSource(Process):
 
             batch_size = self.get_batch_size()
 
-        self.testing_context.last_report_time = now()
+        self.testing_context.last_report_time = arrival_time
+
+    def get_report_priority(self, reporter_name, real_priority):
+        """
+        Returns a priority to include in the report, according to the tester strategy.
+        :param real_priority: Ground-truth priority of the bug.
+        :return: Priority to report.
+        """
+
+        reporter_strategy = self.get_reporter_strategy(reporter_name)
+
+        if reporter_strategy is None:
+            return real_priority
+
+        if reporter_strategy is not None and isinstance(reporter_strategy, EmpiricalInflationStrategy):
+            return self.strategy.priority_to_report(real_priority)
+
+        priority_for_report = real_priority
+
+        return priority_for_report
 
     def get_inflation_penalty(self):
         """
@@ -286,38 +306,20 @@ class BugReportSource(Process):
         """
         inflation_penalty = None
 
-        devtime_level = self.testing_context.devtime_level
-
-        if self.testing_context.quota_system:
-            default_inflation_penalty = self.testing_context.inflation_penalty
-
-            inflation_penalty = 0
-
-            developer_quota = devtime_level[self.name]
-
-            if developer_quota.amount >= default_inflation_penalty:
-                inflation_penalty = default_inflation_penalty
-            elif 0 <= developer_quota.amount < default_inflation_penalty:
-                inflation_penalty = developer_quota.amount
+        # TODO(cgavidia): Temporary comment. Will fix later.
+        # if self.testing_context.quota_system:
+        #     default_inflation_penalty = self.testing_context.inflation_penalty
+        #
+        #     inflation_penalty = 0
+        #
+        #     developer_quota = devtime_level[self.name]
+        #
+        #     if developer_quota.amount >= default_inflation_penalty:
+        #         inflation_penalty = default_inflation_penalty
+        #     elif 0 <= developer_quota.amount < default_inflation_penalty:
+        #         inflation_penalty = developer_quota.amount
 
         return inflation_penalty
-
-    def get_report_priority(self, real_priority):
-        """
-        Returns a priority to include in the report, according to the tester strategy.
-        :param real_priority: Ground-truth priority of the bug.
-        :return: Priority to report.
-        """
-
-        if self.strategy is None:
-            return real_priority
-
-        if self.strategy is not None and isinstance(self.strategy, EmpiricalInflationStrategy):
-            return self.strategy.priority_to_report(real_priority)
-
-        priority_for_report = real_priority
-
-        return priority_for_report
 
     def get_interarrival_time(self):
         """
@@ -344,15 +346,20 @@ class BugReport(Process):
     A project member whose main responsibility is bug reporting.
     """
 
-    def __init__(self, name, reporter, fix_effort, report_priority, real_priority, review_time):
+    def __init__(self, name, reporter, fix_effort, report_priority, real_priority, review_time, arrival_time):
         Process.__init__(self, name)
         self.reporter = reporter
         self.fix_effort = fix_effort
         self.report_priority = report_priority
         self.real_priority = real_priority
         self.review_time = review_time
+        self.arrival_time = arrival_time
+        self.views_counter = 0
 
-    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, devtime_level, inflation_penalty,
+    def get_priority_for_queue(self):
+        return int(self.arrival_time)
+
+    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, testing_context, inflation_penalty,
                debug=False):
         """
         The Process Execution Method for the Bug Reported process.
@@ -380,27 +387,27 @@ class BugReport(Process):
             self.report_priority = self.real_priority
             yield release, self, gatekeeper_resource
 
-        priority_for_resource = int(self.report_priority)
-        yield request, self, developer_resource, priority_for_resource
+        yield request, self, developer_resource, self.get_priority_for_queue()
 
         # This sections applies the quota system process. The Bug Report is holding a Developer resource.
         if inflation_penalty is not None:
-            quota_manager = devtime_level
+            # TODO(cgavidia): Temporary value. Replace later.
+            quota_manager = None
 
             donation = float(inflation_penalty) / (len(quota_manager.keys()) - 1)
-            devtime_level = quota_manager[self.reporter.name]
+            devtime_level = quota_manager[self.reporter]
 
             if false_report:
 
                 if inflation_penalty > 0:
                     if debug:
-                        print "Penalty to be applied to", self.reporter.name, " : Removing ", inflation_penalty, \
+                        print "Penalty to be applied to", self.reporter, " : Removing ", inflation_penalty, \
                             " from existing quota of ", devtime_level.amount
 
                     yield get, self, devtime_level, abs(inflation_penalty)
 
                     for reporter, quota in quota_manager.iteritems():
-                        if reporter != self.reporter.name:
+                        if reporter != self.reporter:
                             if debug:
                                 print "Adding ", donation, " to reporter ", reporter, " quota. Previous value: ", quota.amount
                             yield put, self, quota, donation
@@ -408,36 +415,32 @@ class BugReport(Process):
                 # Priority gets corrected and the report is re-entered on the queue
                 self.report_priority = self.real_priority
                 yield release, self, developer_resource
-                yield request, self, developer_resource, int(self.report_priority)
+                yield request, self, developer_resource, self.get_priority_for_queue()
+
+        if testing_context.ignore(self.report_priority):
+            self.views_counter += 1
+            yield release, self, developer_resource
+
+            if not testing_context.discard(self):
+                yield request, self, developer_resource, self.get_priority_for_queue()
+            else:
+                return
 
         # Finally, here we're using our development time budget.
-        if devtime_level.amount <= 0:
-            if debug:
-                print "No more developer time available for ", self.reporter.name
+        yield hold, self, abs(self.fix_effort)
+        yield release, self, developer_resource
 
-            yield release, self, developer_resource
-        elif self.fix_effort <= devtime_level.amount:
-            yield get, self, devtime_level, abs(self.fix_effort)
-            yield hold, self, abs(self.fix_effort)
-            yield release, self, developer_resource
+        resol_time = now() - arrival_time
 
-            resol_time = now() - arrival_time
-
-            for monitor in resolution_monitors:
-                if isinstance(monitor, dict):
-                    monitor[self.real_priority] += 1
-                else:
-                    monitor.observe(resol_time)
+        for monitor in resolution_monitors:
+            if isinstance(monitor, dict):
+                monitor[self.real_priority] += 1
+            else:
+                monitor.observe(resol_time)
 
             if debug:
                 print now(), ": Report ", self.name, "by reporter ", self.reporter.name, " got fixed after ", resol_time, \
                     " of reporting. Fix effort: ", self.fix_effort, " Available Dev Time: ", devtime_level.amount
-        else:
-            if debug:
-                print "Not enough dev time in quota for fixing ", self.name, " Required: ", self.fix_effort, \
-                    " Avaialble: ", devtime_level.amount
-
-            yield release, self, developer_resource
 
 
 class SimulationController(Process):
@@ -453,33 +456,28 @@ class SimulationController(Process):
         while True:
             yield hold, self, 1
 
-            if self.testing_context.stop_simulation(now()):
+            if self.testing_context.stop_simulation():
                 stopSimulation()
 
 
-def get_bugs_per_priority(priority_generator, catalog_size):
+def start_priority_counter():
     """
-    Gives the counts per priority for a bug catalog, according to the provided generator.
-    :param priority_generator: Priority generator.
-    :return: Map with the priorities.
+    Returns a priority-based counter.
+    :return: A map, with an entry per priority.
     """
-
-    priority_counters = defaultdict(int)
-
-    for _ in range(catalog_size):
-        priority = priority_generator.generate()[0]
-        priority_counters[priority] += np.int64(1)
-
-    return priority_counters
+    return {simdata.NON_SEVERE_PRIORITY: 0,
+            simdata.NORMAL_PRIORITY: 0,
+            simdata.SEVERE_PRIORITY: 0}
 
 
-def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen, max_time,
-              dev_team_bandwith,
+def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen, reporter_gen, max_time,
               priority_generator=None,
-              catalog_size=None,
+              target_fixes=None,
               dev_size_generator=None,
-              dev_bandwith_generator=None,
               gatekeeper_config=False,
+              interarrival_time_gen=None,
+              batch_size_gen=None,
+              views_to_discard=0,
               quota_system=False, inflation_factor=1, debug=False):
     """
     Triggers the simulation, according to the provided parameters.
@@ -511,57 +509,56 @@ def run_model(team_capacity, bugs_by_priority, reporters_config, resolution_time
     if dev_size_generator is not None:
         team_capacity = dev_size_generator.generate()[0]
 
-    if dev_bandwith_generator is not None:
-        dev_team_bandwith = int(dev_bandwith_generator.generate())
-
+    print "Team Capacity: ", team_capacity, " developers"
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
-
-    devtime_level = Level(capacity=sys.maxint, initialBuffered=dev_team_bandwith, monitored=True)
-
     quota_per_dev = None
     if quota_system:
+        # TODO(cgavidia): Temporary value
+        dev_team_bandwith = 0
         quota_per_dev = dev_team_bandwith / len(reporters_config)
         devtime_level = {config['name']: Level(capacity=sys.maxint, initialBuffered=quota_per_dev, monitored=True) for
                          config in reporters_config}
 
     initialize()
 
-    if priority_generator is not None and catalog_size is not None:
-        bugs_by_priority = get_bugs_per_priority(priority_generator, catalog_size)
-
+    # TODO(cgavidia): Temporary value
+    review_time_gen = None
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen,
-                                     bugs_by_priority=bugs_by_priority, default_review_time=default_review_time,
-                                     devtime_level=devtime_level, quota_system=quota_system,
+                                     ignored_gen=ignored_gen,
+                                     reporter_gen=reporter_gen,
+                                     priority_generator=priority_generator, default_review_time=default_review_time,
+                                     quota_system=quota_system,
                                      quota_per_dev=quota_per_dev,
-                                     inflation_factor=inflation_factor)
+                                     inflation_factor=inflation_factor,
+                                     review_time_gen=review_time_gen,
+                                     views_to_discard=views_to_discard,
+                                     target_fixes=target_fixes)
 
     controller = SimulationController(testing_context=testing_context)
     activate(controller, controller.control())
 
     reporter_monitors = {}
-
-    strategy_counters = defaultdict(int)
     for reporter_config in reporters_config:
         reporter_monitor = Monitor()
-        bug_reporter = BugReportSource(reporter_config=reporter_config,
-                                       testing_context=testing_context)
 
-        if bug_reporter.strategy is not None:
-            strategy_counters[bug_reporter.strategy.name] += 1
-
-        activate(bug_reporter,
-                 bug_reporter.start_reporting(developer_resource=developer_resource,
-                                              gatekeeper_resource=gatekeeper_resource,
-                                              reporter_monitor=reporter_monitor), at=start_time)
         reporter_monitors[reporter_config['name']] = {"resolved_monitor": reporter_monitor,
-                                                      "priority_counters": bug_reporter.priority_counters,
-                                                      "report_counters": bug_reporter.report_counters,
-                                                      "resolved_counters": bug_reporter.resolved_counters}
+                                                      "priority_counters": start_priority_counter(),
+                                                      "report_counters": start_priority_counter(),
+                                                      "resolved_counters": start_priority_counter()}
+
+    bug_reporter = BugReportSource(reporters_config=reporters_config,
+                                   testing_context=testing_context,
+                                   interarrival_time_gen=interarrival_time_gen,
+                                   batch_size_gen=batch_size_gen)
+
+    activate(bug_reporter,
+             bug_reporter.start_reporting(developer_resource=developer_resource,
+                                          gatekeeper_resource=gatekeeper_resource,
+                                          reporter_monitors=reporter_monitors), at=start_time)
 
     if debug:
-        print "strategy_counters: ", strategy_counters, " testing_context.med_resolution_time ", testing_context.med_resolution_time, \
-            "testing_context.inflation_penalty ", testing_context.inflation_penalty, "len(reporters_config) ", len(
+        print "testing_context.inflation_penalty ", testing_context.inflation_penalty, "len(reporters_config) ", len(
             reporters_config)
 
     simulation_result = simulate(until=max_time)

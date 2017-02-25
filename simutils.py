@@ -368,15 +368,17 @@ def plot_correlation(total_predicted, total_completed, title, figtext, plot):
         plt.savefig("img/" + title + ".png", bbox_inches='tight')
 
 
-def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config,
+def launch_simulation_parallel(team_capacity, reporters_config,
                                resolution_time_gen,
+                               batch_size_gen,
+                               interarrival_time_gen,
                                max_iterations,
                                max_time=sys.maxint,
-                               dev_team_bandwidth=sys.maxint,
                                priority_generator=None,
-                               catalog_size=None,
+                               ignored_gen=None,
+                               reporter_gen=None,
+                               target_fixes=None,
                                dev_size_generator=None,
-                               dev_bandwith_generator=None,
                                gatekeeper_config=False,
                                inflation_factor=1,
                                quota_system=False,
@@ -387,7 +389,6 @@ def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config
     :param catalog_size: Number of defects present on the system.
     :param priority_generator: Generator for the priority of the defects.
     :param team_capacity:
-    :param bugs_by_priority:
     :param reporters_config:
     :param resolution_time_gen:
     :param max_iterations:
@@ -416,18 +417,19 @@ def launch_simulation_parallel(team_capacity, bugs_by_priority, reporters_config
 
     for _ in range(parallel_blocks):
         worker_input = {'team_capacity': team_capacity,
-                        'bugs_by_priority': bugs_by_priority,
                         'reporters_config': reporters_config,
                         'resolution_time_gen': resolution_time_gen,
+                        'batch_size_gen': batch_size_gen,
+                        'interarrival_time_gen': interarrival_time_gen,
                         'max_iterations': samples_per_worker,
+                        'ignored_gen': ignored_gen,
+                        'reporter_gen': reporter_gen,
                         'max_time': max_time,
-                        'dev_team_bandwidth': dev_team_bandwidth,
                         'gatekeeper_config': gatekeeper_config,
                         'inflation_factor': inflation_factor,
                         'priority_generator': priority_generator,
-                        'catalog_size': catalog_size,
+                        'target_fixes': target_fixes,
                         'dev_size_generator': dev_size_generator,
-                        'dev_bandwith_generator': dev_bandwith_generator,
                         'quota_system': quota_system}
 
         worker_inputs.append(worker_input)
@@ -462,16 +464,17 @@ def launch_simulation_wrapper(input_params):
     """
     simulation_results = launch_simulation(
         team_capacity=input_params['team_capacity'],
-        bugs_by_priority=input_params['bugs_by_priority'],
         reporters_config=input_params['reporters_config'],
         resolution_time_gen=input_params['resolution_time_gen'],
+        batch_size_gen=input_params['batch_size_gen'],
+        interarrival_time_gen=input_params['interarrival_time_gen'],
         max_iterations=input_params['max_iterations'],
         max_time=input_params['max_time'],
-        dev_team_bandwidth=input_params['dev_team_bandwidth'],
         priority_generator=input_params['priority_generator'],
-        catalog_size=input_params['catalog_size'],
+        target_fixes=input_params['target_fixes'],
+        ignored_gen=input_params['ignored_gen'],
+        reporter_gen=input_params['reporter_gen'],
         dev_size_generator=input_params['dev_size_generator'],
-        dev_bandwith_generator=input_params['dev_bandwith_generator'],
         gatekeeper_config=input_params['gatekeeper_config'],
         inflation_factor=input_params['inflation_factor'],
         quota_system=input_params['quota_system'])
@@ -479,13 +482,16 @@ def launch_simulation_wrapper(input_params):
     return simulation_results
 
 
-def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolution_time_gen,
+def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
+                      batch_size_gen,
+                      interarrival_time_gen,
                       max_iterations,
-                      max_time=sys.maxint, dev_team_bandwidth=sys.maxint,
+                      max_time=sys.maxint,
                       priority_generator=None,
-                      catalog_size=None,
+                      ignored_gen=None,
+                      reporter_gen=None,
+                      target_fixes=None,
                       dev_size_generator=None,
-                      dev_bandwith_generator=None,
                       gatekeeper_config=False,
                       inflation_factor=1,
                       quota_system=False):
@@ -497,7 +503,6 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
     :param dev_team_bandwidth: Number of developer hours available.
     :param max_iterations: Maximum number of simulation executions.
     :param team_capacity: Number of developers in the team.
-    :param bugs_by_priority: Number of bugs for the period per priority.
     :param reporters_config: Bug reporter configuration.
     :param resolution_time_gen: Resolution time required by developers.
     :param max_time: Simulation time.
@@ -517,15 +522,16 @@ def launch_simulation(team_capacity, bugs_by_priority, reporters_config, resolut
     for replication_index in range(max_iterations):
         np.random.seed()
         reporter_monitors, priority_monitors, reporting_time = simmodel.run_model(team_capacity=team_capacity,
-                                                                                  bugs_by_priority=bugs_by_priority,
                                                                                   reporters_config=reporters_config,
                                                                                   resolution_time_gen=resolution_time_gen,
+                                                                                  batch_size_gen=batch_size_gen,
+                                                                                  interarrival_time_gen=interarrival_time_gen,
                                                                                   max_time=max_time,
-                                                                                  dev_team_bandwith=dev_team_bandwidth,
+                                                                                  ignored_gen=ignored_gen,
+                                                                                  reporter_gen=reporter_gen,
                                                                                   priority_generator=priority_generator,
-                                                                                  catalog_size=catalog_size,
+                                                                                  target_fixes=target_fixes,
                                                                                   dev_size_generator=dev_size_generator,
-                                                                                  dev_bandwith_generator=dev_bandwith_generator,
                                                                                   gatekeeper_config=gatekeeper_config,
                                                                                   quota_system=quota_system,
                                                                                   inflation_factor=inflation_factor)
