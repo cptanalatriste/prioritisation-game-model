@@ -506,7 +506,7 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
 
     if dev_size_generator is not None:
         # We are ensuring a minimum capacity of one developer.
-        team_capacity = min(1, dev_size_generator.generate()[0])
+        team_capacity = max(1, dev_size_generator.generate()[0])
 
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
