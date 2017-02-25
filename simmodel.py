@@ -223,14 +223,14 @@ class BugReportSource(Process):
         :param developer_resource: The Development Team resource.
         :return: None
         """
+
         interarrival_time = self.get_interarrival_time()
         yield hold, self, interarrival_time
 
-        batch_size = self.get_batch_size()
-        arrival_time = now()
-        self.testing_context.last_report_time = arrival_time
-
         while True:
+            batch_size = self.get_batch_size()
+            arrival_time = now()
+            self.testing_context.last_report_time = arrival_time
 
             for index in range(batch_size):
                 bug_info = self.testing_context.catch_bug()
@@ -274,8 +274,6 @@ class BugReportSource(Process):
 
             interarrival_time = self.get_interarrival_time()
             yield hold, self, abs(interarrival_time)
-
-            batch_size = self.get_batch_size()
 
         self.testing_context.last_report_time = arrival_time
 
@@ -507,9 +505,9 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
     preemptable = False
 
     if dev_size_generator is not None:
-        team_capacity = dev_size_generator.generate()[0]
+        # We are ensuring a minimum capacity of one developer.
+        team_capacity = min(1, dev_size_generator.generate()[0])
 
-    print "Team Capacity: ", team_capacity, " developers"
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
     quota_per_dev = None

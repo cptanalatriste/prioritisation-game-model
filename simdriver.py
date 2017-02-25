@@ -61,7 +61,6 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
         tester_groups = get_reporter_groups(training_dataset)
 
     for index, reporter_list in enumerate(tester_groups):
-        print "Getting information for testers: ", reporter_list
 
         bug_reports = simdata.filter_by_reporter(training_dataset, reporter_list)
         reports = len(bug_reports.index)
@@ -360,6 +359,9 @@ def get_simulation_input(training_issues=None):
     all_ignored_issues = training_issues[training_issues['Status'].isin(['Open'])]
     ignored_per_priority = defaultdict(lambda: None)
 
+    total_ignored = float(len(all_ignored_issues.index))
+    print "Total number of ignored reports: ", total_ignored
+
     for priority in priority_sample.unique():
         if not np.isnan(priority):
             priority_resolved = all_resolved_issues[all_resolved_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
@@ -367,7 +369,10 @@ def get_simulation_input(training_issues=None):
             resolution_per_priority[priority] = resolution_time_gen
 
             priority_ignored = all_ignored_issues[all_ignored_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
-            ignored_probability = len(priority_ignored.index) / float(len(all_ignored_issues.index))
+
+            ignored_probability = 0.0
+            if total_ignored > 0:
+                ignored_probability = len(priority_ignored.index) / total_ignored
 
             print "Ignored probability for Priority ", priority, " is ", ignored_probability
             ignored_per_priority[priority] = simutils.DiscreteEmpiricalDistribution(name="Ignored_" + str(priority),
@@ -569,10 +574,7 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     global_reporter_config = get_reporter_configuration(training_issues, [all_reporters], drive_by_filter=False)
     fit_reporter_distributions(global_reporter_config)
 
-    # TODO(cgavidia): Only used for testing purposes
-    max_iterations = 3
-    simulation_output = simutils.launch_simulation(
-        # simulation_output = simutils.launch_simulation_parallel(
+    simulation_output = simutils.launch_simulation_parallel(
         reporters_config=reporters_config,
         resolution_time_gen=resolution_time_gen,
         batch_size_gen=global_reporter_config[0]['batch_size_gen'],
@@ -662,7 +664,8 @@ def simulate_project(project_key, enhanced_dataframe, test_size=None, max_iterat
         keys_train, keys_valid = split_dataset(keys_train, test_size)
 
         print "Training simulation and validating: Keys in Train: ", len(
-            keys_train), "Keys in Validation ", len(keys_valid), " Keys in Test: ", len(keys_test)
+            keys_train), "Keys in Validation ", len(keys_valid), " Keys in Test: ", len(
+            keys_test), " Test Size: ", test_size, " Simulation iterations: ", max_iterations
 
         metrics_on_valid, simulation_result, training_results = train_validate_simulation(project_key, issues_in_range,
                                                                                           max_iterations,
@@ -706,10 +709,6 @@ def main():
 
     max_iterations = 200
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
-
-    # TODO(cgavidia): Remove later. Only for testing purposes:
-    valid_projects = ['OFBIZ']
-
     test_sizes = [.25]
     # test_sizes = [.4, .3, .2]
 
