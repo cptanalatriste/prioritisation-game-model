@@ -24,6 +24,7 @@ import winsound
 DEBUG = False
 
 TARGET_FIXES = 10
+DIFFERENCE = 2
 
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
 MINIMUM_P_VALUE = 0.05
@@ -473,14 +474,17 @@ def get_team_training_data(training_issues, reporters_config):
 
     metrics_on_training = []
     for train_batch in unique_batches:
+
         issues_for_batch = training_in_batches[training_in_batches[simdata.BATCH_COLUMN] == train_batch]
+        if is_valid_period(issues_for_batch):
+            dev_team_size, _, resolved_batch, dev_team_bandwith = get_dev_team_production(issues_for_batch)
+            dev_team_sizes.append(dev_team_size)
+            dev_team_bandwiths.append(dev_team_bandwith)
 
-        dev_team_size, _, resolved_batch, dev_team_bandwith = get_dev_team_production(issues_for_batch)
-        dev_team_sizes.append(dev_team_size)
-        dev_team_bandwiths.append(dev_team_bandwith)
-
-        reporting_metrics = get_reporting_metrics(issues_for_batch, resolved_batch, reporters_config)
-        metrics_on_training.append(reporting_metrics)
+            reporting_metrics = get_reporting_metrics(issues_for_batch, resolved_batch, reporters_config)
+            metrics_on_training.append(reporting_metrics)
+        else:
+            print "TRAINING PERIOD EXCLUDED!"
 
     dev_team_series = pd.Series(data=dev_team_sizes)
     dev_bandwith_series = pd.Series(data=dev_team_bandwiths)
@@ -511,7 +515,8 @@ def get_reporter_generator(reporters_config):
     return reporter_gen
 
 
-def train_validate_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_valid):
+def train_validate_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_valid, parallel=True,
+                              prefix=""):
     """
 
     Train the simulation model on a dataset and test it in another dataset.
@@ -525,10 +530,19 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     :return: Consolidated simulation results.
     """
 
+    simulate_func = simutils.launch_simulation_parallel
+    if not parallel:
+        print "Project ", project_key, ": Disabling parallel execution ..."
+        simulate_func = simutils.launch_simulation
+
     training_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_train)]
     print "Issues in training: ", len(training_issues.index)
 
     reporters_config = get_reporter_configuration(training_issues, drive_by_filter=True)
+    if (len(reporters_config) == 0):
+        print "Project ", project_key, ": No reporters left on training dataset after drive-by filtering."
+        return None
+
     reporter_gen = get_reporter_generator(reporters_config)
 
     try:
@@ -574,7 +588,7 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     global_reporter_config = get_reporter_configuration(training_issues, [all_reporters], drive_by_filter=False)
     fit_reporter_distributions(global_reporter_config)
 
-    simulation_output = simutils.launch_simulation_parallel(
+    simulation_output = simulate_func(
         reporters_config=reporters_config,
         resolution_time_gen=resolution_time_gen,
         batch_size_gen=global_reporter_config[0]['batch_size_gen'],
@@ -597,8 +611,9 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
 
     print "Project ", project_key, " - Assessing simulation on TRAINING DATASET: "
     training_results = pd.DataFrame(
-        simvalid.analyse_input_output(training_metrics, simulation_result, prefix="TRAINING"))
-    training_results.to_csv("csv/" + "_".join(project_key) + "_training_val_results.csv")
+        simvalid.analyse_input_output(training_metrics, simulation_result, prefix=prefix + "_TRAINING",
+                                      difference=DIFFERENCE))
+    training_results.to_csv("csv/" + prefix + "_training_val_results.csv")
 
     metrics_on_validation = []
 
@@ -637,7 +652,7 @@ def split_dataset(dataframe, set_size):
     return None, None
 
 
-def simulate_project(project_key, enhanced_dataframe, test_size=None, max_iterations=1000):
+def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=None, max_iterations=1000):
     """
     Launches simulation analysis for an specific project.
     :param project_key: Project identifier.
@@ -659,6 +674,8 @@ def simulate_project(project_key, enhanced_dataframe, test_size=None, max_iterat
 
     simulation_results = []
 
+    experiment_prefix = "_".join(project_key) + "_Test_" + str(test_size)
+
     if test_size is not None:
         keys_train, keys_test = split_dataset(keys_in_range, test_size)
         keys_train, keys_valid = split_dataset(keys_train, test_size)
@@ -667,17 +684,25 @@ def simulate_project(project_key, enhanced_dataframe, test_size=None, max_iterat
             keys_train), "Keys in Validation ", len(keys_valid), " Keys in Test: ", len(
             keys_test), " Test Size: ", test_size, " Simulation iterations: ", max_iterations
 
-        metrics_on_valid, simulation_result, training_results = train_validate_simulation(project_key, issues_in_range,
-                                                                                          max_iterations,
-                                                                                          keys_train,
-                                                                                          keys_valid)
+        training_output = train_validate_simulation(project_key, issues_in_range,
+                                                    max_iterations,
+                                                    keys_train,
+                                                    keys_valid,
+                                                    parallel=parallel,
+                                                    prefix=experiment_prefix)
+        if training_output is None:
+            print "TRAINING FAILED for Project ", project_key
+            return None
 
+        metrics_on_valid, simulation_result, training_results = training_output
         simulation_results.extend((metrics_on_valid, simulation_result))
 
     if len(simulation_results) > 0:
         valid_results = pd.DataFrame(
-            simvalid.analyse_input_output(simulation_results[0], simulation_results[1], prefix="VALIDATION"))
-        file_name = "csv/" + "_".join(project_key) + "_validation_val_results.csv"
+            simvalid.analyse_input_output(simulation_results[0], simulation_results[1],
+                                          prefix=experiment_prefix + "_VALIDATION",
+                                          difference=DIFFERENCE))
+        file_name = "csv/" + experiment_prefix + "_validation_val_results.csv"
         valid_results.to_csv(file_name)
 
         print "Project ", project_key, " - Assessing simulation on VALIDATION DATASET. Results written in ", file_name
@@ -700,6 +725,36 @@ def get_valid_projects(enhanced_dataframe, threshold=0.3):
     return project_keys
 
 
+def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iterations, parallel):
+    """
+    Applies the simulation and validation procedures to a project list.
+    :param project_list: List of projects.
+    :param enhanced_dataframe: Bug report dataframe.
+    :param test_size: Percentage of bug reports for testing.
+    :param max_iterations:Iterations per simulation.
+    :param parallel: True for parallel simulation execution.
+    :return:Validation results.
+    """
+    simulation_output = simulate_project(project_list, enhanced_dataframe,
+                                         test_size=test_size,
+                                         max_iterations=max_iterations,
+                                         parallel=parallel)
+
+    if simulation_output is None:
+        return None
+
+    training_results, validation_results = simulation_output
+    passed_tests_training = training_results[
+        training_results['ci_accept_simulation'] | ~training_results['t_test_reject_null']]
+
+    passed_tests_testing = validation_results[
+        validation_results['ci_accept_simulation'] | ~validation_results['t_test_reject_null']]
+
+    return {'project': "_".join(project_list),
+            'passed_tests_training': len(passed_tests_training.index),
+            'passed_tests_testing': len(passed_tests_testing.index)}
+
+
 def main():
     print "Loading information from ", simdata.ALL_ISSUES_CSV
     all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
@@ -709,33 +764,34 @@ def main():
 
     max_iterations = 200
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
-    test_sizes = [.25]
-    # test_sizes = [.4, .3, .2]
+    parallel = True
+    test_sizes = [.4, .3, .2]
+
+    # TODO(cgavidia): Only for testing
+    valid_projects = ["PHOENIX"]
+    # parallel = False
+    test_sizes = [.3]
 
     consolidated_results = []
 
     try:
-        for project in valid_projects:
+        project = None
+        for test_size in test_sizes:
+            consolidated_results.append(
+                get_simulation_results(project_list=valid_projects, max_iterations=max_iterations, parallel=parallel,
+                                       test_size=test_size, enhanced_dataframe=enhanced_dataframe))
 
-            for test_size in test_sizes:
-                training_results, validation_results = simulate_project([project], enhanced_dataframe,
-                                                                        test_size=test_size,
-                                                                        max_iterations=max_iterations)
-                passed_tests_training = training_results[
-                    training_results['ci_accept_simulation'] | ~training_results['t_test_reject_null']]
-
-                passed_tests_testing = validation_results[
-                    validation_results['ci_accept_simulation'] | ~validation_results['t_test_reject_null']]
-
-                consolidated_results.append({'project': project,
-                                             'passed_tests_training': len(passed_tests_training.index),
-                                             'passed_tests_testing': len(passed_tests_testing.index)})
+            #TODO(cgavidia): Only for testing
+            # for project in valid_projects:
+            #     consolidated_results.append(
+            #         get_simulation_results(project_list=[project], max_iterations=max_iterations, parallel=parallel,
+            #                                test_size=test_size, enhanced_dataframe=enhanced_dataframe))
 
     except:
         print "ERROR!!!!: Could not simulate ", project
         traceback.print_exc()
 
-    results_dataframe = pd.DataFrame(consolidated_results)
+    results_dataframe = pd.DataFrame([result for result in consolidated_results if result is not None])
     results_dataframe.to_csv("csv/validation_per_project.csv")
 
 
@@ -745,6 +801,7 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        winsound.Beep(2500, 1000)
+        # winsound.Beep(2500, 1000)
+        pass
 
     print "Execution time in seconds: ", (time.time() - start_time)

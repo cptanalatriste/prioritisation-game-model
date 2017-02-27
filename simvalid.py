@@ -13,7 +13,7 @@ from statsmodels.stats import power
 PLOT = None
 
 
-def analyse_input_output(metrics_on_test, simulation_result, prefix=""):
+def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, prefix=""):
     """
     Validate the results applying hypothesis testing, according to Discrete-Event Simulation by Jerry Banks.
 
@@ -23,7 +23,6 @@ def analyse_input_output(metrics_on_test, simulation_result, prefix=""):
     """
 
     validation_results = []
-    difference = 2.0
 
     resolved_bugs = [data['true_resolved'] for data in metrics_on_test]
     resolved_samples = simulation_result['resolved_samples']
@@ -51,9 +50,10 @@ def analyse_input_output(metrics_on_test, simulation_result, prefix=""):
                             data['priority'] == target_priority][0]
 
         desc = prefix + "_" + "RESOLVED_BUGS_FROM_PRIORITY_" + str(target_priority)
+
         print "Response variable: ", desc
-        validation_results.append(
-            statistical_validation(resolved_bugs, resolved_samples, desc=desc, difference=difference))
+        result = statistical_validation(resolved_bugs, resolved_samples, desc=desc, difference=difference)
+        validation_results.append(result)
 
     return validation_results
 
