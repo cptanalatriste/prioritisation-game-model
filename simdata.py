@@ -184,7 +184,7 @@ def include_batch_information(bug_reports, target_fixes=20):
     """
 
     print "Starting batch assignment for ", len(bug_reports.index), " bug reports ..."
-    with_refreshed_index = bug_reports.sort(columns=[CREATED_DATE_COLUMN], ascending=[1])
+    with_refreshed_index = bug_reports.sort_values(by=[CREATED_DATE_COLUMN], ascending=[1])
     with_refreshed_index = with_refreshed_index.reset_index()
 
     current_batch = 0

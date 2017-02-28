@@ -59,7 +59,9 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
         result = statistical_validation(resolved_bugs, resolved_samples, desc=desc, difference=difference)
         validation_results.append(result)
 
-    pd.DataFrame(resolved_in_data).to_csv("csv/" + prefix + "resolved_in_population.csv")
+    file_name = "csv/" + prefix + "_resolved_in_population.csv"
+    pd.DataFrame(resolved_in_data).to_csv(file_name)
+    print "Resolution report stored in ", file_name
 
     return validation_results
 

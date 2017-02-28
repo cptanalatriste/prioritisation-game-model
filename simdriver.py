@@ -21,8 +21,8 @@ import winsound
 
 DEBUG = False
 
-TARGET_FIXES = 20
-DIFFERENCE = 3
+TARGET_FIXES = 10
+DIFFERENCE = 2
 
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
 MINIMUM_P_VALUE = 0.05
@@ -432,9 +432,8 @@ def is_valid_period(issues_for_period):
     :return: True if valid for simulation. False otherwise.
     """
 
-    ERROR_TOLERANCE = 2
     resolved_issues = issues_for_period[issues_for_period[simdata.RESOLVED_IN_BATCH_COLUMN]]
-    result = abs(len(resolved_issues.index) - TARGET_FIXES) <= ERROR_TOLERANCE
+    result = abs(len(resolved_issues.index) - TARGET_FIXES) <= DIFFERENCE
 
     if not result:
         print "The invalid period only has ", len(resolved_issues.index), " fixes in a batch of ", len(
@@ -637,7 +636,6 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
             reporting_metrics = get_reporting_metrics(issues_for_period, resolved_in_period, reporters_config)
             metrics_on_validation.append(reporting_metrics)
         else:
-            print "VALIDATION PERIOD EXCLUDED!!! "
             excluded_counter += 1
 
     print  excluded_counter, " batches where excluded from a total of ", len(unique_batches)
@@ -759,7 +757,14 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
                                          parallel=parallel)
 
     if simulation_output is None:
-        return None
+        return [{'test_size': test_size,
+                 'project_list': "_".join(project_list),
+                 'meassure': 'ERROR_COULDNT_TRAIN',
+                 'simulation_value': 0.0,
+                 'training_value': 0.0,
+                 'validation_value': 0.0,
+                 'accept_simulation_training': False,
+                 'accept_simulation_validation': False}]
 
     training_results, validation_results = simulation_output
     performance_meassures = ['RESOLVED_BUGS_FROM_PRIORITY_1', 'RESOLVED_BUGS_FROM_PRIORITY_3']
@@ -801,11 +806,6 @@ def main():
     parallel = True
     test_sizes = [.4, .3, .2]
 
-    # TODO(cgavidia): Only for testing
-    # valid_projects = ["PHOENIX"]
-    # parallel = False
-    # test_sizes = [.3]
-
     consolidated_results = []
 
     try:
@@ -815,20 +815,24 @@ def main():
                                                            parallel=parallel,
                                                            test_size=test_size, enhanced_dataframe=enhanced_dataframe)
 
-            # for project in valid_projects:
-            #     consolidated_results.append(
-            #         get_simulation_results(project_list=[project], max_iterations=max_iterations, parallel=parallel,
-            #                                test_size=test_size, enhanced_dataframe=enhanced_dataframe))
+            for project in valid_projects:
+                results = get_simulation_results(project_list=[project], max_iterations=max_iterations,
+                                                 parallel=parallel,
+                                                 test_size=test_size, enhanced_dataframe=enhanced_dataframe)
+
+                consolidated_results += results
 
     except:
         print "ERROR!!!!: Could not simulate ", project
         traceback.print_exc()
 
-    results_dataframe = pd.DataFrame([result for result in consolidated_results if result is not None])
+    consolidated_results = [result for result in consolidated_results if result is not None]
 
-    file_name = "csv/validation_per_project.csv"
-    results_dataframe.to_csv(file_name)
-    print "Consolidated validation results written to ", file_name
+    if len(consolidated_results) > 0:
+        results_dataframe = pd.DataFrame(consolidated_results)
+        file_name = "csv/" + TARGET_FIXES + "_fixes_" + DIFFERENCE + "_ci_difference_validation_per_project.csv"
+        results_dataframe.to_csv(file_name)
+        print "Consolidated validation results written to ", file_name
 
 
 if __name__ == "__main__":
