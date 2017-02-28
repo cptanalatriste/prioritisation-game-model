@@ -424,7 +424,7 @@ def get_resolution_times(issues_for_period):
     return resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
 
 
-def is_valid_period(issues_for_period):
+def is_valid_period(issues_for_period, batch=-1):
     """
     Determines the rule for launching the simulation for that period.
     :param issues_for_period: Total issues in the period.
@@ -432,12 +432,13 @@ def is_valid_period(issues_for_period):
     :return: True if valid for simulation. False otherwise.
     """
 
+    tolerance = 0.0
     resolved_issues = issues_for_period[issues_for_period[simdata.RESOLVED_IN_BATCH_COLUMN]]
-    result = abs(len(resolved_issues.index) - TARGET_FIXES) <= DIFFERENCE
+    result = abs(len(resolved_issues.index) - TARGET_FIXES) <= tolerance
 
     if not result:
         print "The invalid period only has ", len(resolved_issues.index), " fixes in a batch of ", len(
-            issues_for_period.index)
+            issues_for_period.index), " Identifier: ", batch
 
     return result
 
@@ -481,7 +482,7 @@ def get_team_training_data(training_issues, reporters_config):
     for train_batch in unique_batches:
 
         issues_for_batch = training_in_batches[training_in_batches[simdata.BATCH_COLUMN] == train_batch]
-        if is_valid_period(issues_for_batch):
+        if is_valid_period(issues_for_batch, train_batch):
             dev_team_size, _, resolved_batch, dev_team_bandwith = get_dev_team_production(issues_for_batch)
 
             dev_team_sizes.append(dev_team_size)
@@ -632,7 +633,7 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
         dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(
             issues_for_period)
 
-        if is_valid_period(issues_for_period):
+        if is_valid_period(issues_for_period, valid_period):
             reporting_metrics = get_reporting_metrics(issues_for_period, resolved_in_period, reporters_config)
             metrics_on_validation.append(reporting_metrics)
         else:
@@ -805,6 +806,7 @@ def main():
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
     parallel = True
     test_sizes = [.4, .3, .2]
+    per_project = True
 
     consolidated_results = []
 
@@ -815,10 +817,11 @@ def main():
                                                            parallel=parallel,
                                                            test_size=test_size, enhanced_dataframe=enhanced_dataframe)
 
-            for project in valid_projects:
-                results = get_simulation_results(project_list=[project], max_iterations=max_iterations,
-                                                 parallel=parallel,
-                                                 test_size=test_size, enhanced_dataframe=enhanced_dataframe)
+            if per_project:
+                for project in valid_projects:
+                    results = get_simulation_results(project_list=[project], max_iterations=max_iterations,
+                                                     parallel=parallel,
+                                                     test_size=test_size, enhanced_dataframe=enhanced_dataframe)
 
                 consolidated_results += results
 
@@ -830,7 +833,8 @@ def main():
 
     if len(consolidated_results) > 0:
         results_dataframe = pd.DataFrame(consolidated_results)
-        file_name = "csv/" + TARGET_FIXES + "_fixes_" + DIFFERENCE + "_ci_difference_validation_per_project.csv"
+        file_name = "csv/" + str(TARGET_FIXES) + "_fixes_" + str(
+            DIFFERENCE) + "_ci_difference_validation_per_project.csv"
         results_dataframe.to_csv(file_name)
         print "Consolidated validation results written to ", file_name
 
@@ -841,7 +845,6 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        # winsound.Beep(2500, 1000)
-        pass
+        winsound.Beep(2500, 1000)
 
     print "Execution time in seconds: ", (time.time() - start_time)
