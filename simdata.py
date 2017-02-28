@@ -218,8 +218,13 @@ def enhace_report_dataframe(bug_reports):
     bug_reports[RESOLUTION_TIME_COLUMN] = bug_reports.apply(get_resolution_time, axis=1)
 
     bug_reports[SIMPLE_PRIORITY_COLUMN] = bug_reports['Priority'].replace(SIMPLIFIED_PRIORITIES)
-    bug_reports[ORIGINAL_SIMPLE_PRIORITY_COLUMN] = bug_reports['Original Priority'].replace(SIMPLIFIED_PRIORITIES)
+    bug_reports[ORIGINAL_SIMPLE_PRIORITY_COLUMN] = bug_reports['Original Priority']
     bug_reports[NEW_SIMPLE_PRIORITY_COLUMN] = bug_reports['New Priority'].replace(SIMPLIFIED_PRIORITIES)
+
+    # bug_reports[SIMPLE_PRIORITY_COLUMN] = bug_reports[SIMPLE_PRIORITY_COLUMN].fillna(NON_SEVERE_PRIORITY)
+    # bug_reports[ORIGINAL_SIMPLE_PRIORITY_COLUMN] = bug_reports[ORIGINAL_SIMPLE_PRIORITY_COLUMN].fillna(
+    #     NON_SEVERE_PRIORITY)
+    # bug_reports[NEW_SIMPLE_PRIORITY_COLUMN] = bug_reports[NEW_SIMPLE_PRIORITY_COLUMN].fillna(NON_SEVERE_PRIORITY)
 
     return bug_reports
 

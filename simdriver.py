@@ -539,7 +539,7 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     print "Issues in training: ", len(training_issues.index)
 
     reporters_config = get_reporter_configuration(training_issues, drive_by_filter=True)
-    if (len(reporters_config) == 0):
+    if len(reporters_config) == 0:
         print "Project ", project_key, ": No reporters left on training dataset after drive-by filtering."
         return None
 
@@ -652,6 +652,16 @@ def split_dataset(dataframe, set_size):
     return None, None
 
 
+def get_experiment_prefix(project_key, test_size):
+    """
+    A convenient prefix to identify an experiment instance.
+    :param project_key: Projects under analysis.
+    :param test_size: Size of the test dataset.
+    :return: The prefix.
+    """
+    return "_".join(project_key) + "_Test_" + str(test_size)
+
+
 def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=None, max_iterations=1000):
     """
     Launches simulation analysis for an specific project.
@@ -664,17 +674,12 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
 
     analytics.run_project_analysis(project_key, issues_in_range)
 
-    starting_date = pytz.utc.localize(datetime.datetime(2014, 1, 1))
-    ending_date = issues_in_range[simdata.CREATED_DATE_COLUMN].max()
-    # print "Setting an starting point for analysis: ", starting_date
-    # issues_in_range = simdata.filter_by_create_date(issues_in_range, starting_date, ending_date)
-
     keys_in_range = issues_in_range[simdata.ISSUE_KEY_COLUMN].unique()
     print "Number of issue keys after starting point filtering: ", len(keys_in_range)
 
     simulation_results = []
 
-    experiment_prefix = "_".join(project_key) + "_Test_" + str(test_size)
+    experiment_prefix = get_experiment_prefix(project_key, test_size)
 
     if test_size is not None:
         keys_train, keys_test = split_dataset(keys_in_range, test_size)
@@ -744,15 +749,31 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
         return None
 
     training_results, validation_results = simulation_output
-    passed_tests_training = training_results[
-        training_results['ci_accept_simulation'] | ~training_results['t_test_reject_null']]
+    performance_meassures = ['RESOLVED_BUGS_FROM_PRIORITY_1', 'RESOLVED_BUGS_FROM_PRIORITY_3']
 
-    passed_tests_testing = validation_results[
-        validation_results['ci_accept_simulation'] | ~validation_results['t_test_reject_null']]
+    results = []
+    for meassure in performance_meassures:
+        column_value = get_experiment_prefix(project_list, test_size) + "_TRAINING_" + meassure
+        training_series = training_results.loc[training_results['desc'] == column_value].iloc[0]
+        simulation_value = training_series['sample_mean']
+        training_value = training_series['population_mean']
+        accept_simulation_training = training_series['ci_accept_simulation']
 
-    return {'project': "_".join(project_list),
-            'passed_tests_training': len(passed_tests_training.index),
-            'passed_tests_testing': len(passed_tests_testing.index)}
+        column_value = get_experiment_prefix(project_list, test_size) + "_VALIDATION_" + meassure
+        validation_series = validation_results.loc[validation_results['desc'] == column_value].iloc[0]
+        validation_value = validation_series['population_mean']
+        accept_simulation_validation = validation_series['ci_accept_simulation']
+
+        results.append({'test_size': test_size,
+                        'project_list': "_".join(project_list),
+                        'meassure': meassure,
+                        'simulation_value': simulation_value,
+                        'training_value': training_value,
+                        'validation_value': validation_value,
+                        'accept_simulation_training': accept_simulation_training,
+                        'accept_simulation_validation': accept_simulation_validation})
+
+    return results
 
 
 def main():
@@ -777,11 +798,11 @@ def main():
     try:
         project = None
         for test_size in test_sizes:
-            consolidated_results.append(
-                get_simulation_results(project_list=valid_projects, max_iterations=max_iterations, parallel=parallel,
-                                       test_size=test_size, enhanced_dataframe=enhanced_dataframe))
+            consolidated_results += get_simulation_results(project_list=valid_projects, max_iterations=max_iterations,
+                                                           parallel=parallel,
+                                                           test_size=test_size, enhanced_dataframe=enhanced_dataframe)
 
-            #TODO(cgavidia): Only for testing
+            # TODO(cgavidia): Only for testing
             # for project in valid_projects:
             #     consolidated_results.append(
             #         get_simulation_results(project_list=[project], max_iterations=max_iterations, parallel=parallel,
@@ -792,7 +813,10 @@ def main():
         traceback.print_exc()
 
     results_dataframe = pd.DataFrame([result for result in consolidated_results if result is not None])
-    results_dataframe.to_csv("csv/validation_per_project.csv")
+
+    file_name = "csv/validation_per_project.csv"
+    results_dataframe.to_csv(file_name)
+    print "Consolidated validation results written to ", file_name
 
 
 if __name__ == "__main__":

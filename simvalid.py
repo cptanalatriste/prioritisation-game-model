@@ -38,6 +38,8 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
     validation_results.append(
         statistical_validation(reporting_times, reporting_times_samples, desc=desc, difference=difference))
 
+    resolved_in_data = {}
+
     for target_priority in simdata.SUPPORTED_PRIORITIES:
         results_per_priority = [data['results_per_priority'] for data in metrics_on_test]
 
@@ -45,6 +47,8 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
         for priority_list in results_per_priority:
             resolved_bugs.append(
                 [data['true_resolved'] for data in priority_list if data['priority'] == target_priority][0])
+
+        resolved_in_data['Priority_' + str(target_priority)] = resolved_bugs
 
         resolved_samples = [data['resolved_samples'] for data in simulation_result['results_per_priority'] if
                             data['priority'] == target_priority][0]
@@ -54,6 +58,8 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
         print "Response variable: ", desc
         result = statistical_validation(resolved_bugs, resolved_samples, desc=desc, difference=difference)
         validation_results.append(result)
+
+    pd.DataFrame(resolved_in_data).to_csv("csv/" + prefix + "resolved_in_population.csv")
 
     return validation_results
 
