@@ -3,10 +3,8 @@ This modules triggers the bug report simulation. Launch this module to trigger t
 project dataset.
 """
 import time
-import datetime
 import traceback
 
-import pytz
 from scipy import stats
 import numpy as np
 
@@ -23,8 +21,8 @@ import winsound
 
 DEBUG = False
 
-TARGET_FIXES = 10
-DIFFERENCE = 2
+TARGET_FIXES = 20
+DIFFERENCE = 3
 
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
 MINIMUM_P_VALUE = 0.05
@@ -434,8 +432,15 @@ def is_valid_period(issues_for_period):
     :return: True if valid for simulation. False otherwise.
     """
 
-    resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False, only_valid_resolution=False)
-    return len(resolved_issues.index) == TARGET_FIXES
+    ERROR_TOLERANCE = 2
+    resolved_issues = issues_for_period[issues_for_period[simdata.RESOLVED_IN_BATCH_COLUMN]]
+    result = abs(len(resolved_issues.index) - TARGET_FIXES) <= ERROR_TOLERANCE
+
+    if not result:
+        print "The invalid period only has ", len(resolved_issues.index), " fixes in a batch of ", len(
+            issues_for_period.index)
+
+    return result
 
 
 def get_dev_team_production(issues_for_period):
@@ -444,8 +449,7 @@ def get_dev_team_production(issues_for_period):
     :return: Developer Team Size and Developer Team Production.
     """
 
-    resolved_in_period = simdata.filter_resolved(issues_for_period, only_with_commits=False,
-                                                 only_valid_resolution=False)
+    resolved_in_period = issues_for_period[issues_for_period[simdata.RESOLVED_IN_BATCH_COLUMN]]
 
     bug_resolvers = resolved_in_period['JIRA Resolved By']
     dev_team_size = bug_resolvers.nunique()
@@ -473,18 +477,23 @@ def get_team_training_data(training_issues, reporters_config):
         unique_batches), " batches with ", TARGET_FIXES, " fixed reports ..."
 
     metrics_on_training = []
+
+    excluded_counter = 0
     for train_batch in unique_batches:
 
         issues_for_batch = training_in_batches[training_in_batches[simdata.BATCH_COLUMN] == train_batch]
         if is_valid_period(issues_for_batch):
             dev_team_size, _, resolved_batch, dev_team_bandwith = get_dev_team_production(issues_for_batch)
+
             dev_team_sizes.append(dev_team_size)
             dev_team_bandwiths.append(dev_team_bandwith)
 
             reporting_metrics = get_reporting_metrics(issues_for_batch, resolved_batch, reporters_config)
             metrics_on_training.append(reporting_metrics)
         else:
-            print "TRAINING PERIOD EXCLUDED!"
+            excluded_counter += 1
+
+    print excluded_counter, " batches were excluded from a total of ", len(unique_batches)
 
     dev_team_series = pd.Series(data=dev_team_sizes)
     dev_bandwith_series = pd.Series(data=dev_team_bandwiths)
@@ -617,6 +626,7 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
 
     metrics_on_validation = []
 
+    excluded_counter = 0
     for valid_period in unique_batches:
         issues_for_period = valid_issues[valid_issues[simdata.BATCH_COLUMN] == valid_period]
 
@@ -628,6 +638,9 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
             metrics_on_validation.append(reporting_metrics)
         else:
             print "VALIDATION PERIOD EXCLUDED!!! "
+            excluded_counter += 1
+
+    print  excluded_counter, " batches where excluded from a total of ", len(unique_batches)
 
     return metrics_on_validation, simulation_result, training_results
 
@@ -670,7 +683,7 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
     :return: None
     """
     issues_in_range = get_valid_reports(project_key, enhanced_dataframe, exclude_priority=None)
-    issues_in_range = issues_in_range.sort(simdata.CREATED_DATE_COLUMN, ascending=True)
+    issues_in_range = issues_in_range.sort_values(by=simdata.CREATED_DATE_COLUMN, ascending=True)
 
     analytics.run_project_analysis(project_key, issues_in_range)
 
@@ -789,9 +802,9 @@ def main():
     test_sizes = [.4, .3, .2]
 
     # TODO(cgavidia): Only for testing
-    valid_projects = ["PHOENIX"]
+    # valid_projects = ["PHOENIX"]
     # parallel = False
-    test_sizes = [.3]
+    # test_sizes = [.3]
 
     consolidated_results = []
 
@@ -802,7 +815,6 @@ def main():
                                                            parallel=parallel,
                                                            test_size=test_size, enhanced_dataframe=enhanced_dataframe)
 
-            # TODO(cgavidia): Only for testing
             # for project in valid_projects:
             #     consolidated_results.append(
             #         get_simulation_results(project_list=[project], max_iterations=max_iterations, parallel=parallel,

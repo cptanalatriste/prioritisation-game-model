@@ -17,6 +17,7 @@ RESOLUTION_DATE_COLUMN = 'Parsed Resolution Date'
 PERIOD_COLUMN = 'Month'
 ISSUE_KEY_COLUMN = 'Issue Key'
 BATCH_COLUMN = 'Batch'
+RESOLVED_IN_BATCH_COLUMN = 'Resolved in Batch'
 RESOLUTION_TIME_COLUMN = 'Resolution Time'
 
 SIMPLE_PRIORITY_COLUMN = 'Simplified Priority'
@@ -181,26 +182,51 @@ def include_batch_information(bug_reports, target_fixes=20):
     :param bug_reports:
     :return: Dataframe with a batch column
     """
+
+    print "Starting batch assignment for ", len(bug_reports.index), " bug reports ..."
     with_refreshed_index = bug_reports.sort(columns=[CREATED_DATE_COLUMN], ascending=[1])
     with_refreshed_index = with_refreshed_index.reset_index()
 
     current_batch = 0
-    current_fixes = 0
+    current_batch_start = with_refreshed_index.iloc[0][CREATED_DATE_COLUMN]
     batches = []
+    resolved_in_batch = []
+
+    batch_starts = [current_batch_start]
 
     for _, report_series in with_refreshed_index.iterrows():
 
         batches.append(current_batch)
-        is_resolved = report_series['Status'] in RESOLUTION_STATUS
+        current_creation_date = report_series[CREATED_DATE_COLUMN]
 
-        if is_resolved:
-            current_fixes += 1
+        current_fixes = with_refreshed_index[
+            (with_refreshed_index[CREATED_DATE_COLUMN] > current_batch_start) &
+            (with_refreshed_index[CREATED_DATE_COLUMN] < current_creation_date) &
+            (with_refreshed_index[RESOLUTION_DATE_COLUMN] < current_creation_date)]
 
-        if current_fixes == target_fixes:
+        if len(current_fixes.index) >= target_fixes:
             current_batch += 1
-            current_fixes = 0
+            current_batch_start = current_creation_date
+            batch_starts.append(current_batch_start)
 
     with_refreshed_index[BATCH_COLUMN] = pd.Series(batches, index=with_refreshed_index.index)
+
+    for _, report_series in with_refreshed_index.iterrows():
+        current_batch = report_series[BATCH_COLUMN]
+        batch_start = batch_starts[current_batch]
+        batch_end = max(with_refreshed_index[RESOLUTION_DATE_COLUMN].dropna().values)
+
+        if current_batch < (len(batch_starts) - 1):
+            batch_end = batch_starts[current_batch + 1]
+
+        resolved = False
+        if report_series[RESOLUTION_DATE_COLUMN] is not None and batch_start <= report_series[
+            RESOLUTION_DATE_COLUMN] <= batch_end:
+            resolved = True
+        resolved_in_batch.append(resolved)
+
+    with_refreshed_index[RESOLVED_IN_BATCH_COLUMN] = pd.Series(resolved_in_batch, index=with_refreshed_index.index)
+
     return with_refreshed_index
 
 
@@ -367,7 +393,7 @@ def get_report_batches(bug_reports, window_size=1):
     """
 
     report_dates = bug_reports[CREATED_DATE_COLUMN]
-    report_dates = report_dates.order()
+    report_dates = report_dates.sort_values()
 
     batches = []
     for position, created_date in enumerate(report_dates.values):
