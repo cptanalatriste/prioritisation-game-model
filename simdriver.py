@@ -21,8 +21,8 @@ import winsound
 
 DEBUG = False
 
-TARGET_FIXES = 10
-DIFFERENCE = 2
+TARGET_FIXES = 15
+DIFFERENCE = 3
 
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
 MINIMUM_P_VALUE = 0.05
@@ -380,7 +380,12 @@ def get_simulation_input(training_issues=None):
                                                                                                    (
                                                                                                        1 - ignored_probability)])
 
-    return resolution_per_priority, ignored_per_priority
+    priorities_in_training = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
+    print "Priorities for defects in training: ", priorities_in_training.describe()
+    priority_generator = simutils.DiscreteEmpiricalDistribution(observations=priorities_in_training)
+    print "Training Priority Map : ", priority_generator.get_probabilities()
+
+    return resolution_per_priority, ignored_per_priority, priority_generator
 
 
 def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None):
@@ -449,7 +454,12 @@ def get_dev_team_production(issues_for_period):
     :return: Developer Team Size and Developer Team Production.
     """
 
-    resolved_in_period = issues_for_period[issues_for_period[simdata.RESOLVED_IN_BATCH_COLUMN]]
+    if simdata.RESOLVED_IN_BATCH_COLUMN in issues_for_period.columns:
+        resolved_in_period = issues_for_period[issues_for_period[simdata.RESOLVED_IN_BATCH_COLUMN]]
+    else:
+        print "No resolution in batch information found. Considering all resolved"
+        resolved_in_period = simdata.filter_resolved(issues_for_period, only_with_commits=False,
+                                                     only_valid_resolution=False)
 
     bug_resolvers = resolved_in_period['JIRA Resolved By']
     dev_team_size = bug_resolvers.nunique()
@@ -506,7 +516,7 @@ def get_team_training_data(training_issues, reporters_config):
     return dev_team_series, dev_bandwith_series, metrics_on_training
 
 
-def get_reporter_generator(reporters_config):
+def get_reporter_generator(reporters_config, symmetric=False):
     """
     Generates a probability distribution for bug reporters.
     :param reporters_config: List with reporter behaviour information.
@@ -516,12 +526,34 @@ def get_reporter_generator(reporters_config):
     total_reports = float(sum(report_values))
     probability_values = [reports / total_reports for reports in report_values]
 
-    print "sum(probability_values) ", sum(probability_values)
+    if symmetric:
+        print "THIS IS A SYMMETRIC GENERATOR: All reporter's have the same probability."
+        probability_values = [1.0 / len(reporters_config) for _ in reporters_config]
 
     reporter_gen = simutils.DiscreteEmpiricalDistribution(name="Reporter_Generator",
                                                           values=[config['name'] for config in reporters_config],
                                                           probabilities=probability_values)
     return reporter_gen
+
+
+def get_report_stream_params(training_issues, reporters_config, symmetric=False):
+    """
+    Returns the generators required for the bug report stream in the simulation.
+    :param reporters_config: Reporter information.
+    :return: A generator for reporter, for batch sizes and time between batches.
+    """
+    print "Getting global reporting information ..."
+
+    reporter_gen = get_reporter_generator(reporters_config, symmetric=symmetric)
+
+    all_reporters = [config['name'] for config in reporters_config]
+    global_reporter_config = get_reporter_configuration(training_issues, [all_reporters], drive_by_filter=False)
+    fit_reporter_distributions(global_reporter_config)
+
+    batch_size_gen = global_reporter_config[0]['batch_size_gen']
+    interarrival_time_gen = global_reporter_config[0]['interarrival_time_gen']
+
+    return reporter_gen, batch_size_gen, interarrival_time_gen
 
 
 def train_validate_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_valid, parallel=True,
@@ -552,8 +584,6 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
         print "Project ", project_key, ": No reporters left on training dataset after drive-by filtering."
         return None
 
-    reporter_gen = get_reporter_generator(reporters_config)
-
     try:
         simutils.assign_strategies(reporters_config, training_issues)
     except ValueError as e:
@@ -563,7 +593,7 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
     print "Issues in training after reporter filtering: ", len(training_issues.index)
 
-    resolution_time_gen, ignored_gen = get_simulation_input(training_issues)
+    resolution_time_gen, ignored_gen, priority_generator = get_simulation_input(training_issues)
     if resolution_time_gen is None:
         print "Not enough resolution time info! ", project_key
         return
@@ -580,28 +610,19 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     print len(valid_issues.index), " reports where grouped in ", len(
         unique_batches), " batches with ", TARGET_FIXES, " fixed reports ..."
 
-    priorities_in_training = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
-    print "Priorities for defects in training: ", priorities_in_training.describe()
-
-    priority_generator = simutils.DiscreteEmpiricalDistribution(observations=priorities_in_training)
-    print "Training Priority Map : ", priority_generator.get_probabilities()
-
     dev_team_series, dev_bandwith_series, training_metrics = get_team_training_data(training_issues,
                                                                                     reporters_config)
 
     dev_team_size_training = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series)
     print "Using an DISCRETE EMPIRICAL DISTRIBUTION for the Development Team Size ..."
 
-    print "Getting global reporting information ..."
-    all_reporters = [config['name'] for config in reporters_config]
-    global_reporter_config = get_reporter_configuration(training_issues, [all_reporters], drive_by_filter=False)
-    fit_reporter_distributions(global_reporter_config)
+    reporter_gen, batch_size_gen, interarrival_time_gen = get_report_stream_params(training_issues, reporters_config)
 
     simulation_output = simulate_func(
         reporters_config=reporters_config,
         resolution_time_gen=resolution_time_gen,
-        batch_size_gen=global_reporter_config[0]['batch_size_gen'],
-        interarrival_time_gen=global_reporter_config[0]['interarrival_time_gen'],
+        batch_size_gen=batch_size_gen,
+        interarrival_time_gen=interarrival_time_gen,
         ignored_gen=ignored_gen,
         reporter_gen=reporter_gen,
         max_iterations=max_iterations,
@@ -823,7 +844,7 @@ def main():
                                                      parallel=parallel,
                                                      test_size=test_size, enhanced_dataframe=enhanced_dataframe)
 
-                consolidated_results += results
+                    consolidated_results += results
 
     except:
         print "ERROR!!!!: Could not simulate ", project

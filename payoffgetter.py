@@ -33,9 +33,6 @@ DEFAULT_CONFIGURATION = {
         simdata.NORMAL_PRIORITY: 10 * 2,
         simdata.SEVERE_PRIORITY: 10 * 5
     },
-    'N_PLAYERS': None,  # None, for not filtering among suitable players.
-    'CLONE_PLAYER': 0,  # None to disable cloning
-    'CLONE_MEDIAN': True,
 
     # Throtling configuration parameters.
     'THROTTLING_ENABLED': False,
@@ -54,41 +51,9 @@ DEFAULT_CONFIGURATION = {
 
     # Team Configuration
     'NUMBER_OF_TEAMS': 2,
-    'AGGREGATE_AGENT_TEAM': -1
+    'AGGREGATE_AGENT_TEAM': -1,
+    'SYMMETRIC': True  # If all the players have the same strategic vision, i.e  there are no advantages per player.
 }
-
-
-def select_game_players(reporter_configuration, number_of_players=5, clone_player=None):
-    """
-    Selects which of the players available will be the ones playing the game.
-    :param clone_player: The index of the players. whose clones will be returned.
-    :param number_of_players: Number of players to be playing the game. In case it is None, no filtering will be performed.
-    :param reporter_configuration: List of non drive-by testers.
-    :return: List of selected players.
-    """
-    sorted_reporters = sorted(reporter_configuration,
-                              key=lambda config: len(config['interarrival_time_gen'].observations), reverse=True)
-
-    if number_of_players is None:
-        number_of_players = len(reporter_configuration)
-
-    if clone_player is not None:
-        source_player = [sorted_reporters[clone_player]]
-        source_name = source_player[0]['name']
-
-        print "Cloning player at index: ", clone_player, "(", source_name, ")"
-        simdriver.fit_reporter_distributions(source_player)
-
-        list_with_clones = []
-
-        for index in range(number_of_players):
-            clone = copy.deepcopy(source_player[0])
-            clone['name'] = 'clone_' + source_name + '_' + str(index)
-            list_with_clones.append(clone)
-
-        return list_with_clones
-
-    return sorted_reporters[:number_of_players]
 
 
 def select_reporters_for_simulation(reporter_configuration):
@@ -245,9 +210,12 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
     return run_simulation(strategy_maps=input_params.strategy_maps, strategies_catalog=input_params.strategies_catalog,
                           player_configuration=input_params.player_configuration,
                           dev_team_size=input_params.dev_team_size,
-                          bugs_by_priority=input_params.bugs_by_priority,
                           resolution_time_gen=input_params.resolution_time_gen,
-                          dev_team_bandwith=input_params.dev_team_bandwith, teams=input_params.teams,
+                          ignored_gen=input_params.ignored_gen, reporter_gen=input_params.reporter_gen,
+                          target_fixes=input_params.target_fixes, batch_size_gen=input_params.batch_size_gen,
+                          interarrival_time_gen=input_params.interarrival_time_gen,
+                          priority_generator=input_params.priority_generator,
+                          teams=input_params.teams,
                           game_configuration=game_configuration)
 
 
@@ -294,25 +262,15 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     if game_configuration["HEURISTIC_STRATEGIES"]:
         strategies_catalog.extend(get_heuristic_strategies())
 
-    print "start_payoff_calculation->strategies_catalog: ", strategies_catalog
+    print "strategies_catalog: ", strategies_catalog
 
     # This are the reporters whose reported bugs will be used to configure the simulation.
     reporter_configuration = select_reporters_for_simulation(valid_reporters)
 
     # This is the configuration of the actual game players.
-    clone_player = game_configuration["CLONE_PLAYER"]
-    if game_configuration["CLONE_MEDIAN"]:
-        clone_player = len(reporter_configuration) / 2
-
-    player_configuration = select_game_players(reporter_configuration,
-                                               number_of_players=game_configuration["N_PLAYERS"],
-                                               clone_player=clone_player)
+    player_configuration = reporter_configuration
 
     print "Reporters selected for playing the game ", len(player_configuration)
-
-    if clone_player is None:
-        # When cloning is configured, distribution fitting happened before.
-        simdriver.fit_reporter_distributions(player_configuration)
 
     teams = game_configuration["NUMBER_OF_TEAMS"]
     strategy_maps = get_strategy_map(strategies_catalog, teams)
@@ -323,32 +281,37 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
 
     print "Starting simulation for project ", project_keys
 
-    bugs_by_priority = {index: value
-                        for index, value in
-                        valid_reports[simdata.SIMPLE_PRIORITY_COLUMN].value_counts().iteritems()}
-
-    resolution_time_gen = simdriver.get_simulation_input(training_issues=valid_reports)
+    resolution_time_gen, ignored_gen, priority_generator = simdriver.get_simulation_input(training_issues=valid_reports)
     dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = simdriver.get_dev_team_production(
         valid_reports)
 
+    target_fixes = issues_resolved
     bug_reporters = valid_reports['Reported By']
     test_team_size = bug_reporters.nunique()
 
+    reporter_gen, batch_size_gen, interarrival_time_gen = simdriver.get_report_stream_params(valid_reports,
+                                                                                             player_configuration,
+                                                                                             symmetric=
+                                                                                             game_configuration[
+                                                                                                 'SYMMETRIC'])
+
     print "Project ", project_keys, " Test Period: ", "ALL", " Reporters: ", test_team_size, " Developers:", dev_team_size, \
-        " Reports: ", bugs_by_priority, " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
+        " Resolved in Period: ", issues_resolved,
 
     input_params = collections.namedtuple('SimulationParams',
                                           ['strategy_maps', 'strategies_catalog', 'player_configuration',
-                                           'dev_team_size', 'bugs_by_priority', 'resolution_time_gen',
-                                           'dev_team_bandwith', 'teams'])
+                                           'dev_team_size', 'resolution_time_gen', 'teams',
+                                           'ignored_gen', 'reporter_gen', 'target_fixes', 'batch_size_gen',
+                                           'interarrival_time_gen', 'priority_generator'])
 
-    return input_params(strategy_maps, strategies_catalog, player_configuration, dev_team_size, bugs_by_priority,
-                        resolution_time_gen, dev_team_bandwith, teams)
+    return input_params(strategy_maps, strategies_catalog, player_configuration, dev_team_size,
+                        resolution_time_gen, teams, ignored_gen, reporter_gen, target_fixes, batch_size_gen,
+                        interarrival_time_gen, priority_generator)
 
 
-def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_team_size, bugs_by_priority,
-                   resolution_time_gen,
-                   dev_team_bandwith, teams, game_configuration):
+def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_team_size, resolution_time_gen, teams,
+                   game_configuration, ignored_gen=None, reporter_gen=None, target_fixes=None, batch_size_gen=None,
+                   interarrival_time_gen=None, priority_generator=None):
     """
 
     :param strategy_maps: Strategy profiles of the game.
@@ -367,16 +330,13 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
 
     profile_payoffs = []
 
-    print "Simulation configuration: REPLICATIONS_PER_PROFILE ", game_configuration[
-        "REPLICATIONS_PER_PROFILE"], " THROTTLING_ENABLED ", \
-        game_configuration["THROTTLING_ENABLED"], " PRIORITY_SCORING ", game_configuration["PRIORITY_SCORING"], \
-        " PROJECT_FILTER ", game_configuration["PROJECT_FILTER"], " EMPIRICAL_STRATEGIES ", game_configuration[
-        "EMPIRICAL_STRATEGIES"], \
-        " HEURISTIC_STRATEGIES ", game_configuration["HEURISTIC_STRATEGIES"], " N_CLUSTERS ", game_configuration[
-        "N_CLUSTERS"], " N_PLAYERS ", game_configuration["N_PLAYERS"], \
-        " CLONE_PLAYER ", game_configuration["CLONE_PLAYER"], " CLONE_MEDIAN ", game_configuration[
-        "CLONE_MEDIAN"], " GATEKEEPER_CONFIG ", game_configuration["GATEKEEPER_CONFIG"], ' INFLATION_FACTOR ', \
-        game_configuration['INFLATION_FACTOR']
+    print "Simulation configuration: REPLICATIONS_PER_PROFILE ", game_configuration["REPLICATIONS_PER_PROFILE"], \
+        " THROTTLING_ENABLED ", game_configuration["THROTTLING_ENABLED"], " PRIORITY_SCORING ", \
+        game_configuration["PRIORITY_SCORING"], " PROJECT_FILTER ", game_configuration["PROJECT_FILTER"], \
+        " EMPIRICAL_STRATEGIES ", game_configuration["EMPIRICAL_STRATEGIES"], " HEURISTIC_STRATEGIES ", \
+        game_configuration["HEURISTIC_STRATEGIES"], " N_CLUSTERS ", game_configuration["N_CLUSTERS"], \
+        " GATEKEEPER_CONFIG ", game_configuration["GATEKEEPER_CONFIG"], ' INFLATION_FACTOR ', \
+        game_configuration['INFLATION_FACTOR'], " target_fixes: ", target_fixes
 
     print "Simulating ", len(strategy_maps), " strategy profiles..."
 
@@ -399,15 +359,18 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                                   game_configuration["AGGREGATE_AGENT_TEAM"])
 
             if overall_dataframe is None:
-
                 simulation_output = simutils.launch_simulation_parallel(
                     team_capacity=dev_team_size,
-                    bugs_by_priority=bugs_by_priority,
+                    ignored_gen=ignored_gen,
+                    reporter_gen=reporter_gen,
+                    target_fixes=target_fixes,
+                    batch_size_gen=batch_size_gen,
+                    interarrival_time_gen=interarrival_time_gen,
+                    priority_generator=priority_generator,
                     reporters_config=player_configuration,
                     resolution_time_gen=resolution_time_gen,
                     max_time=simulation_time,
                     max_iterations=game_configuration["REPLICATIONS_PER_PROFILE"],
-                    dev_team_bandwidth=dev_team_bandwith,
                     inflation_factor=game_configuration["INFLATION_FACTOR"],
                     quota_system=game_configuration["THROTTLING_ENABLED"],
                     gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
@@ -457,6 +420,9 @@ def main():
 
     valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
 
+    # TODO(cgavidia): Only for testing
+    valid_projects = ['OFBIZ']
+
     for project in valid_projects:
         print "Calculating equilibria for project ", project
 
@@ -465,6 +431,10 @@ def main():
         simulation_configuration['REPLICATIONS_PER_PROFILE'] = 200
         simulation_configuration['EMPIRICAL_STRATEGIES'] = True
         simulation_configuration['N_CLUSTERS'] = 5
+
+        # TODO(cgavidia): Only for testing
+        # simulation_configuration['EMPIRICAL_STRATEGIES'] = False
+        # simulation_configuration['REPLICATIONS_PER_PROFILE'] = 200
 
         equilibrium_list = start_payoff_calculation(enhanced_dataframe, valid_projects, simulation_configuration)
 

@@ -216,17 +216,27 @@ def include_batch_information(bug_reports, target_fixes=20):
 
     with_refreshed_index[BATCH_COLUMN] = pd.Series(batches, index=with_refreshed_index.index)
 
+    previous_batch = 0
+    batch_resolved_count = 0
     for _, report_series in with_refreshed_index.iterrows():
+
         current_batch = report_series[BATCH_COLUMN]
+        if previous_batch != current_batch:
+            batch_resolved_count = 0
+
         batch_start = batch_starts[current_batch]
         batch_reports = with_refreshed_index[with_refreshed_index[BATCH_COLUMN] == current_batch]
         batch_end = max(batch_reports[CREATED_DATE_COLUMN].dropna().values)
 
         resolved = False
-        if report_series[RESOLUTION_DATE_COLUMN] is not None and batch_start <= report_series[
-            RESOLUTION_DATE_COLUMN] <= batch_end:
+        if batch_resolved_count < target_fixes and report_series[RESOLUTION_DATE_COLUMN] is not None and batch_start <= \
+                report_series[
+                    RESOLUTION_DATE_COLUMN] <= batch_end:
             resolved = True
+            batch_resolved_count += 1
+
         resolved_in_batch.append(resolved)
+        previous_batch = current_batch
 
     with_refreshed_index[RESOLVED_IN_BATCH_COLUMN] = pd.Series(resolved_in_batch, index=with_refreshed_index.index)
     return with_refreshed_index

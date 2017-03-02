@@ -131,6 +131,8 @@ class TestingContext:
 
         total_fixed = sum([monitors['completed'].count() for priority, monitors in self.priority_monitors.iteritems()])
 
+        # print "total_fixed: ", total_fixed
+
         if total_fixed < self.target_fixes:
             return False
 
@@ -290,10 +292,9 @@ class BugReportSource(Process):
             return real_priority
 
         if reporter_strategy is not None and isinstance(reporter_strategy, EmpiricalInflationStrategy):
-            return self.strategy.priority_to_report(real_priority)
+            return reporter_strategy.priority_to_report(real_priority)
 
         priority_for_report = real_priority
-
         return priority_for_report
 
     def get_inflation_penalty(self):
@@ -508,6 +509,7 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
         # We are ensuring a minimum capacity of one developer.
         team_capacity = max(1, dev_size_generator.generate()[0])
 
+    # print "team_capacity: ", team_capacity
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
     quota_per_dev = None
