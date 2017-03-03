@@ -19,6 +19,7 @@ ISSUE_KEY_COLUMN = 'Issue Key'
 BATCH_COLUMN = 'Batch'
 RESOLVED_IN_BATCH_COLUMN = 'Resolved in Batch'
 RESOLUTION_TIME_COLUMN = 'Resolution Time'
+STATUS_COLUMN = 'Status'
 
 SIMPLE_PRIORITY_COLUMN = 'Simplified Priority'
 ORIGINAL_SIMPLE_PRIORITY_COLUMN = 'Original Simplified Priority'
@@ -36,7 +37,7 @@ NORMAL_PRIORITY = 2
 NON_SEVERE_PRIORITY = 1
 SIMPLIFIED_PRIORITIES = {"Blocker": SEVERE_PRIORITY,
                          "Critical": SEVERE_PRIORITY,
-                         "Major": SEVERE_PRIORITY,
+                         "Major": NON_SEVERE_PRIORITY,
                          "Minor": NON_SEVERE_PRIORITY,
                          "Trivial": NON_SEVERE_PRIORITY}
 SUPPORTED_PRIORITIES = [NON_SEVERE_PRIORITY, SEVERE_PRIORITY]
@@ -194,6 +195,7 @@ def include_batch_information(bug_reports, target_fixes=20):
     batch_starts = []
 
     report_counter = 0
+
     for _, report_series in with_refreshed_index.iterrows():
 
         if current_batch_start is None:
@@ -207,12 +209,16 @@ def include_batch_information(bug_reports, target_fixes=20):
         current_fixes = with_refreshed_index[
             (with_refreshed_index[CREATED_DATE_COLUMN] >= current_batch_start) &
             (with_refreshed_index[CREATED_DATE_COLUMN] <= current_creation_date) &
-            (with_refreshed_index[RESOLUTION_DATE_COLUMN] <= current_creation_date)]
+            (with_refreshed_index[RESOLUTION_DATE_COLUMN] <= current_creation_date) &
+            (with_refreshed_index[STATUS_COLUMN].isin(RESOLUTION_STATUS))]
 
         if len(current_fixes.index) >= target_fixes:
             current_batch += 1
             report_counter = 0
             current_batch_start = None
+
+    print "The bug reports where grouped in ", current_batch + 1, " batches."
+    print "Starting resoluton in batch status calculation ..."
 
     with_refreshed_index[BATCH_COLUMN] = pd.Series(batches, index=with_refreshed_index.index)
 
@@ -229,9 +235,10 @@ def include_batch_information(bug_reports, target_fixes=20):
         batch_end = max(batch_reports[CREATED_DATE_COLUMN].dropna().values)
 
         resolved = False
-        if batch_resolved_count < target_fixes and report_series[RESOLUTION_DATE_COLUMN] is not None and batch_start <= \
-                report_series[
-                    RESOLUTION_DATE_COLUMN] <= batch_end:
+        if (report_series[STATUS_COLUMN] in RESOLUTION_STATUS) and \
+                (batch_resolved_count < target_fixes) and \
+                (report_series[RESOLUTION_DATE_COLUMN] is not None) and \
+                (batch_start <= report_series[RESOLUTION_DATE_COLUMN] <= batch_end):
             resolved = True
             batch_resolved_count += 1
 
@@ -318,7 +325,7 @@ def filter_resolved(bug_reports, only_with_commits=True, only_valid_resolution=T
     :param bug_reports: Original dataframe
     :return: Only resolved issues.
     """
-    resolved_issues = bug_reports[bug_reports['Status'].isin(RESOLUTION_STATUS)]
+    resolved_issues = bug_reports[bug_reports[STATUS_COLUMN].isin(RESOLUTION_STATUS)]
 
     if only_valid_resolution:
         resolved_issues = resolved_issues[resolved_issues['Resolution'].isin(VALID_RESOLUTION_VALUES)]

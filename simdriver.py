@@ -21,8 +21,8 @@ import winsound
 
 DEBUG = False
 
-TARGET_FIXES = 15
-DIFFERENCE = 3
+TARGET_FIXES = 10
+DIFFERENCE = 2
 
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
 MINIMUM_P_VALUE = 0.05
@@ -355,11 +355,14 @@ def get_simulation_input(training_issues=None):
     all_resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False,
                                                   only_valid_resolution=False)
 
-    all_ignored_issues = training_issues[training_issues['Status'].isin(['Open'])]
+    all_ignored_issues = training_issues[training_issues[simdata.STATUS_COLUMN].isin(['Open'])]
     ignored_per_priority = defaultdict(lambda: None)
 
     total_ignored = float(len(all_ignored_issues.index))
     print "Total number of ignored reports: ", total_ignored
+
+    most_relevant_priority = None
+    most_relevant_probability = None
 
     for priority in priority_sample.unique():
         if not np.isnan(priority):
@@ -368,18 +371,28 @@ def get_simulation_input(training_issues=None):
             resolution_per_priority[priority] = resolution_time_gen
 
             priority_ignored = all_ignored_issues[all_ignored_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+            priority_reported = training_issues[training_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
 
             ignored_probability = 0.0
-            if total_ignored > 0:
-                ignored_probability = len(priority_ignored.index) / total_ignored
 
-            print "Ignored probability for Priority ", priority, " is ", ignored_probability
+            total_reported = float(len(priority_reported.index))
+            if total_reported > 0:
+                ignored_probability = len(priority_ignored.index) / total_reported
+
+            print "Ignored probability for Priority ", priority, " is ", ignored_probability, ". Ignored reports: ", len(
+                priority_ignored.index)
+
+            if most_relevant_priority is None or ignored_probability < most_relevant_probability:
+                most_relevant_priority = priority
+                most_relevant_probability = ignored_probability
+
             ignored_per_priority[priority] = simutils.DiscreteEmpiricalDistribution(name="Ignored_" + str(priority),
                                                                                     values=[True, False],
                                                                                     probabilities=[ignored_probability,
                                                                                                    (
                                                                                                        1 - ignored_probability)])
 
+    print "MOST RELEVANT PRIORITY: ", most_relevant_priority
     priorities_in_training = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
     print "Priorities for defects in training: ", priorities_in_training.describe()
     priority_generator = simutils.DiscreteEmpiricalDistribution(observations=priorities_in_training)
@@ -826,20 +839,32 @@ def main():
     max_iterations = 200
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
     parallel = True
-    test_sizes = [.4, .3, .2]
+    test_sizes = [.2, .3, .4]
     per_project = True
+    consolidated = True
+
+    # TODO(cgavidia): Only for testing
+    consolidated = False
+    per_project = True
+    test_sizes = [.2]
 
     consolidated_results = []
-
     try:
-        project = None
-        for test_size in test_sizes:
-            consolidated_results += get_simulation_results(project_list=valid_projects, max_iterations=max_iterations,
-                                                           parallel=parallel,
-                                                           test_size=test_size, enhanced_dataframe=enhanced_dataframe)
+        project_name = None
 
-            if per_project:
+        if consolidated:
+            project_name = "ALL"
+            for test_size in test_sizes:
+                consolidated_results += get_simulation_results(project_list=valid_projects,
+                                                               max_iterations=max_iterations,
+                                                               parallel=parallel,
+                                                               test_size=test_size,
+                                                               enhanced_dataframe=enhanced_dataframe)
+
+        if per_project:
+            for test_size in test_sizes:
                 for project in valid_projects:
+                    project_name = project
                     results = get_simulation_results(project_list=[project], max_iterations=max_iterations,
                                                      parallel=parallel,
                                                      test_size=test_size, enhanced_dataframe=enhanced_dataframe)
@@ -847,15 +872,20 @@ def main():
                     consolidated_results += results
 
     except:
-        print "ERROR!!!!: Could not simulate ", project
+        print "ERROR!!!!: Could not simulate ", project_name
         traceback.print_exc()
 
     consolidated_results = [result for result in consolidated_results if result is not None]
 
     if len(consolidated_results) > 0:
+        prefix = ""
+        if consolidated:
+            prefix = "ALL_"
+        if per_project:
+            prefix = "PROJECTS_"
         results_dataframe = pd.DataFrame(consolidated_results)
-        file_name = "csv/" + str(TARGET_FIXES) + "_fixes_" + str(
-            DIFFERENCE) + "_ci_difference_validation_per_project.csv"
+        file_name = "csv/" + prefix + str(TARGET_FIXES) + "_fixes_" + str(
+            DIFFERENCE) + "_ci_difference_validation.csv"
         results_dataframe.to_csv(file_name)
         print "Consolidated validation results written to ", file_name
 
