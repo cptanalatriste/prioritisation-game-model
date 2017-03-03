@@ -84,14 +84,13 @@ def get_heuristic_strategies():
     """
 
     honest_strategy = simmodel.EmpiricalInflationStrategy(strategy_config={'name': simmodel.HONEST_STRATEGY,
-                                                                           simutils.NONSEVERE_CORRECTION_COLUMN: 0.0,
-                                                                           simutils.SEVERE_CORRECTION_COLUMN: 0.0})
+                                                                           simutils.NON_SEVERE_INFLATED_COLUMN: 0.0,
+                                                                           simutils.SEVERE_DEFLATED_COLUMN: 0.0})
 
     simple_inflate_strategy = simmodel.EmpiricalInflationStrategy(
         strategy_config={'name': simmodel.SIMPLE_INFLATE_STRATEGY,
-                         simutils.NONSEVERE_CORRECTION_COLUMN: 1.0,
                          simutils.NON_SEVERE_INFLATED_COLUMN: 1.0,
-                         simutils.SEVERE_CORRECTION_COLUMN: 0.0})
+                         simutils.SEVERE_DEFLATED_COLUMN: 0.0})
 
     return [honest_strategy,
             simple_inflate_strategy]
@@ -113,7 +112,6 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
     print "Reporters with corrections: ", len(reporters_with_corrections)
 
     correction_dataframe = simutils.get_reporter_behavior_dataframe(reporters_with_corrections)
-    reporter_dataframe = simutils.get_reporter_behavior_dataframe(reporter_configuration)
 
     kmeans = KMeans(n_clusters=n_clusters,
                     init='k-means++',
@@ -123,42 +121,29 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
 
     kmeans.fit(correction_dataframe)
 
-    predicted_clusters = kmeans.predict(reporter_dataframe)
+    predicted_clusters = kmeans.predict(correction_dataframe)
     cluster_column = 'cluster'
-    reporter_dataframe[cluster_column] = predicted_clusters
+    correction_dataframe[cluster_column] = predicted_clusters
 
     centroids = kmeans.cluster_centers_
     print "Clustering centroids ..."
 
     strategies_per_team = []
     for index, centroid in enumerate(centroids):
-        nonsevere_correction_index = 3
-        severe_correction_index = 4
         nonsevere_inflation_index = 0
         severe_deflation_index = 1
 
         print  " ", simutils.REPORTER_COLUMNS[nonsevere_inflation_index], ": ", "{0:.0f}%".format(
             centroid[nonsevere_inflation_index] * 100), \
             " ", simutils.REPORTER_COLUMNS[severe_deflation_index], ": ", "{0:.0f}%".format(
-            centroid[severe_deflation_index] * 100), \
-            " ", simutils.REPORTER_COLUMNS[2], ": ", "{0:.0f}%".format(centroid[2] * 100), \
-            " ", simutils.REPORTER_COLUMNS[nonsevere_correction_index], ": ", "{0:.0f}%".format(
-            centroid[nonsevere_correction_index] * 100), \
-            " ", simutils.REPORTER_COLUMNS[severe_correction_index], ": ", "{0:.0f}%".format(
-            centroid[severe_correction_index] * 100)
+            centroid[severe_deflation_index] * 100)
 
         strategies_per_team.append({'name': 'EMPIRICAL' + str(index),
-                                    simutils.NONSEVERE_CORRECTION_COLUMN: centroid[nonsevere_correction_index],
-                                    simutils.SEVERE_CORRECTION_COLUMN: centroid[severe_correction_index],
                                     simutils.NON_SEVERE_INFLATED_COLUMN: centroid[nonsevere_inflation_index],
                                     simutils.SEVERE_DEFLATED_COLUMN: centroid[severe_deflation_index]
                                     })
 
-    print "Cluster distribution: \n", reporter_dataframe[cluster_column].value_counts()
-
-    for index, cluster in enumerate(reporter_dataframe[cluster_column].values):
-        reporter_configuration[index][cluster_column] = cluster_column
-
+    print "Cluster distribution: \n", correction_dataframe[cluster_column].value_counts()
     return strategies_per_team
 
 
@@ -261,8 +246,6 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
 
     if game_configuration["HEURISTIC_STRATEGIES"]:
         strategies_catalog.extend(get_heuristic_strategies())
-
-    print "strategies_catalog: ", strategies_catalog
 
     # This are the reporters whose reported bugs will be used to configure the simulation.
     reporter_configuration = select_reporters_for_simulation(valid_reporters)
@@ -418,7 +401,7 @@ def main():
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-    valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
+    all_valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
 
     # TODO(cgavidia): Only for testing
     valid_projects = ['OFBIZ']
@@ -433,10 +416,11 @@ def main():
         simulation_configuration['N_CLUSTERS'] = 5
 
         # TODO(cgavidia): Only for testing
-        # simulation_configuration['EMPIRICAL_STRATEGIES'] = False
-        # simulation_configuration['REPLICATIONS_PER_PROFILE'] = 200
+        simulation_configuration['HEURISTIC_STRATEGIES'] = False
+        simulation_configuration['EMPIRICAL_STRATEGIES'] = True
+        simulation_configuration['REPLICATIONS_PER_PROFILE'] = 80
 
-        equilibrium_list = start_payoff_calculation(enhanced_dataframe, valid_projects, simulation_configuration)
+        equilibrium_list = start_payoff_calculation(enhanced_dataframe, all_valid_projects, simulation_configuration)
 
 
 if __name__ == "__main__":

@@ -28,16 +28,10 @@ import simmodel
 
 MINIMUM_OBSERVATIONS = 3
 
-NON_SEVERE_TRUE_COLUMN = "Non-Severe-True"
 NON_SEVERE_INFLATED_COLUMN = "Non-Severe-Inflated"
-SEVERE_TRUE_COLUMN = "Severe-True"
 SEVERE_DEFLATED_COLUMN = "Severe-Deflated"
-CORRECTION_COLUMN = "Corrections"
-NONSEVERE_CORRECTION_COLUMN = "NonSevere-Corrections"
-SEVERE_CORRECTION_COLUMN = "Severe-Corrections"
 
-REPORTER_COLUMNS = [NON_SEVERE_INFLATED_COLUMN, SEVERE_DEFLATED_COLUMN, CORRECTION_COLUMN, NONSEVERE_CORRECTION_COLUMN,
-                    SEVERE_CORRECTION_COLUMN]
+REPORTER_COLUMNS = [NON_SEVERE_INFLATED_COLUMN, SEVERE_DEFLATED_COLUMN]
 
 
 class ContinuousEmpiricalDistribution:
@@ -168,22 +162,13 @@ def get_reporter_behavior_dataframe(reporters_config):
     for config in reporters_config:
         total_nonsevere = float(config['reports_per_priority'][simdata.NON_SEVERE_PRIORITY])
         total_severe = float(config['reports_per_priority'][simdata.SEVERE_PRIORITY])
-        total_modified = float(config['with_modified_priority'])
 
-        non_severe_true = config['modified_details']['priority_1_true']
         non_severe_false = config['modified_details']['priority_1_false']
-        non_severe_modified = non_severe_true + non_severe_false
-
-        severe_true = config['modified_details']['priority_3_true']
         severe_false = config['modified_details']['priority_3_false']
-        severe_modified = severe_true + severe_false
 
         reporter_records.append(
-            [non_severe_false / non_severe_modified if non_severe_modified != 0 else 0,
-             severe_false / severe_modified if severe_modified != 0 else 0,
-             total_modified / (total_nonsevere + total_severe),
-             non_severe_modified / total_nonsevere if total_nonsevere != 0 else 0,
-             severe_modified / total_severe if total_severe != 0 else 0])
+            [non_severe_false / total_nonsevere if total_nonsevere != 0 else 0,
+             severe_false / total_severe if total_severe != 0 else 0])
 
     reporter_dataframe = pd.DataFrame(reporter_records)
 

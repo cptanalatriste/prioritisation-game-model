@@ -22,22 +22,27 @@ class EmpiricalInflationStrategy:
 
     def __init__(self, strategy_config):
         self.name = strategy_config['name']
-        self.strategy_config = strategy_config
+
+        inflation_prob = strategy_config[simutils.NON_SEVERE_INFLATED_COLUMN]
+        self.inflation_generator = simutils.DiscreteEmpiricalDistribution(name="inflation_generator",
+                                                                          values=[True, False],
+                                                                          probabilities=[inflation_prob,
+                                                                                         (1 - inflation_prob)])
+
+        deflation_prob = strategy_config[simutils.SEVERE_DEFLATED_COLUMN]
+        self.deflation_generator = simutils.DiscreteEmpiricalDistribution(name="deflation_generator",
+                                                                          values=[True, False],
+                                                                          probabilities=[deflation_prob,
+                                                                                         (1 - deflation_prob)])
 
     def priority_to_report(self, original_priority):
         result = original_priority
 
-        correct = np.random.uniform()
-        if original_priority == simdata.NON_SEVERE_PRIORITY and correct <= self.strategy_config[
-            simutils.NONSEVERE_CORRECTION_COLUMN]:
-            inflate = np.random.uniform()
-            if inflate <= self.strategy_config[simutils.NON_SEVERE_INFLATED_COLUMN]:
+        if original_priority == simdata.NON_SEVERE_PRIORITY:
+            if self.inflation_generator.generate():
                 result = simdata.SEVERE_PRIORITY
-
-        elif original_priority == simdata.SEVERE_PRIORITY and correct <= self.strategy_config[
-            simutils.SEVERE_CORRECTION_COLUMN]:
-            deflate = np.random.uniform()
-            if deflate <= self.strategy_config[simutils.SEVERE_DEFLATED_COLUMN]:
+        elif original_priority == simdata.SEVERE_PRIORITY:
+            if self.deflation_generator.generate():
                 result = simdata.NON_SEVERE_PRIORITY
 
         return result
