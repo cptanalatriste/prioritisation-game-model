@@ -133,15 +133,17 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
         nonsevere_inflation_index = 0
         severe_deflation_index = 1
 
-        print  " ", simutils.REPORTER_COLUMNS[nonsevere_inflation_index], ": ", "{0:.0f}%".format(
-            centroid[nonsevere_inflation_index] * 100), \
-            " ", simutils.REPORTER_COLUMNS[severe_deflation_index], ": ", "{0:.0f}%".format(
-            centroid[severe_deflation_index] * 100)
+        inflation_as_string = "{0:.0f}%".format(centroid[nonsevere_inflation_index] * 100)
+        deflation_as_string = "{0:.0f}%".format(centroid[severe_deflation_index] * 100)
 
-        strategies_per_team.append({'name': 'EMPIRICAL' + str(index),
-                                    simutils.NON_SEVERE_INFLATED_COLUMN: centroid[nonsevere_inflation_index],
-                                    simutils.SEVERE_DEFLATED_COLUMN: centroid[severe_deflation_index]
-                                    })
+        print  " ", simutils.REPORTER_COLUMNS[nonsevere_inflation_index], ": ", inflation_as_string, \
+            " ", simutils.REPORTER_COLUMNS[severe_deflation_index], ": ", deflation_as_string
+
+        strategies_per_team.append(
+            {'name': 'EMPIRICAL' + str(index) + "_INF" + inflation_as_string + "DEF" + deflation_as_string,
+             simutils.NON_SEVERE_INFLATED_COLUMN: centroid[nonsevere_inflation_index],
+             simutils.SEVERE_DEFLATED_COLUMN: centroid[severe_deflation_index]
+             })
 
     print "Cluster distribution: \n", correction_dataframe[cluster_column].value_counts()
     return strategies_per_team
@@ -403,24 +405,46 @@ def main():
 
     all_valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
 
-    # TODO(cgavidia): Only for testing
-    valid_projects = ['OFBIZ']
+    per_project = True
+    consolidated = True
 
-    for project in valid_projects:
-        print "Calculating equilibria for project ", project
+    simulation_configuration = dict(DEFAULT_CONFIGURATION)
+    simulation_configuration['REPLICATIONS_PER_PROFILE'] = 200
+    simulation_configuration['EMPIRICAL_STRATEGIES'] = True
+    simulation_configuration['N_CLUSTERS'] = 5
 
-        simulation_configuration = dict(DEFAULT_CONFIGURATION)
-        simulation_configuration['PROJECT_FILTER'] = [project]
-        simulation_configuration['REPLICATIONS_PER_PROFILE'] = 200
-        simulation_configuration['EMPIRICAL_STRATEGIES'] = True
-        simulation_configuration['N_CLUSTERS'] = 5
+    valid_projects = all_valid_projects
 
-        # TODO(cgavidia): Only for testing
-        simulation_configuration['HEURISTIC_STRATEGIES'] = False
-        simulation_configuration['EMPIRICAL_STRATEGIES'] = True
-        simulation_configuration['REPLICATIONS_PER_PROFILE'] = 80
+    equilibrium_catalog = []
+    if per_project:
+        for project in valid_projects:
+            print "Calculating equilibria for project ", project
 
+            configuration = dict(simulation_configuration)
+            configuration['PROJECT_FILTER'] = [project]
+            equilibrium_list = start_payoff_calculation(enhanced_dataframe, all_valid_projects,
+                                                        configuration)
+
+            equilibrium_catalog += [gtutils.get_equilibrium_as_dict(identifier=project, profile=profile) for profile in
+                                    equilibrium_list]
+
+    if consolidated:
+        configuration = dict(simulation_configuration)
+        configuration['PROJECT_FILTER'] = None
         equilibrium_list = start_payoff_calculation(enhanced_dataframe, all_valid_projects, simulation_configuration)
+        equilibrium_catalog += [gtutils.get_equilibrium_as_dict(identifier="CONSOLIDATED", profile=profile) for profile
+                                in
+                                equilibrium_list]
+
+    prefix = ""
+    if consolidated:
+        prefix += "ALL_"
+    if per_project:
+        prefix += "PROJECTS_"
+    results_dataframe = pd.DataFrame(equilibrium_catalog)
+    file_name = "csv/" + prefix + "vanilla_equilibrium_results.csv"
+    results_dataframe.to_csv(file_name)
+    print "Consolidated equilibrium results written to ", file_name
 
 
 if __name__ == "__main__":

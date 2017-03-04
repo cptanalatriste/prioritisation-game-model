@@ -1,7 +1,6 @@
 """
 This module is a discrete event simulation model for the bug reporting process
 """
-from collections import defaultdict
 
 from SimPy.Simulation import *
 from SimPy.SimPlot import *
@@ -49,6 +48,9 @@ class EmpiricalInflationStrategy:
 
     def __str__(self):
         return self.name
+
+    def __repr__(self):
+        return str(self)
 
 
 class TestingContext:

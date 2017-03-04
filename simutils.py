@@ -39,11 +39,11 @@ class ContinuousEmpiricalDistribution:
         self.distribution = None
         self.parameters = None
 
-        if observations is not None:
+        self.observations = observations
+        if observations is not None and distribution is None:
             if len(observations) < MINIMUM_OBSERVATIONS:
-                raise ValueError("Only " + str(len(observations)) + " were provided.")
+                raise ValueError("Only " + str(len(observations)) + " samples were provided.")
 
-            self.observations = observations
             self.inverse_cdf = self.inverse_transform_sampling()
 
         if distribution is not None and parameters is not None:

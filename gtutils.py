@@ -5,6 +5,7 @@ This modules provides functions for equilibrium calculation through the Gambit S
 import subprocess
 from string import Template
 from collections import defaultdict
+import fractions
 
 GAMBIT_FOLDER = "C:\Program Files (x86)\Gambit\\"
 
@@ -116,6 +117,25 @@ def calculate_equilibrium(strategies_catalog, gambit_file):
             print "This is a SYMMETRIC EQUILIBRIUM PROFILE!!"
 
     return equilibrium_list
+
+
+def get_equilibrium_as_dict(identifier, profile):
+    """
+    Returns a map representation of the equilibrium, suitable to be stored in a dataframe.
+    :param profile: Equilibrium as dict
+    :return: An improved dict
+    """
+
+    profile_representation = {}
+    for team, strategy_set in profile.iteritems():
+
+        for strategy_name, probability in strategy_set.iteritems():
+            profile_representation["TEAM_" + str(team) + "_" + strategy_name] = str(
+                round(float(fractions.Fraction(probability)), 2))
+
+    profile_representation["SYMMETRIC"] = is_symmetric_equilibrium(profile)
+    profile_representation["IDENTIFIER"] = identifier
+    return profile_representation
 
 
 def is_symmetric_equilibrium(profile):

@@ -843,16 +843,12 @@ def main():
     per_project = True
     consolidated = True
 
-    # TODO(cgavidia): Only for testing
-    consolidated = False
-    per_project = True
-    test_sizes = [.2]
-
     consolidated_results = []
     try:
         project_name = None
 
         if consolidated:
+            print "Starting consolidated analysis ..."
             project_name = "ALL"
             for test_size in test_sizes:
                 consolidated_results += get_simulation_results(project_list=valid_projects,
@@ -862,6 +858,7 @@ def main():
                                                                enhanced_dataframe=enhanced_dataframe)
 
         if per_project:
+            print "Starting per-project analysis ..."
             for test_size in test_sizes:
                 for project in valid_projects:
                     project_name = project
@@ -880,9 +877,9 @@ def main():
     if len(consolidated_results) > 0:
         prefix = ""
         if consolidated:
-            prefix = "ALL_"
+            prefix += "ALL_"
         if per_project:
-            prefix = "PROJECTS_"
+            prefix += "PROJECTS_"
         results_dataframe = pd.DataFrame(consolidated_results)
         file_name = "csv/" + prefix + str(TARGET_FIXES) + "_fixes_" + str(
             DIFFERENCE) + "_ci_difference_validation.csv"
