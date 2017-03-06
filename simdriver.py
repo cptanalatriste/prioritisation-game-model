@@ -839,8 +839,8 @@ def main():
     max_iterations = 200
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
     parallel = True
-    test_sizes = [.2, .3, .4]
-    per_project = True
+    test_sizes = [.2]
+    per_project = False
     consolidated = True
 
     consolidated_results = []

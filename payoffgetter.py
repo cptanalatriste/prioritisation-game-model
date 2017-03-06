@@ -383,7 +383,9 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
 
     game_desc = "AS-IS" if not game_configuration["THROTTLING_ENABLED"] else "THROTTLING"
     game_desc = "GATEKEEPER" if game_configuration["GATEKEEPER_CONFIG"] else game_desc
-    game_desc = "_".join(game_configuration["PROJECT_FILTER"]) + "_" + game_desc
+
+    if game_configuration["PROJECT_FILTER"] is not None and len(game_configuration["PROJECT_FILTER"]) > 0:
+        game_desc = "_".join(game_configuration["PROJECT_FILTER"]) + "_" + game_desc
 
     print "Generating Gambit NFG file ..."
     gambit_file = gtutils.get_strategic_game_format(game_desc, player_configuration, strategies_catalog,
@@ -405,7 +407,7 @@ def main():
 
     all_valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
 
-    per_project = True
+    per_project = False
     consolidated = True
 
     simulation_configuration = dict(DEFAULT_CONFIGURATION)
@@ -431,7 +433,7 @@ def main():
     if consolidated:
         configuration = dict(simulation_configuration)
         configuration['PROJECT_FILTER'] = None
-        equilibrium_list = start_payoff_calculation(enhanced_dataframe, all_valid_projects, simulation_configuration)
+        equilibrium_list = start_payoff_calculation(enhanced_dataframe, all_valid_projects, configuration)
         equilibrium_catalog += [gtutils.get_equilibrium_as_dict(identifier="CONSOLIDATED", profile=profile) for profile
                                 in
                                 equilibrium_list]
