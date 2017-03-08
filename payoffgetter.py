@@ -384,12 +384,16 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
     game_desc = "AS-IS" if not game_configuration["THROTTLING_ENABLED"] else "THROTTLING"
     game_desc = "GATEKEEPER" if game_configuration["GATEKEEPER_CONFIG"] else game_desc
 
+    if game_configuration["THROTTLING_ENABLED"]:
+        game_desc += "_INF" + str(game_configuration['INFLATION_FACTOR'] * 100)
+
     if game_configuration["PROJECT_FILTER"] is not None and len(game_configuration["PROJECT_FILTER"]) > 0:
         game_desc = "_".join(game_configuration["PROJECT_FILTER"]) + "_" + game_desc
 
     print "Generating Gambit NFG file ..."
     gambit_file = gtutils.get_strategic_game_format(game_desc, player_configuration, strategies_catalog,
                                                     profile_payoffs, teams)
+    print "NFG File created at ", gambit_file
 
     print "Executing Gambit for equilibrium calculation..."
     equilibrium_list = gtutils.calculate_equilibrium(strategies_catalog, gambit_file)

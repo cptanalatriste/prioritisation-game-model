@@ -107,6 +107,15 @@ class DiscreteEmpiricalDistribution:
             probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
 
         self.name = name
+        self.configure(values, probabilities)
+
+    def configure(self, values, probabilities):
+        """
+        Configures the rv_discrete instance that will generate the variates.
+        :param values: Values to produce.
+        :param probabilities: Probability of each of these values.
+        :return: None
+        """
         self.values = values
         self.probabilities = probabilities
 
@@ -123,8 +132,20 @@ class DiscreteEmpiricalDistribution:
         return self.values[variate_index]
 
     def get_probabilities(self):
+        """
+        Returns a dictionary with the supported values with their corresponding probabilities.
+        :return: Dictionary with probabilities.
+        """
         probability_map = {value: self.probabilities[index] for index, value in enumerate(self.values)}
         return defaultdict(float, probability_map)
+
+    def copy(self, name=""):
+        """
+        Generates a copy of the current generator.
+        :param name: Name of the copy.
+        :return: A generator copy.
+        """
+        return DiscreteEmpiricalDistribution(name=name, values=self.values, probabilities=self.probabilities)
 
 
 def remove_drive_in_testers(reporters_config, min_reports):

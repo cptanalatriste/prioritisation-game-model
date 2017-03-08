@@ -46,7 +46,7 @@ def get_profile_for_plotting(equilibrium_list):
     return profile
 
 
-def simulate_and_obtain_equilibria(input_params, game_configuration):
+def simulate_and_obtain_equilibria(input_params, game_configuration, prefix=""):
     equilibrium_list = payoffgetter.run_simulation(strategy_maps=input_params.strategy_maps,
                                                    strategies_catalog=input_params.strategies_catalog,
                                                    player_configuration=input_params.player_configuration,
@@ -60,10 +60,24 @@ def simulate_and_obtain_equilibria(input_params, game_configuration):
     symmetric_equilibrium = [profile for profile in equilibrium_list if gtutils.is_symmetric_equilibrium(profile)]
     print "Symmetric Equilibria: ", len(symmetric_equilibrium)
 
+    file_name = "csv/" + prefix + "_equilibrium_results.csv"
+    pd.DataFrame(
+        [gtutils.get_equilibrium_as_dict(identifier=prefix, profile=profile) for profile in equilibrium_list]).to_csv(
+        file_name)
+    print "Equilibrium results stored in ", file_name
+
     return equilibrium_list, symmetric_equilibrium
 
 
 def do_penalty_experiments(input_params, game_configuration):
+    """
+    Executes the simulation model using different settings for the penalty factor, and calculates the equilibrium under
+    each of this conditions.
+
+    :param input_params: Simulation inputs.
+    :param game_configuration: Game parameters.
+    :return: None.
+    """
     game_configuration['THROTTLING_ENABLED'] = True
 
     experiment_results = []
@@ -71,7 +85,9 @@ def do_penalty_experiments(input_params, game_configuration):
         game_configuration['INFLATION_FACTOR'] = float(inflation_factor) / 20
 
         print "Current inflation factor: ", game_configuration['INFLATION_FACTOR']
-        equilibrium_list, symmetric_equilibrium = simulate_and_obtain_equilibria(input_params, game_configuration)
+        equilibrium_list, symmetric_equilibrium = simulate_and_obtain_equilibria(input_params, game_configuration,
+                                                                                 prefix="INF" + str(game_configuration[
+                                                                                                        'INFLATION_FACTOR'] * 100))
 
         profile_for_plotting = get_profile_for_plotting(symmetric_equilibrium)
         sample_team = 0
@@ -87,8 +103,14 @@ def do_penalty_experiments(input_params, game_configuration):
         experiment_results.append(results)
 
     dataframe = pd.DataFrame(experiment_results)
-    dataframe.to_csv("csv/" + "_".join(game_configuration['PROJECT_FILTER']) + "_penalty_experiment_results.csv",
-                     index=False)
+    prefix = "ALL"
+
+    if game_configuration['PROJECT_FILTER'] is not None and len(game_configuration['PROJECT_FILTER']) > 0:
+        prefix = "_".join(game_configuration['PROJECT_FILTER'])
+
+    filename = "csv/" + prefix + "_penalty_experiment_results.csv"
+    dataframe.to_csv(filename, index=False)
+    print "Penalty experiment results stored in ", filename
 
 
 def analyse_project(project_list, enhanced_dataframe, valid_projects, replications_per_profile=1000,
@@ -114,10 +136,6 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
 
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
                                                           game_configuration)
-    # print "Starting AS-IS Game Analysis ..."
-    # game_configuration['THROTTLING_ENABLED'] = False
-    #
-    # simulate_and_obtain_equilibria(input_params, game_configuration)
 
     print "Starting Throtling penalty experiments..."
     game_configuration['THROTTLING_ENABLED'] = True
@@ -150,9 +168,18 @@ def main():
 
     valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
 
-    for project in valid_projects:
-        analyse_project([project], enhanced_dataframe, valid_projects, replications_per_profile=200,
-                        use_empirical=True)
+    per_project = False
+    consolidated = True
+
+    if per_project:
+        print "Running per-project analysis ..."
+        for project in valid_projects:
+            analyse_project([project], enhanced_dataframe, valid_projects, replications_per_profile=200,
+                            use_empirical=True, use_heuristic=True)
+
+    if consolidated:
+        analyse_project(None, enhanced_dataframe, valid_projects, replications_per_profile=200,
+                        use_empirical=True, use_heuristic=True)
 
 
 if __name__ == "__main__":

@@ -58,9 +58,8 @@ class TestingContext:
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, resolution_time_gen, ignored_gen, reporter_gen, default_review_time, priority_generator,
+    def __init__(self, resolution_time_gen, ignore_generators, reporter_gen, default_review_time, priority_generator,
                  quota_system,
-                 quota_per_dev,
                  review_time_gen,
                  target_fixes,
                  views_to_discard,
@@ -76,7 +75,7 @@ class TestingContext:
         """
 
         self.resolution_time_gen = resolution_time_gen
-        self.ignored_gen = ignored_gen
+        self.ignore_generators = ignore_generators
         self.reporter_gen = reporter_gen
         self.priority_generator = priority_generator
         self.default_review_time = default_review_time
@@ -84,7 +83,6 @@ class TestingContext:
         self.first_report_time = None
         self.last_report_time = None
         self.target_fixes = target_fixes
-        self.quota_per_dev = quota_per_dev
         self.quota_system = quota_system
         self.views_to_discard = views_to_discard
 
@@ -97,8 +95,8 @@ class TestingContext:
 
         self.bug_counter = 0
 
-        if self.quota_per_dev and self.quota_system:
-            self.inflation_penalty = self.get_default_inflation_penalty() * inflation_factor
+        if self.quota_system:
+            self.inflation_factor = inflation_factor
 
     def catch_bug(self):
         """
@@ -158,15 +156,35 @@ class TestingContext:
 
         return fix_effort
 
-    def ignore(self, reported_priority):
+    def ignore(self, reported_priority, reporter_name):
         """
         Returns if the reported removed from the queue should be fixed.
         :param reported_priority: Priority in the report.
         :return: True if it should be ignored, false otherwise.
         """
-        generator = self.ignored_gen[int(reported_priority)]
+
+        generator = self.ignore_generators[reporter_name][int(reported_priority)]
         generator_output = generator.generate()
         return generator_output
+
+    def apply_penalty(self, inflation_penalty, reporter_name):
+        """
+        Augments the probability for ignoring, for a specific reporter.
+        :param inflation_penalty: The penalty to apply
+        :param reporter_name: The offender reporter
+        :return: None
+        """
+        generators = self.ignore_generators[reporter_name]
+
+        for priority, generator in generators.iteritems():
+            probability_map = generator.get_probabilities()
+
+            minimum_probability = 0.95
+            current_probability = probability_map[True]
+
+            if current_probability >= minimum_probability:
+                ignore_probability = min(minimum_probability, current_probability + inflation_penalty)
+                generator.configure(values=[True, False], probabilities=[ignore_probability, 1 - ignore_probability])
 
     def discard(self, report):
         """
@@ -188,13 +206,6 @@ class TestingContext:
             review_time = self.review_time_gen.generate().item()
 
         return review_time
-
-    def get_default_inflation_penalty(self):
-        """
-        Returns the discount from a tester's quota if inflation is detected.
-        :return: Inflation penalty.
-        """
-        return self.quota_per_dev
 
 
 class BugReportSource(Process):
@@ -312,18 +323,8 @@ class BugReportSource(Process):
         """
         inflation_penalty = None
 
-        # TODO(cgavidia): Temporary comment. Will fix later.
-        # if self.testing_context.quota_system:
-        #     default_inflation_penalty = self.testing_context.inflation_penalty
-        #
-        #     inflation_penalty = 0
-        #
-        #     developer_quota = devtime_level[self.name]
-        #
-        #     if developer_quota.amount >= default_inflation_penalty:
-        #         inflation_penalty = default_inflation_penalty
-        #     elif 0 <= developer_quota.amount < default_inflation_penalty:
-        #         inflation_penalty = developer_quota.amount
+        if self.testing_context.quota_system:
+            inflation_penalty = self.testing_context.inflation_factor
 
         return inflation_penalty
 
@@ -381,10 +382,6 @@ class BugReport(Process):
 
         arrival_time = now()
 
-        false_report = False
-        if self.report_priority != self.real_priority:
-            false_report = True
-
         # This section relates to the gatekeeper logic.
         if gatekeeper_resource:
             yield request, self, gatekeeper_resource
@@ -395,35 +392,7 @@ class BugReport(Process):
 
         yield request, self, developer_resource, self.get_priority_for_queue()
 
-        # This sections applies the quota system process. The Bug Report is holding a Developer resource.
-        if inflation_penalty is not None:
-            # TODO(cgavidia): Temporary value. Replace later.
-            quota_manager = None
-
-            donation = float(inflation_penalty) / (len(quota_manager.keys()) - 1)
-            devtime_level = quota_manager[self.reporter]
-
-            if false_report:
-
-                if inflation_penalty > 0:
-                    if debug:
-                        print "Penalty to be applied to", self.reporter, " : Removing ", inflation_penalty, \
-                            " from existing quota of ", devtime_level.amount
-
-                    yield get, self, devtime_level, abs(inflation_penalty)
-
-                    for reporter, quota in quota_manager.iteritems():
-                        if reporter != self.reporter:
-                            if debug:
-                                print "Adding ", donation, " to reporter ", reporter, " quota. Previous value: ", quota.amount
-                            yield put, self, quota, donation
-
-                # Priority gets corrected and the report is re-entered on the queue
-                self.report_priority = self.real_priority
-                yield release, self, developer_resource
-                yield request, self, developer_resource, self.get_priority_for_queue()
-
-        if testing_context.ignore(self.report_priority):
+        if testing_context.ignore(reported_priority=self.report_priority, reporter_name=self.reporter):
             self.views_counter += 1
             yield release, self, developer_resource
 
@@ -445,8 +414,22 @@ class BugReport(Process):
                 monitor.observe(resol_time)
 
             if debug:
-                print now(), ": Report ", self.name, "by reporter ", self.reporter.name, " got fixed after ", resol_time, \
-                    " of reporting. Fix effort: ", self.fix_effort, " Available Dev Time: ", devtime_level.amount
+                print now(), ": Report ", self.name, "by reporter ", self.reporter, " got fixed after ", resol_time, \
+                    " of reporting. Fix effort: ", self.fix_effort
+
+        # This sections applies the penalty procedure. The bug reported have been already fixed.
+        false_report = False
+        if self.report_priority != self.real_priority:
+            false_report = True
+
+        if inflation_penalty is not None:
+
+            if false_report:
+
+                if inflation_penalty > 0:
+                    if debug:
+                        print "Penalty to be applied to", self.reporter, " : Penalizing with ", inflation_penalty
+                    testing_context.apply_penalty(inflation_penalty=inflation_penalty, reporter_name=self.reporter)
 
 
 class SimulationController(Process):
@@ -519,24 +502,23 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
     # print "team_capacity: ", team_capacity
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
-    quota_per_dev = None
-    if quota_system:
-        # TODO(cgavidia): Temporary value
-        dev_team_bandwith = 0
-        quota_per_dev = dev_team_bandwith / len(reporters_config)
-        devtime_level = {config['name']: Level(capacity=sys.maxint, initialBuffered=quota_per_dev, monitored=True) for
-                         config in reporters_config}
+
+    severe_generator = ignored_gen[simdata.SEVERE_PRIORITY]
+    nonsevere_generator = ignored_gen[simdata.NON_SEVERE_PRIORITY]
+
+    ignore_generators = {config['name']: {simdata.NON_SEVERE_PRIORITY: nonsevere_generator.copy(),
+                                          simdata.SEVERE_PRIORITY: severe_generator.copy()}
+                         for config in reporters_config}
 
     initialize()
 
     # TODO(cgavidia): Temporary value
     review_time_gen = None
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen,
-                                     ignored_gen=ignored_gen,
+                                     ignore_generators=ignore_generators,
                                      reporter_gen=reporter_gen,
                                      priority_generator=priority_generator, default_review_time=default_review_time,
                                      quota_system=quota_system,
-                                     quota_per_dev=quota_per_dev,
                                      inflation_factor=inflation_factor,
                                      review_time_gen=review_time_gen,
                                      views_to_discard=views_to_discard,
