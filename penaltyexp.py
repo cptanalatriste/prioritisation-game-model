@@ -51,10 +51,14 @@ def simulate_and_obtain_equilibria(input_params, game_configuration, prefix=""):
                                                    strategies_catalog=input_params.strategies_catalog,
                                                    player_configuration=input_params.player_configuration,
                                                    dev_team_size=input_params.dev_team_size,
-                                                   bugs_by_priority=input_params.bugs_by_priority,
                                                    resolution_time_gen=input_params.resolution_time_gen,
-                                                   dev_team_bandwith=input_params.dev_team_bandwith,
                                                    teams=input_params.teams,
+                                                   ignored_gen=input_params.ignored_gen,
+                                                   reporter_gen=input_params.reporter_gen,
+                                                   target_fixes=input_params.target_fixes,
+                                                   batch_size_gen=input_params.batch_size_gen,
+                                                   interarrival_time_gen=input_params.interarrival_time_gen,
+                                                   priority_generator=input_params.priority_generator,
                                                    game_configuration=game_configuration)
 
     symmetric_equilibrium = [profile for profile in equilibrium_list if gtutils.is_symmetric_equilibrium(profile)]
@@ -81,8 +85,11 @@ def do_penalty_experiments(input_params, game_configuration):
     game_configuration['THROTTLING_ENABLED'] = True
 
     experiment_results = []
-    for inflation_factor in range(0, 5):
+    for inflation_factor in range(1, 6):
+    # for raw_inflation in [0.01, 0.02, 0.03]:
         game_configuration['INFLATION_FACTOR'] = float(inflation_factor) / 20
+
+        # game_configuration['INFLATION_FACTOR'] = raw_inflation
 
         print "Current inflation factor: ", game_configuration['INFLATION_FACTOR']
         equilibrium_list, symmetric_equilibrium = simulate_and_obtain_equilibria(input_params, game_configuration,

@@ -143,6 +143,8 @@ def fit_reporter_distributions(reporters_config):
     """
     for config in reporters_config:
         inter_arrival_sample = config['interarrival_time_gen'].observations
+        print "Fitting distribution according to the current sample: ", inter_arrival_sample.describe()
+
         reporter_list = config['name']
 
         best_fit = siminput.launch_input_analysis(inter_arrival_sample, "INTERRIVAL_TIME_" + str(reporter_list),
@@ -461,7 +463,7 @@ def is_valid_period(issues_for_period, batch=-1):
     return result
 
 
-def get_dev_team_production(issues_for_period):
+def get_dev_team_production(issues_for_period, debug=False):
     """
     Returns the production of the development team for a specific period.
     :return: Developer Team Size and Developer Team Production.
@@ -473,6 +475,10 @@ def get_dev_team_production(issues_for_period):
         print "No resolution in batch information found. Considering all resolved"
         resolved_in_period = simdata.filter_resolved(issues_for_period, only_with_commits=False,
                                                      only_valid_resolution=False)
+
+    if debug:
+        print "Developer productivity: ", len(resolved_in_period.index), " issues resolved from ", len(
+            issues_for_period.index), " reports"
 
     bug_resolvers = resolved_in_period['JIRA Resolved By']
     dev_team_size = bug_resolvers.nunique()
@@ -564,6 +570,8 @@ def get_report_stream_params(training_issues, reporters_config, symmetric=False)
     fit_reporter_distributions(global_reporter_config)
 
     batch_size_gen = global_reporter_config[0]['batch_size_gen']
+    print "Current batch size information: ", batch_size_gen.observations.describe()
+
     interarrival_time_gen = global_reporter_config[0]['interarrival_time_gen']
 
     return reporter_gen, batch_size_gen, interarrival_time_gen
@@ -626,8 +634,8 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     dev_team_series, dev_bandwith_series, training_metrics = get_team_training_data(training_issues,
                                                                                     reporters_config)
 
-    dev_team_size_training = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series)
-    print "Using an DISCRETE EMPIRICAL DISTRIBUTION for the Development Team Size ..."
+    team_capacity = dev_team_series.median()
+    print "Using as team capacity the median on every batch. Current value: ", team_capacity,
 
     reporter_gen, batch_size_gen, interarrival_time_gen = get_report_stream_params(training_issues, reporters_config)
 
@@ -641,8 +649,8 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
         max_iterations=max_iterations,
         priority_generator=priority_generator,
         target_fixes=TARGET_FIXES,
-        team_capacity=None,
-        dev_size_generator=dev_team_size_training)
+        team_capacity=team_capacity,
+        dev_size_generator=None)
 
     simulation_result = consolidate_results("SIMULATION", None, None,
                                             reporters_config,
@@ -664,7 +672,7 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     for valid_period in unique_batches:
         issues_for_period = valid_issues[valid_issues[simdata.BATCH_COLUMN] == valid_period]
 
-        dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(
+        _, issues_resolved, resolved_in_period, dev_team_bandwith = get_dev_team_production(
             issues_for_period)
 
         if is_valid_period(issues_for_period, valid_period):

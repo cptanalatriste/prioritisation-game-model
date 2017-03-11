@@ -284,9 +284,10 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
         " Resolved in Period: ", issues_resolved,
 
     input_params = collections.namedtuple('SimulationParams',
-                                          ['strategy_maps', 'strategies_catalog', 'player_configuration',
-                                           'dev_team_size', 'resolution_time_gen', 'teams',
-                                           'ignored_gen', 'reporter_gen', 'target_fixes', 'batch_size_gen',
+                                          ['strategy_maps', 'strategies_catalog',
+                                           'player_configuration', 'dev_team_size',
+                                           'resolution_time_gen', 'teams', 'ignored_gen',
+                                           'reporter_gen', 'target_fixes', 'batch_size_gen',
                                            'interarrival_time_gen', 'priority_generator'])
 
     return input_params(strategy_maps, strategies_catalog, player_configuration, dev_team_size,

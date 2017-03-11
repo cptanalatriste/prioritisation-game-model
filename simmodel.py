@@ -179,11 +179,11 @@ class TestingContext:
         for priority, generator in generators.iteritems():
             probability_map = generator.get_probabilities()
 
-            minimum_probability = 0.95
+            maximum_probability = 0.95
             current_probability = probability_map[True]
 
-            if current_probability >= minimum_probability:
-                ignore_probability = min(minimum_probability, current_probability + inflation_penalty)
+            if current_probability < maximum_probability:
+                ignore_probability = min(maximum_probability, current_probability + inflation_penalty)
                 generator.configure(values=[True, False], probabilities=[ignore_probability, 1 - ignore_probability])
 
     def discard(self, report):

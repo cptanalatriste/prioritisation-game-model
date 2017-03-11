@@ -101,7 +101,9 @@ class ContinuousEmpiricalDistribution:
 
 class DiscreteEmpiricalDistribution:
     def __init__(self, name="", observations=None, values=None, probabilities=None):
+        self.observations = pd.Series([])
         if observations is not None:
+            self.observations = observations
             values_with_probabilities = observations.value_counts(normalize=True)
             values = np.array([index for index, _ in values_with_probabilities.iteritems()])
             probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
@@ -524,7 +526,9 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
     resolved_per_reporter = []
     reporting_times = []
 
-    print "Running ", max_iterations, " replications ... "
+    print "Running ", max_iterations, " replications. Target fixes: ", target_fixes, \
+        " .Throttling enabled: ", quota_system, " . Inflation penalty: ", inflation_factor, \
+        " Developers in team: ", team_capacity
     for replication_index in range(max_iterations):
         np.random.seed()
         reporter_monitors, priority_monitors, reporting_time = simmodel.run_model(team_capacity=team_capacity,
