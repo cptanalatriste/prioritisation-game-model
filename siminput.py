@@ -84,7 +84,7 @@ def apply_kolmogorov_smirnov(dist_name, cdf_function, data_series, debug=False):
     return p_value
 
 
-def fit_probability_distribution(dist_name, distribution, data_series, xmin, xmax, debug=False):
+def fit_probability_distribution(dist_name, distribution, data_series, xmin, xmax, debug=True):
     """
     Plots and fitted distribution using the maximum likelihood estimation. Also, before that the Kolmogorov-Smirnov test is
     performed.
@@ -99,8 +99,6 @@ def fit_probability_distribution(dist_name, distribution, data_series, xmin, xma
 
     # Distribution fitting through maximum likelihood estimation.
     parameter_tuple = distribution.fit(data_series)
-    if debug:
-        print "Fitted distribution params for ", dist_name, ": ", parameter_tuple
 
     if not xmin:
         xmin = data_series.min()
@@ -129,6 +127,9 @@ def fit_probability_distribution(dist_name, distribution, data_series, xmin, xma
     ks_p_value = apply_kolmogorov_smirnov(dist_name, cdf_function, data_series)
     apply_anderson_darling(dist_name, data_series)
     plt.plot(counts, label=dist_name)
+
+    if debug:
+        print "Fitted distribution params for ", dist_name, ": ", parameter_tuple, " ks_p_value: ", ks_p_value
 
     return {"dist_name": dist_name,
             "ks_p_value": ks_p_value,

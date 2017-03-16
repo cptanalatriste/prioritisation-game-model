@@ -14,6 +14,7 @@ ALL_ISSUES_CSV = GIT_HOME + "\github-data-miner\UNFILTERED\Release_Counter_UNFIL
 PRIORITY_CHANGER_COLUMN = "Priority Changer"
 CREATED_DATE_COLUMN = 'Parsed Created Date'
 RESOLUTION_DATE_COLUMN = 'Parsed Resolution Date'
+PRIORITY_CHANGE_TIME_COLUMN = 'Priority Change Time'
 PERIOD_COLUMN = 'Month'
 ISSUE_KEY_COLUMN = 'Issue Key'
 BATCH_COLUMN = 'Batch'
@@ -73,11 +74,11 @@ def launch_histogram(data_points, config=None):
 
 def get_resolution_time(report_series):
     """
-    Calculates the fix effort in the units defined by time factor. It is defined as the days between the resolution and the "In Progress" status
-    change by the resolver.
+    Calculates the fix effort in the units defined by time factor. It is defined as the hours between the resolution and
+     the "In Progress" status change by the resolver.
 
     :param report_series: Bug report as Series.
-    :return: Fix effort in days.
+    :return: Fix effort in hours.
     """
 
     first_contact_str = report_series['Creation Date']
@@ -89,6 +90,27 @@ def get_resolution_time(report_series):
 
         if first_contact < resolution_date:
             return (resolution_date - first_contact).total_seconds() / TIME_FACTOR
+
+    return None
+
+
+def get_priority_change_time(report_series):
+    """
+    Calculates the time for priority change in the units defined by time factor. It is defined as the hours between the
+    report creation and the priority change.
+
+    :param report_series: Bug report as Series.
+    :return: Fix effort in hours.
+    """
+    create_date_str = report_series['Creation Date']
+    priority_change_str = report_series['Priority Change Date']
+
+    if isinstance(create_date_str, basestring) and isinstance(priority_change_str, basestring):
+        create_date = dateutil.parser.parse(create_date_str)
+        priority_change_date = dateutil.parser.parse(priority_change_str)
+
+        if create_date < priority_change_date:
+            return (priority_change_date - create_date).total_seconds() / TIME_FACTOR
 
     return None
 
@@ -261,6 +283,7 @@ def enhace_report_dataframe(bug_reports):
     bug_reports[PERIOD_COLUMN] = bug_reports.apply(date_as_string, axis=1)
 
     bug_reports[RESOLUTION_TIME_COLUMN] = bug_reports.apply(get_resolution_time, axis=1)
+    bug_reports[PRIORITY_CHANGE_TIME_COLUMN] = bug_reports.apply(get_priority_change_time, axis=1)
 
     bug_reports[SIMPLE_PRIORITY_COLUMN] = bug_reports['Priority'].replace(SIMPLIFIED_PRIORITIES)
     bug_reports[ORIGINAL_SIMPLE_PRIORITY_COLUMN] = bug_reports['Original Priority']

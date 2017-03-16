@@ -48,7 +48,7 @@ DEFAULT_CONFIGURATION = {
     # 'GATEKEEPER_CONFIG': {'review_time': 8,  # False to disable the Gatekeeper on the simulation.
     #                       'capacity': 1},
     'GATEKEEPER_CONFIG': False,
-
+    'SUCCESS_RATE': 1.0,
     # Team Configuration
     'NUMBER_OF_TEAMS': 2,
     'AGGREGATE_AGENT_TEAM': -1,
@@ -270,6 +270,9 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = simdriver.get_dev_team_production(
         valid_reports)
 
+    print "Obtaining priority change distribution ..."
+    review_time_gen = simdriver.get_priority_change_gen(training_issues=valid_reports)
+
     target_fixes = issues_resolved
     bug_reporters = valid_reports['Reported By']
     test_team_size = bug_reporters.nunique()
@@ -280,6 +283,14 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
                                                                                              game_configuration[
                                                                                                  'SYMMETRIC'])
 
+    catcher_generator = None
+    if game_configuration['SUCCESS_RATE'] is not None:
+        success_rate = game_configuration['SUCCESS_RATE']
+        print "The inflation detection succes rate is: ", success_rate
+        catcher_generator = simutils.DiscreteEmpiricalDistribution(name="InflationCatcher",
+                                                                   values=[True, False],
+                                                                   probabilities=[success_rate, (1 - success_rate)])
+
     print "Project ", project_keys, " Test Period: ", "ALL", " Reporters: ", test_team_size, " Developers:", dev_team_size, \
         " Resolved in Period: ", issues_resolved,
 
@@ -288,16 +299,18 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
                                            'player_configuration', 'dev_team_size',
                                            'resolution_time_gen', 'teams', 'ignored_gen',
                                            'reporter_gen', 'target_fixes', 'batch_size_gen',
-                                           'interarrival_time_gen', 'priority_generator'])
+                                           'interarrival_time_gen', 'priority_generator', 'review_time_gen',
+                                           'catcher_generator'])
 
     return input_params(strategy_maps, strategies_catalog, player_configuration, dev_team_size,
                         resolution_time_gen, teams, ignored_gen, reporter_gen, target_fixes, batch_size_gen,
-                        interarrival_time_gen, priority_generator)
+                        interarrival_time_gen, priority_generator, review_time_gen, catcher_generator)
 
 
 def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_team_size, resolution_time_gen, teams,
                    game_configuration, ignored_gen=None, reporter_gen=None, target_fixes=None, batch_size_gen=None,
-                   interarrival_time_gen=None, priority_generator=None):
+                   interarrival_time_gen=None, catcher_generator=None, priority_generator=None,
+                   simfunction=simutils.launch_simulation_parallel):
     """
 
     :param strategy_maps: Strategy profiles of the game.
@@ -345,7 +358,10 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                                   game_configuration["AGGREGATE_AGENT_TEAM"])
 
             if overall_dataframe is None:
-                simulation_output = simutils.launch_simulation_parallel(
+                # TODO(cgavidia): Only for testing
+                # simfunction = simutils.launch_simulation
+
+                simulation_output = simfunction(
                     team_capacity=dev_team_size,
                     ignored_gen=ignored_gen,
                     reporter_gen=reporter_gen,
@@ -356,6 +372,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                     reporters_config=player_configuration,
                     resolution_time_gen=resolution_time_gen,
                     max_time=simulation_time,
+                    catcher_generator=catcher_generator,
                     max_iterations=game_configuration["REPLICATIONS_PER_PROFILE"],
                     inflation_factor=game_configuration["INFLATION_FACTOR"],
                     quota_system=game_configuration["THROTTLING_ENABLED"],
@@ -421,7 +438,6 @@ def main():
     simulation_configuration['N_CLUSTERS'] = 5
 
     valid_projects = all_valid_projects
-
     equilibrium_catalog = []
     if per_project:
         for project in valid_projects:

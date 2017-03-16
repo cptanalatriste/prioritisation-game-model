@@ -25,7 +25,6 @@ def get_inflation_behaviour(inflation_percentage, real_priority, corrected_issue
                               "Regular": 2,
                               "Non-Severe": 1}
 
-    inflation_impact = ""
     if inflation_percentage < 0.1:
         inflation_impact = "Low"
         return inflation_impact
@@ -37,7 +36,6 @@ def get_inflation_behaviour(inflation_percentage, real_priority, corrected_issue
     target_priority = corrected_issues[SIMPLE_ORIG_PRIORITY_COLUMN].mode().iloc[0]
     inflation_degree_num = prioritity_equivalence[target_priority] - prioritity_equivalence[real_priority]
 
-    inflation_degree = ""
     if inflation_degree_num == 1:
         inflation_degree = "Inflation"
     elif inflation_degree_num > 1:

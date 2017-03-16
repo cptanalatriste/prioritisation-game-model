@@ -25,6 +25,7 @@ TARGET_FIXES = 10
 DIFFERENCE = 2
 
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
+# Also, it was found in Discrete Event Simulation by George Fishman (Chapter 100
 MINIMUM_P_VALUE = 0.05
 
 from collections import defaultdict
@@ -43,7 +44,7 @@ def get_reporter_groups(bug_dataset):
     return tester_groups
 
 
-def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_filter=True, debug=False):
+def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_filter=True, batching=True, debug=False):
     """
     Returns the reporting information required for the simulation to run.
 
@@ -64,17 +65,25 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
         bug_reports = simdata.filter_by_reporter(training_dataset, reporter_list)
         reports = len(bug_reports.index)
 
-        batches = simdata.get_report_batches(bug_reports)
-        arrival_times = [batch["batch_head"] for batch in batches]
+        if batching:
+            batches = simdata.get_report_batches(bug_reports)
+            arrival_times = [batch["batch_head"] for batch in batches]
+
+            batch_sizes_sample = [batch["batch_count"] for batch in batches]
+            sample_as_observations = pd.Series(data=batch_sizes_sample)
+        else:
+            report_dates = bug_reports[simdata.CREATED_DATE_COLUMN]
+            arrival_times = report_dates.sort_values().values
+            sample_as_observations = 1
 
         inter_arrival_sample = simdata.get_interarrival_times(arrival_times, period_start)
-        batch_sizes_sample = [batch["batch_count"] for batch in batches]
 
         try:
 
             inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(observations=inter_arrival_sample)
             batch_size_gen = simutils.DiscreteEmpiricalDistribution(name="batch_dist",
-                                                                    observations=pd.Series(data=batch_sizes_sample))
+                                                                    observations=sample_as_observations,
+                                                                    inverse_cdf=True)
 
             reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
             if len(reporter_list) == 1:
@@ -147,7 +156,12 @@ def fit_reporter_distributions(reporters_config):
 
         reporter_list = config['name']
 
-        best_fit = siminput.launch_input_analysis(inter_arrival_sample, "INTERRIVAL_TIME_" + str(reporter_list),
+        description = "INTERRIVAL_TIME_" + str(reporter_list)
+        file_name = "csv/" + description + ".csv"
+        inter_arrival_sample.to_csv(file_name)
+        print "Inter-arrival samples stored in ", file_name
+
+        best_fit = siminput.launch_input_analysis(inter_arrival_sample, description,
                                                   show_data_plot=False, save_plot=False)
         inter_arrival_time_gen = None
 
@@ -324,11 +338,17 @@ def get_resolution_time_gen(resolved_issues, desc=""):
 
     print "Resolution times in Training Range for ", desc, ": \n", resolution_time_sample.describe()
 
-    best_fit = siminput.launch_input_analysis(resolution_time_sample, "RESOL_TIME_" + desc,
+    description = "RESOL_TIME_" + desc
+
+    file_name = "csv/" + description + ".csv"
+    resolution_time_sample.to_csv(file_name)
+    print "Resolution time samples stored in ", file_name
+
+    best_fit = siminput.launch_input_analysis(resolution_time_sample, description,
                                               show_data_plot=False, save_plot=False)
     resolution_time_gen = None
 
-    # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
+    # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2 - Page 46)
     if best_fit["ks_p_value"] >= MINIMUM_P_VALUE:
         print "Using ", best_fit["dist_name"], " for ", desc, " Resolution Time with parameters ", \
             best_fit["parameters"], " with p-value ", best_fit["ks_p_value"]
@@ -340,6 +360,40 @@ def get_resolution_time_gen(resolved_issues, desc=""):
         resolution_time_gen = simutils.ContinuousEmpiricalDistribution(observations=resolution_time_sample)
 
     return resolution_time_gen
+
+
+def get_priority_change_gen(training_issues):
+    """
+    Gets a variate generator for the time for a priority to get corrected. In hours.
+    :param training_issues: Dataframe with bug reports.
+    :return: An random variate generator.
+    """
+    with_changed_priority = simdata.get_modified_priority_bugs(training_issues)
+    change_time_sample = with_changed_priority[simdata.PRIORITY_CHANGE_TIME_COLUMN].dropna()
+
+    print "Priority change times in Training Range : \n", change_time_sample.describe()
+
+    description = "PRIORITY_CHANGE"
+    file_name = "csv/" + description + ".csv"
+    change_time_sample.to_csv(file_name)
+    print "Priority change samples stored in ", file_name
+
+    best_fit = siminput.launch_input_analysis(change_time_sample, description,
+                                              show_data_plot=False, save_plot=False)
+
+    change_time_gen = None
+    # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2 - Page 46)
+    if best_fit["ks_p_value"] >= MINIMUM_P_VALUE:
+        print "Using ", best_fit["dist_name"], " for Priority Change Time with parameters", best_fit[
+            "parameters"], " with p-value ", best_fit["ks_p_value"]
+        change_time_gen = simutils.ContinuousEmpiricalDistribution(distribution=best_fit["distribution"],
+                                                                   parameters=best_fit["parameters"],
+                                                                   observations=change_time_sample)
+    elif len(change_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
+        print "Using an Empirical Distribution for Priority Change Time"
+        change_time_gen = simutils.ContinuousEmpiricalDistribution(observations=change_time_sample)
+
+    return change_time_gen
 
 
 def get_simulation_input(training_issues=None):
@@ -396,7 +450,6 @@ def get_simulation_input(training_issues=None):
 
     print "MOST RELEVANT PRIORITY: ", most_relevant_priority
     priorities_in_training = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
-    print "Priorities for defects in training: ", priorities_in_training.describe()
     priority_generator = simutils.DiscreteEmpiricalDistribution(observations=priorities_in_training)
     print "Training Priority Map : ", priority_generator.get_probabilities()
 
@@ -634,8 +687,8 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     dev_team_series, dev_bandwith_series, training_metrics = get_team_training_data(training_issues,
                                                                                     reporters_config)
 
-    team_capacity = dev_team_series.median()
-    print "Using as team capacity the median on every batch. Current value: ", team_capacity,
+    print "Development Team Size sample: \n", dev_team_series.describe(),
+    dev_size_generator = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series, inverse_cdf=True)
 
     reporter_gen, batch_size_gen, interarrival_time_gen = get_report_stream_params(training_issues, reporters_config)
 
@@ -649,8 +702,8 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
         max_iterations=max_iterations,
         priority_generator=priority_generator,
         target_fixes=TARGET_FIXES,
-        team_capacity=team_capacity,
-        dev_size_generator=None)
+        team_capacity=None,
+        dev_size_generator=dev_size_generator)
 
     simulation_result = consolidate_results("SIMULATION", None, None,
                                             reporters_config,
@@ -852,6 +905,7 @@ def main():
     consolidated = True
 
     consolidated_results = []
+
     try:
         project_name = None
 

@@ -47,6 +47,13 @@ def get_profile_for_plotting(equilibrium_list):
 
 
 def simulate_and_obtain_equilibria(input_params, game_configuration, prefix=""):
+    """
+    Given a game configuration, it computes the heuristic payoff matrix and calculates the symmetric Nash Equilibrium
+    :param input_params: Simulation parameters.
+    :param game_configuration: Game configuration.
+    :param prefix: Prefix for the generated file.
+    :return: A list of equilibria, including the symmetric ones.
+    """
     equilibrium_list = payoffgetter.run_simulation(strategy_maps=input_params.strategy_maps,
                                                    strategies_catalog=input_params.strategies_catalog,
                                                    player_configuration=input_params.player_configuration,
@@ -59,6 +66,7 @@ def simulate_and_obtain_equilibria(input_params, game_configuration, prefix=""):
                                                    batch_size_gen=input_params.batch_size_gen,
                                                    interarrival_time_gen=input_params.interarrival_time_gen,
                                                    priority_generator=input_params.priority_generator,
+                                                   catcher_generator=input_params.catcher_generator,
                                                    game_configuration=game_configuration)
 
     symmetric_equilibrium = [profile for profile in equilibrium_list if gtutils.is_symmetric_equilibrium(profile)]
@@ -86,7 +94,7 @@ def do_penalty_experiments(input_params, game_configuration):
 
     experiment_results = []
     for inflation_factor in range(1, 6):
-    # for raw_inflation in [0.01, 0.02, 0.03]:
+        # for raw_inflation in [0.01, 0.02, 0.03]:
         game_configuration['INFLATION_FACTOR'] = float(inflation_factor) / 20
 
         # game_configuration['INFLATION_FACTOR'] = raw_inflation
@@ -141,25 +149,37 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
     game_configuration['HEURISTIC_STRATEGIES'] = use_heuristic
     game_configuration['EMPIRICAL_STRATEGIES'] = use_empirical
 
+    do_throttling = True
+    do_gatekeeper = True
+
+    # TODO(cgavidia): Only for testing
+    do_throttling = False
+    game_configuration['EMPIRICAL_STRATEGIES'] = False
+
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
                                                           game_configuration)
 
-    print "Starting Throtling penalty experiments..."
-    game_configuration['THROTTLING_ENABLED'] = True
-    do_penalty_experiments(input_params, game_configuration)
+    if do_throttling:
+        print "Starting Throtling penalty experiments..."
+        game_configuration['THROTTLING_ENABLED'] = True
+        do_penalty_experiments(input_params, game_configuration)
 
-    # inflation_factor = 0.1
-    # print "Starting Throttling Game Analysis with an Inflation Factor of ", inflation_factor
-    # game_configuration['THROTTLING_ENABLED'] = True
-    # game_configuration['INFLATION_FACTOR'] = inflation_factor
-    # simulate_and_obtain_equilibria(input_params, game_configuration)
-    #
-    # print "Starting gatekeeper analysis ..."
-    # game_configuration['THROTTLING_ENABLED'] = False
-    # game_configuration['GATEKEEPER_CONFIG'] = {'review_time': 8,
-    #                                            'capacity': 1}
-    #
-    # simulate_and_obtain_equilibria(input_params, game_configuration)
+    if do_gatekeeper:
+        print "Starting gatekeeper analysis ..."
+        game_configuration['THROTTLING_ENABLED'] = False
+        game_configuration['SUCCESS_RATE'] = 0.9
+
+        #TODO(cgavidia): Replace later. Temporary hack
+        input_params = input_params._replace(target_fixes=int(input_params.target_fixes * 0.1))
+        game_configuration['GATEKEEPER_CONFIG'] = {'review_time_gen': input_params.review_time_gen,
+                                                   'capacity': 1}
+
+        print "Updating the success rate to: ", game_configuration['SUCCESS_RATE']
+        input_params.catcher_generator.configure(values=[True, False],
+                                                 probabilities=[game_configuration['SUCCESS_RATE'],
+                                                                1 - game_configuration['SUCCESS_RATE']])
+
+        simulate_and_obtain_equilibria(input_params, game_configuration)
 
 
 def main():

@@ -63,13 +63,14 @@ class TestingContext:
                  review_time_gen,
                  target_fixes,
                  views_to_discard,
-                 inflation_factor=1):
+                 catcher_generator,
+                 inflation_factor=None):
         """
         Configures the context of the simulation.
 
         :param resolution_time_gen: Generators for resolution time, depending on their priority.
         :param bugs_by_priority: Number of defects present on the system, per priority.
-        :param default_review_time: Time the gatekeeper uses for assesing the bug true priority.
+        :param default_review_time: Time the gatekeeper uses for assessing the bug true priority.
         :param devtime_level: Level containing the number of developer time hours available for bug fixing.
         :param quota_system: If true, the number of developer hours available will be distributed among testers, penalizing inflators.
         """
@@ -85,6 +86,7 @@ class TestingContext:
         self.target_fixes = target_fixes
         self.quota_system = quota_system
         self.views_to_discard = views_to_discard
+        self.catcher_generator = catcher_generator
 
         self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {'completed': Monitor(),
                                                                 'reported': 0},
@@ -127,6 +129,14 @@ class TestingContext:
 
         return 0
 
+    def get_total_fixes(self):
+        """
+        Returns the number of reports fixed so far.
+        :return: Number of fixes
+        """
+
+        return sum([monitors['completed'].count() for priority, monitors in self.priority_monitors.iteritems()])
+
     def stop_simulation(self):
         """
         Returns True if the simulation must be stopped.
@@ -134,7 +144,7 @@ class TestingContext:
         :return: True if we should stop. False otherwise.
         """
 
-        total_fixed = sum([monitors['completed'].count() for priority, monitors in self.priority_monitors.iteritems()])
+        total_fixed = self.get_total_fixes()
 
         # print "total_fixed: ", total_fixed
 
@@ -165,6 +175,19 @@ class TestingContext:
 
         generator = self.ignore_generators[reporter_name][int(reported_priority)]
         generator_output = generator.generate()
+        return generator_output
+
+    def catch_inflation(self):
+        """
+        Returns True if the person doing the priority assessment does it correctly.
+        :return: True if correct priority, false otherwise.
+        """
+        generator = self.catcher_generator
+
+        if generator is None:
+            generator_output = True
+        else:
+            generator_output = generator.generate()
         return generator_output
 
     def apply_penalty(self, inflation_penalty, reporter_name):
@@ -345,7 +368,8 @@ class BugReportSource(Process):
         Returns the number of bugs to be contained in the batch report.
         :return: Number of bug reports.
         """
-        return int(np.asscalar(self.batch_size_gen.generate()[0]))
+        batch_size = self.batch_size_gen.generate()
+        return int(batch_size)
 
 
 class BugReport(Process):
@@ -382,12 +406,24 @@ class BugReport(Process):
 
         arrival_time = now()
 
+        if debug:
+            print "Report ", self.name, " arrived at ", now(), " .Current fixes: ", testing_context.get_total_fixes()
+
+        false_report = False
+        if self.report_priority != self.real_priority:
+            false_report = True
+
         # This section relates to the gatekeeper logic.
         if gatekeeper_resource:
             yield request, self, gatekeeper_resource
             yield hold, self, abs(self.review_time)
 
-            self.report_priority = self.real_priority
+            if false_report and testing_context.catch_inflation():
+                self.report_priority = self.real_priority
+            else:
+                if debug:
+                    print "An inflation/deflation was ignored!"
+
             yield release, self, gatekeeper_resource
 
         yield request, self, developer_resource, self.get_priority_for_queue()
@@ -418,18 +454,12 @@ class BugReport(Process):
                     " of reporting. Fix effort: ", self.fix_effort
 
         # This sections applies the penalty procedure. The bug reported have been already fixed.
-        false_report = False
-        if self.report_priority != self.real_priority:
-            false_report = True
-
         if inflation_penalty is not None:
 
-            if false_report:
-
-                if inflation_penalty > 0:
-                    if debug:
-                        print "Penalty to be applied to", self.reporter, " : Penalizing with ", inflation_penalty
-                    testing_context.apply_penalty(inflation_penalty=inflation_penalty, reporter_name=self.reporter)
+            if false_report and inflation_penalty > 0 and testing_context.catch_inflation():
+                if debug:
+                    print "Penalty to be applied to", self.reporter, " : Penalizing with ", inflation_penalty
+                testing_context.apply_penalty(inflation_penalty=inflation_penalty, reporter_name=self.reporter)
 
 
 class SimulationController(Process):
@@ -467,7 +497,7 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
               interarrival_time_gen=None,
               batch_size_gen=None,
               views_to_discard=0,
-              quota_system=False, inflation_factor=1, debug=False):
+              quota_system=False, inflation_factor=None, catcher_generator=None, debug=False):
     """
     Triggers the simulation, according to the provided parameters.
     :param debug: Enable to got debug information.
@@ -486,8 +516,9 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
 
     gatekeeper_resource = None
     default_review_time = None
+    review_time_gen = None
     if gatekeeper_config:
-        default_review_time = gatekeeper_config['review_time']
+        review_time_gen = gatekeeper_config['review_time_gen']
         gatekeeper_resource = Resource(capacity=gatekeeper_config['capacity'], name="gatekeeper_team",
                                        unitName="gatekeeper", qType=PriorityQ,
                                        preemptable=False)
@@ -497,7 +528,7 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
 
     if dev_size_generator is not None:
         # We are ensuring a minimum capacity of one developer.
-        team_capacity = max(1, dev_size_generator.generate()[0])
+        team_capacity = max(1, dev_size_generator.generate())
 
     # print "team_capacity: ", team_capacity
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
@@ -512,8 +543,6 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
 
     initialize()
 
-    # TODO(cgavidia): Temporary value
-    review_time_gen = None
     testing_context = TestingContext(resolution_time_gen=resolution_time_gen,
                                      ignore_generators=ignore_generators,
                                      reporter_gen=reporter_gen,
@@ -522,6 +551,7 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
                                      inflation_factor=inflation_factor,
                                      review_time_gen=review_time_gen,
                                      views_to_discard=views_to_discard,
+                                     catcher_generator=catcher_generator,
                                      target_fixes=target_fixes)
 
     controller = SimulationController(testing_context=testing_context)

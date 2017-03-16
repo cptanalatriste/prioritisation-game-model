@@ -4,6 +4,8 @@ Utility types for supporting the simulation.
 from collections import defaultdict
 
 import sys
+
+import math
 from pathos.multiprocessing import ProcessingPool as Pool
 
 import scipy.interpolate as interpolate
@@ -44,28 +46,19 @@ class ContinuousEmpiricalDistribution:
             if len(observations) < MINIMUM_OBSERVATIONS:
                 raise ValueError("Only " + str(len(observations)) + " samples were provided.")
 
-            self.inverse_cdf = self.inverse_transform_sampling()
+            self.inverse_cdf = get_inverse_cdf(self.observations)
 
         if distribution is not None and parameters is not None:
             self.distribution = distribution
             self.parameters = parameters
 
-    def inverse_transform_sampling(self, n_bins=40):
-        """
-        Code inspired from:
-        http://www.nehalemlabs.net/prototype/blog/2013/12/16/how-to-do-inverse-transformation-sampling-in-scipy-and-numpy/
-
-        :param n_bins:Number of bins for the CDF
-        :return: Inverse CDF
-        """
-        hist, bin_edges = np.histogram(self.observations, bins=n_bins, density=True)
-        cum_values = np.zeros(bin_edges.shape)
-        cum_values[1:] = np.cumsum(hist * np.diff(bin_edges))
-        inv_cdf = interpolate.interp1d(cum_values, bin_edges)
-
-        return inv_cdf
-
     def generate_from_scipy(self):
+        """
+        A theoretical distribution fitted from the data. Generates samples from the fitted distributions.
+        (From: Discrete Event Simulation by G. Fishman, Chapter 10)
+
+        :return:
+        """
         parameter_tuple = self.parameters
 
         if len(parameter_tuple) == 2:
@@ -100,16 +93,28 @@ class ContinuousEmpiricalDistribution:
 
 
 class DiscreteEmpiricalDistribution:
-    def __init__(self, name="", observations=None, values=None, probabilities=None):
+    def __init__(self, name="", observations=None, values=None, probabilities=None, inverse_cdf=False):
         self.observations = pd.Series([])
-        if observations is not None:
-            self.observations = observations
-            values_with_probabilities = observations.value_counts(normalize=True)
-            values = np.array([index for index, _ in values_with_probabilities.iteritems()])
-            probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
-
+        self.inverse_cdf = None
+        self.disc_distribution = None
         self.name = name
-        self.configure(values, probabilities)
+
+        if observations is not None and isinstance(observations, pd.Series):
+            self.observations = observations
+
+            if inverse_cdf:
+                self.inverse_cdf = get_inverse_cdf(self.observations)
+            else:
+                values_with_probabilities = observations.value_counts(normalize=True)
+                values = np.array([index for index, _ in values_with_probabilities.iteritems()])
+                probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
+
+        if observations is not None and isinstance(observations, int):
+            values = [observations]
+            probabilities = [1.0]
+
+        if values is not None and probabilities is not None:
+            self.configure(values, probabilities)
 
     def configure(self, values, probabilities):
         """
@@ -123,15 +128,26 @@ class DiscreteEmpiricalDistribution:
 
         self.disc_distribution = rv_discrete(values=(range(len(values)), self.probabilities))
 
-    def generate(self, rand_uniform=None):
+    def generate(self):
         """
-        Samples from the empirical distribution. Inspired in:
-        http://stackoverflow.com/questions/11373192/generating-discrete-random-variables-with-specified-weights-using-scipy-or-numpy
-
+        Samples from the empirical distribution.
         :return: Random variate
         """
-        variate_index = self.disc_distribution.rvs(size=1)
-        return self.values[variate_index]
+
+        if self.disc_distribution is not None:
+            # This procedure was inspired by:
+            # http://stackoverflow.com/questions/11373192/generating-discrete-random-variables-with-specified-weights-using-scipy-or-numpy
+
+            variate_index = self.disc_distribution.rvs(size=1)
+            return self.values[variate_index]
+
+        if self.inverse_cdf is not None:
+            # This is the Quantile Method implementation for discrete variables, according to Discrete-Event Simulation
+            # by G. Fishman (page 463)
+
+            rand_uniform = uniform.rvs(size=1)[0]
+            rand_variate = self.inverse_cdf(rand_uniform)
+            return math.floor(rand_variate)
 
     def get_probabilities(self):
         """
@@ -148,6 +164,30 @@ class DiscreteEmpiricalDistribution:
         :return: A generator copy.
         """
         return DiscreteEmpiricalDistribution(name=name, values=self.values, probabilities=self.probabilities)
+
+
+def get_inverse_cdf(observations, n_bins=40):
+    """
+    Inverse cumulative distribution function, required for inverse transformation sampling.
+
+    Code inspired from:
+    http://www.nehalemlabs.net/prototype/blog/2013/12/16/how-to-do-inverse-transformation-sampling-in-scipy-and-numpy/
+
+    An Empirical Distribution Function based exclusively on the data, and generates samples from them
+    during the simulation (From: Discrete Event Simulation by G. Fishman, Chapter 10)
+
+    Potentially, we are generating an estimatot of the inverse distribution function, called the Quantile Method on
+    Discrete Event Simulation by G. Fishman, Chapter 10. Our parameter n_bins would be called k in the book.
+
+    :return: Inverse CDF instance
+    """
+
+    hist, bin_edges = np.histogram(observations, bins=n_bins, density=True)
+    cum_values = np.zeros(bin_edges.shape)
+    cum_values[1:] = np.cumsum(hist * np.diff(bin_edges))
+    inv_cdf = interpolate.interp1d(cum_values, bin_edges)
+
+    return inv_cdf
 
 
 def remove_drive_in_testers(reporters_config, min_reports):
@@ -388,7 +428,8 @@ def launch_simulation_parallel(team_capacity, reporters_config,
                                target_fixes=None,
                                dev_size_generator=None,
                                gatekeeper_config=False,
-                               inflation_factor=1,
+                               inflation_factor=None,
+                               catcher_generator=None,
                                quota_system=False,
                                parallel_blocks=4):
     """
@@ -438,6 +479,7 @@ def launch_simulation_parallel(team_capacity, reporters_config,
                         'priority_generator': priority_generator,
                         'target_fixes': target_fixes,
                         'dev_size_generator': dev_size_generator,
+                        'catcher_generator': catcher_generator,
                         'quota_system': quota_system}
 
         worker_inputs.append(worker_input)
@@ -485,7 +527,8 @@ def launch_simulation_wrapper(input_params):
         dev_size_generator=input_params['dev_size_generator'],
         gatekeeper_config=input_params['gatekeeper_config'],
         inflation_factor=input_params['inflation_factor'],
-        quota_system=input_params['quota_system'])
+        quota_system=input_params['quota_system'],
+        catcher_generator=input_params['catcher_generator'])
 
     return simulation_results
 
@@ -501,7 +544,8 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
                       target_fixes=None,
                       dev_size_generator=None,
                       gatekeeper_config=False,
-                      inflation_factor=1,
+                      inflation_factor=None,
+                      catcher_generator=None,
                       quota_system=False):
     """
     Triggers the simulation according a given configuration. It includes the seed reset behaviour.
@@ -528,7 +572,8 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
 
     print "Running ", max_iterations, " replications. Target fixes: ", target_fixes, \
         " .Throttling enabled: ", quota_system, " . Inflation penalty: ", inflation_factor, \
-        " Developers in team: ", team_capacity
+        " Developers in team: ", team_capacity, " Success probabilities: ", catcher_generator, \
+        " Gatekeeper Config: ", gatekeeper_config
     for replication_index in range(max_iterations):
         np.random.seed()
         reporter_monitors, priority_monitors, reporting_time = simmodel.run_model(team_capacity=team_capacity,
@@ -540,6 +585,7 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
                                                                                   ignored_gen=ignored_gen,
                                                                                   reporter_gen=reporter_gen,
                                                                                   priority_generator=priority_generator,
+                                                                                  catcher_generator=catcher_generator,
                                                                                   target_fixes=target_fixes,
                                                                                   dev_size_generator=dev_size_generator,
                                                                                   gatekeeper_config=gatekeeper_config,
