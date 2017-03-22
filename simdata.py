@@ -200,7 +200,7 @@ def period_identifier(report_series, batch_size=BATCH_SIZE):
     return batch_identifier
 
 
-def include_batch_information(bug_reports, target_fixes=20):
+def include_batch_information(bug_reports, target_fixes=20, only_with_commits=True, only_valid_resolution=True):
     """
     Includes the column for grouping bug reports in batches.
     :param bug_reports:
@@ -229,11 +229,12 @@ def include_batch_information(bug_reports, target_fixes=20):
         report_counter += 1
         current_creation_date = report_series[CREATED_DATE_COLUMN]
 
-        current_fixes = with_refreshed_index[
+        previous_reports = with_refreshed_index[
             (with_refreshed_index[CREATED_DATE_COLUMN] >= current_batch_start) &
             (with_refreshed_index[CREATED_DATE_COLUMN] <= current_creation_date) &
-            (with_refreshed_index[RESOLUTION_DATE_COLUMN] <= current_creation_date) &
-            (with_refreshed_index[STATUS_COLUMN].isin(RESOLUTION_STATUS))]
+            (with_refreshed_index[RESOLUTION_DATE_COLUMN] <= current_creation_date)]
+
+        current_fixes = filter_resolved(previous_reports, only_with_commits, only_valid_resolution)
 
         if len(current_fixes.index) >= target_fixes:
             current_batch += 1
@@ -258,7 +259,7 @@ def include_batch_information(bug_reports, target_fixes=20):
         batch_end = max(batch_reports[CREATED_DATE_COLUMN].dropna().values)
 
         resolved = False
-        if (report_series[STATUS_COLUMN] in RESOLUTION_STATUS) and \
+        if (resolved_definition(report_series, only_with_commits, only_valid_resolution)) and \
                 (batch_resolved_count < target_fixes) and \
                 (report_series[RESOLUTION_DATE_COLUMN] is not None) and \
                 (batch_start <= report_series[RESOLUTION_DATE_COLUMN] <= batch_end):
@@ -343,19 +344,34 @@ def exclude_self_fixes(bug_reports):
     return clean_bug_reports
 
 
+def resolved_definition(bug_report, only_with_commits=True, only_valid_resolution=True):
+    """
+    Given a bug report series, returns True if it is considered resolved.
+    :param bug_report: Bug Report Series.
+    :param only_with_commits: True if it should have commits related to it.
+    :param only_valid_resolution: True if the resolution value implies development effort.
+    :return:
+    """
+    is_resolved = bug_report[STATUS_COLUMN] in RESOLUTION_STATUS
+
+    if only_valid_resolution:
+        is_resolved = is_resolved and bug_report['Resolution'] in VALID_RESOLUTION_VALUES
+
+    if only_with_commits:
+        is_resolved = is_resolved and bug_report['Commits'] > 0
+
+    return is_resolved
+
+
 def filter_resolved(bug_reports, only_with_commits=True, only_valid_resolution=True):
     """
     Return the issues that are Closed/Resolved with a valid resolution and with commits in Git.
     :param bug_reports: Original dataframe
     :return: Only resolved issues.
     """
-    resolved_issues = bug_reports[bug_reports[STATUS_COLUMN].isin(RESOLUTION_STATUS)]
 
-    if only_valid_resolution:
-        resolved_issues = resolved_issues[resolved_issues['Resolution'].isin(VALID_RESOLUTION_VALUES)]
-
-    if only_with_commits:
-        resolved_issues = resolved_issues[resolved_issues['Commits'] > 0]
+    resolved_issues = bug_reports[
+        bug_reports.apply(lambda report: resolved_definition(report, only_with_commits, only_valid_resolution), axis=1)]
 
     return resolved_issues
 
