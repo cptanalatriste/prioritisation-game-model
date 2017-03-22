@@ -25,6 +25,7 @@ from sklearn.metrics import r2_score
 
 import matplotlib.pyplot as plt
 
+import progressbar
 import simdata
 import simmodel
 
@@ -41,12 +42,11 @@ class ContinuousEmpiricalDistribution:
         self.distribution = None
         self.parameters = None
 
-        self.observations = observations
         if observations is not None and distribution is None:
             if len(observations) < MINIMUM_OBSERVATIONS:
                 raise ValueError("Only " + str(len(observations)) + " samples were provided.")
 
-            self.inverse_cdf = get_inverse_cdf(self.observations)
+            self.inverse_cdf = get_inverse_cdf(observations)
 
         if distribution is not None and parameters is not None:
             self.distribution = distribution
@@ -92,26 +92,36 @@ class ContinuousEmpiricalDistribution:
         return rand_variate
 
 
+class ConstantGenerator:
+    """
+    A Generator that produces the same value all the time.
+    """
+
+    def __init__(self, name="", value=None):
+        self.name = name
+        self.value = value
+
+    def generate(self):
+        return self.value
+
+    def __str__(self):
+        return str(self.value) + " (Constant)"
+
+
 class DiscreteEmpiricalDistribution:
     def __init__(self, name="", observations=None, values=None, probabilities=None, inverse_cdf=False):
-        self.observations = pd.Series([])
         self.inverse_cdf = None
         self.disc_distribution = None
         self.name = name
 
         if observations is not None and isinstance(observations, pd.Series):
-            self.observations = observations
 
             if inverse_cdf:
-                self.inverse_cdf = get_inverse_cdf(self.observations)
+                self.inverse_cdf = get_inverse_cdf(observations)
             else:
                 values_with_probabilities = observations.value_counts(normalize=True)
                 values = np.array([index for index, _ in values_with_probabilities.iteritems()])
                 probabilities = [probability for _, probability in values_with_probabilities.iteritems()]
-
-        if observations is not None and isinstance(observations, int):
-            values = [observations]
-            probabilities = [1.0]
 
         if values is not None and probabilities is not None:
             self.configure(values, probabilities)
@@ -165,6 +175,9 @@ class DiscreteEmpiricalDistribution:
         """
         return DiscreteEmpiricalDistribution(name=name, values=self.values, probabilities=self.probabilities)
 
+    def __str__(self):
+        return str(self.get_probabilities())
+
 
 def get_inverse_cdf(observations, n_bins=40):
     """
@@ -199,7 +212,7 @@ def remove_drive_in_testers(reporters_config, min_reports):
     :return: Filtered list of reporters config.
     """
     # reporter_metrics = [np.mean(config['interarrival_time_gen'].observations) for config in reporters_config]
-    reporter_metrics = [len(config['interarrival_time_gen'].observations) for config in reporters_config]
+    reporter_metrics = [len(config['inter_arrival_sample']) for config in reporters_config]
 
     overall_mean = np.mean(reporter_metrics)
     overall_std = np.std(reporter_metrics)
@@ -209,7 +222,7 @@ def remove_drive_in_testers(reporters_config, min_reports):
     print "remove_drive_in_testers->min_reports ", min_reports, "overall_mean ", overall_mean, "overall_std ", overall_std, "overall_max", overall_max, "overall_min", overall_min
 
     engaged_testers = [config for config in reporters_config if
-                       len(config['interarrival_time_gen'].observations) >= min_reports]
+                       len(config['inter_arrival_sample']) >= min_reports]
 
     return engaged_testers
 
@@ -431,7 +444,8 @@ def launch_simulation_parallel(team_capacity, reporters_config,
                                inflation_factor=None,
                                catcher_generator=None,
                                quota_system=False,
-                               parallel_blocks=4):
+                               parallel_blocks=4,
+                               show_progress=True):
     """
     Parallelized version of the simulation launch, to maximize CPU utilization.
 
@@ -480,10 +494,13 @@ def launch_simulation_parallel(team_capacity, reporters_config,
                         'target_fixes': target_fixes,
                         'dev_size_generator': dev_size_generator,
                         'catcher_generator': catcher_generator,
-                        'quota_system': quota_system}
+                        'quota_system': quota_system,
+                        'show_progress': False}
 
         worker_inputs.append(worker_input)
 
+    # Showing progress bar of first batch
+    worker_inputs[0]['show_progress'] = show_progress
     worker_outputs = pool.map(launch_simulation_wrapper, worker_inputs)
 
     print "Workers in pool finished. Consolidating outputs..."
@@ -528,7 +545,8 @@ def launch_simulation_wrapper(input_params):
         gatekeeper_config=input_params['gatekeeper_config'],
         inflation_factor=input_params['inflation_factor'],
         quota_system=input_params['quota_system'],
-        catcher_generator=input_params['catcher_generator'])
+        catcher_generator=input_params['catcher_generator'],
+        show_progress=input_params['show_progress'])
 
     return simulation_results
 
@@ -546,7 +564,8 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
                       gatekeeper_config=False,
                       inflation_factor=None,
                       catcher_generator=None,
-                      quota_system=False):
+                      quota_system=False,
+                      show_progress=True):
     """
     Triggers the simulation according a given configuration. It includes the seed reset behaviour.
 
@@ -570,10 +589,21 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
     resolved_per_reporter = []
     reporting_times = []
 
-    print "Running ", max_iterations, " replications. Target fixes: ", target_fixes, \
-        " .Throttling enabled: ", quota_system, " . Inflation penalty: ", inflation_factor, \
-        " Developers in team: ", team_capacity, " Success probabilities: ", catcher_generator, \
-        " Gatekeeper Config: ", gatekeeper_config
+    if show_progress:
+        gatekeeper_params = None
+
+        if gatekeeper_config is not None:
+            gatekeeper_params = " Capacity " + str(gatekeeper_config['capacity']) + " Time Generator " + str(
+                gatekeeper_config['review_time_gen'])
+
+        print "Running ", max_iterations, " replications. Target fixes: ", target_fixes, \
+            " .Throttling enabled: ", quota_system, " . Inflation penalty: ", inflation_factor, \
+            " Developers in team: ", team_capacity, " Success probabilities: ", str(catcher_generator), \
+            " Gatekeeper Config: ", gatekeeper_params
+
+    progress_bar = None
+    if show_progress:
+        progress_bar = progressbar.ProgressBar(max_iterations)
     for replication_index in range(max_iterations):
         np.random.seed()
         reporter_monitors, priority_monitors, reporting_time = simmodel.run_model(team_capacity=team_capacity,
@@ -611,7 +641,11 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
 
         reporting_times.append(reporting_time)
 
-    print max_iterations, " replications finished."
+        if progress_bar is not None:
+            progress_bar.progress(replication_index + 1)
+
+    if show_progress:
+        print max_iterations, " replications finished."
 
     return {"completed_per_reporter": completed_per_reporter,
             "completed_per_priority": completed_per_priority,

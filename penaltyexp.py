@@ -15,6 +15,7 @@ import simmodel
 
 import payoffgetter
 import gtutils
+import simutils
 
 
 def get_profile_for_plotting(equilibrium_list):
@@ -149,12 +150,10 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
     game_configuration['HEURISTIC_STRATEGIES'] = use_heuristic
     game_configuration['EMPIRICAL_STRATEGIES'] = use_empirical
 
-    do_throttling = True
-    do_gatekeeper = True
-
     # TODO(cgavidia): Only for testing
-    do_throttling = False
-    game_configuration['EMPIRICAL_STRATEGIES'] = False
+    do_gatekeeper = False
+    do_throttling = True
+    # game_configuration['EMPIRICAL_STRATEGIES'] = False
 
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
                                                           game_configuration)
@@ -166,20 +165,17 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
 
     if do_gatekeeper:
         print "Starting gatekeeper analysis ..."
+
+        gatekeepers = 2
+        review_time_minutes = 20.0
+        review_time_gen = simutils.ConstantGenerator(name="review_time_gen", value=review_time_minutes / 60.0)
+
         game_configuration['THROTTLING_ENABLED'] = False
-        game_configuration['SUCCESS_RATE'] = 0.9
+        game_configuration['GATEKEEPER_CONFIG'] = {'review_time_gen': review_time_gen,
+                                                   'capacity': gatekeepers}
 
-        #TODO(cgavidia): Replace later. Temporary hack
-        input_params = input_params._replace(target_fixes=int(input_params.target_fixes * 0.1))
-        game_configuration['GATEKEEPER_CONFIG'] = {'review_time_gen': input_params.review_time_gen,
-                                                   'capacity': 1}
-
-        print "Updating the success rate to: ", game_configuration['SUCCESS_RATE']
-        input_params.catcher_generator.configure(values=[True, False],
-                                                 probabilities=[game_configuration['SUCCESS_RATE'],
-                                                                1 - game_configuration['SUCCESS_RATE']])
-
-        simulate_and_obtain_equilibria(input_params, game_configuration)
+        simulate_and_obtain_equilibria(input_params, game_configuration,
+                                       prefix="GATEKEEPER_SUCCESS" + str(game_configuration['SUCCESS_RATE']))
 
 
 def main():

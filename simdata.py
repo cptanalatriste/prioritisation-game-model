@@ -11,6 +11,7 @@ import pytz
 GIT_HOME = "D:\git"
 ALL_ISSUES_CSV = GIT_HOME + "\github-data-miner\UNFILTERED\Release_Counter_UNFILTERED.csv"
 
+PROJECT_KEY_COUMN = "Project Key"
 PRIORITY_CHANGER_COLUMN = "Priority Changer"
 CREATED_DATE_COLUMN = 'Parsed Created Date'
 RESOLUTION_DATE_COLUMN = 'Parsed Resolution Date'

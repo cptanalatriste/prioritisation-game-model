@@ -36,7 +36,7 @@ DEFAULT_CONFIGURATION = {
 
     # Throtling configuration parameters.
     'THROTTLING_ENABLED': False,
-    'INFLATION_FACTOR': 1,
+    'INFLATION_FACTOR': None,
 
     # Empirical Strategies parameters.
     'EMPIRICAL_STRATEGIES': False,
@@ -47,7 +47,7 @@ DEFAULT_CONFIGURATION = {
     # Gatekeeper configuration.
     # 'GATEKEEPER_CONFIG': {'review_time': 8,  # False to disable the Gatekeeper on the simulation.
     #                       'capacity': 1},
-    'GATEKEEPER_CONFIG': False,
+    'GATEKEEPER_CONFIG': None,
     'SUCCESS_RATE': 1.0,
     # Team Configuration
     'NUMBER_OF_TEAMS': 2,
@@ -358,8 +358,6 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                                   game_configuration["AGGREGATE_AGENT_TEAM"])
 
             if overall_dataframe is None:
-                # TODO(cgavidia): Only for testing
-                # simfunction = simutils.launch_simulation
 
                 simulation_output = simfunction(
                     team_capacity=dev_team_size,

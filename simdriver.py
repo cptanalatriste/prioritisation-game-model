@@ -120,7 +120,9 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
 
             config = {'name': reporter_name,
                       'interarrival_time_gen': inter_arrival_time_gen,
+                      'inter_arrival_sample': inter_arrival_sample,
                       'batch_size_gen': batch_size_gen,
+                      'batch_size_sample': sample_as_observations,
                       'reporter_list': reporter_list,
                       'reports_per_priority': reports_per_priority,
                       'with_modified_priority': with_modified_priority,
@@ -151,7 +153,7 @@ def fit_reporter_distributions(reporters_config):
     :return: None.
     """
     for config in reporters_config:
-        inter_arrival_sample = config['interarrival_time_gen'].observations
+        inter_arrival_sample = config['inter_arrival_sample']
         print "Fitting distribution according to the current sample: ", inter_arrival_sample.describe()
 
         reporter_list = config['name']
@@ -371,6 +373,7 @@ def get_priority_change_gen(training_issues):
     with_changed_priority = simdata.get_modified_priority_bugs(training_issues)
     change_time_sample = with_changed_priority[simdata.PRIORITY_CHANGE_TIME_COLUMN].dropna()
 
+    print "Priority changes per project:  \n", with_changed_priority[simdata.PROJECT_KEY_COUMN].value_counts()
     print "Priority change times in Training Range : \n", change_time_sample.describe()
 
     description = "PRIORITY_CHANGE"
@@ -408,8 +411,8 @@ def get_simulation_input(training_issues=None):
     print "Simplified Priorities in Training Range: \n ", counts_per_priority
 
     resolution_per_priority = defaultdict(lambda: None)
-    all_resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=False,
-                                                  only_valid_resolution=False)
+    all_resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=True,
+                                                  only_valid_resolution=True)
 
     all_ignored_issues = training_issues[training_issues[simdata.STATUS_COLUMN].isin(['Open'])]
     ignored_per_priority = defaultdict(lambda: None)
@@ -485,18 +488,6 @@ def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None):
     return project_bugs
 
 
-def get_resolution_times(issues_for_period):
-    """
-    From an issues dataframe, it returns the list of resolution times contained, excluding NaN
-    :param issues_for_period: Dataframe with issues.
-    :return: Resolution time series
-    """
-    resolved_issues = simdata.filter_resolved(issues_for_period, only_with_commits=False,
-                                              only_valid_resolution=False)
-
-    return resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
-
-
 def is_valid_period(issues_for_period, batch=-1):
     """
     Determines the rule for launching the simulation for that period.
@@ -526,8 +517,8 @@ def get_dev_team_production(issues_for_period, debug=False):
         resolved_in_period = issues_for_period[issues_for_period[simdata.RESOLVED_IN_BATCH_COLUMN]]
     else:
         print "No resolution in batch information found. Considering all resolved"
-        resolved_in_period = simdata.filter_resolved(issues_for_period, only_with_commits=False,
-                                                     only_valid_resolution=False)
+        resolved_in_period = simdata.filter_resolved(issues_for_period, only_with_commits=True,
+                                                     only_valid_resolution=True)
 
     if debug:
         print "Developer productivity: ", len(resolved_in_period.index), " issues resolved from ", len(
@@ -623,7 +614,7 @@ def get_report_stream_params(training_issues, reporters_config, symmetric=False)
     fit_reporter_distributions(global_reporter_config)
 
     batch_size_gen = global_reporter_config[0]['batch_size_gen']
-    print "Current batch size information: ", batch_size_gen.observations.describe()
+    print "Current batch size information: \n", global_reporter_config[0]['batch_size_sample'].describe()
 
     interarrival_time_gen = global_reporter_config[0]['interarrival_time_gen']
 
