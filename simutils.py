@@ -6,6 +6,8 @@ from collections import defaultdict
 import sys
 
 import math
+
+import time
 from pathos.multiprocessing import ProcessingPool as Pool
 
 import scipy.interpolate as interpolate
@@ -604,6 +606,8 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
     progress_bar = None
     if show_progress:
         progress_bar = progressbar.ProgressBar(max_iterations)
+
+    start_time = time.time()
     for replication_index in range(max_iterations):
         np.random.seed()
         reporter_monitors, priority_monitors, reporting_time = simmodel.run_model(team_capacity=team_capacity,
@@ -645,7 +649,7 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
             progress_bar.progress(replication_index + 1)
 
     if show_progress:
-        print max_iterations, " replications finished."
+        print max_iterations, " replications finished. Execution time: ", (time.time() - start_time), " (s)"
 
     return {"completed_per_reporter": completed_per_reporter,
             "completed_per_priority": completed_per_priority,

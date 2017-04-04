@@ -94,11 +94,10 @@ def do_penalty_experiments(input_params, game_configuration):
     game_configuration['THROTTLING_ENABLED'] = True
 
     experiment_results = []
-    for inflation_factor in range(1, 6):
-        # for raw_inflation in [0.01, 0.02, 0.03]:
-        game_configuration['INFLATION_FACTOR'] = float(inflation_factor) / 20
 
-        # game_configuration['INFLATION_FACTOR'] = raw_inflation
+    inflation_factors = [0.01, 0.03, 0.05]
+    for raw_inflation in inflation_factors:
+        game_configuration['INFLATION_FACTOR'] = raw_inflation
 
         print "Current inflation factor: ", game_configuration['INFLATION_FACTOR']
         equilibrium_list, symmetric_equilibrium = simulate_and_obtain_equilibria(input_params, game_configuration,
@@ -129,6 +128,23 @@ def do_penalty_experiments(input_params, game_configuration):
     print "Penalty experiment results stored in ", filename
 
 
+def do_gatekeeper_experiments(input_params, game_configuration):
+    """
+    Performs the Gatekeeper game with several levels of success rate for inflation detection.
+    :param input_params: Simulation inputs.
+    :param game_configuration: Game parameters.
+    :return: None
+    """
+
+    success_rates = [1.0, 0.9]
+    for success_rate in success_rates:
+        game_configuration['SUCCESS_RATE'] = success_rate
+
+        input_params.catcher_generator.configure(values=[True, False], probabilities=[success_rate, (1 - success_rate)])
+        simulate_and_obtain_equilibria(input_params, game_configuration,
+                                       prefix="GATEKEEPER_SUCCESS" + str(game_configuration['SUCCESS_RATE']))
+
+
 def analyse_project(project_list, enhanced_dataframe, valid_projects, replications_per_profile=1000,
                     use_empirical=False, use_heuristic=True):
     """
@@ -151,9 +167,8 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
     game_configuration['EMPIRICAL_STRATEGIES'] = use_empirical
 
     # TODO(cgavidia): Only for testing
-    do_gatekeeper = False
-    do_throttling = True
-    # game_configuration['EMPIRICAL_STRATEGIES'] = False
+    do_gatekeeper = True
+    do_throttling = False
 
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
                                                           game_configuration)
@@ -174,8 +189,7 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
         game_configuration['GATEKEEPER_CONFIG'] = {'review_time_gen': review_time_gen,
                                                    'capacity': gatekeepers}
 
-        simulate_and_obtain_equilibria(input_params, game_configuration,
-                                       prefix="GATEKEEPER_SUCCESS" + str(game_configuration['SUCCESS_RATE']))
+        do_gatekeeper_experiments(input_params, game_configuration)
 
 
 def main():
@@ -194,14 +208,17 @@ def main():
     per_project = False
     consolidated = True
 
+    replications_per_profile = 200
+
     if per_project:
         print "Running per-project analysis ..."
         for project in valid_projects:
-            analyse_project([project], enhanced_dataframe, valid_projects, replications_per_profile=200,
+            analyse_project([project], enhanced_dataframe, valid_projects,
+                            replications_per_profile=replications_per_profile,
                             use_empirical=True, use_heuristic=True)
 
     if consolidated:
-        analyse_project(None, enhanced_dataframe, valid_projects, replications_per_profile=200,
+        analyse_project(None, enhanced_dataframe, valid_projects, replications_per_profile=replications_per_profile,
                         use_empirical=True, use_heuristic=True)
 
 

@@ -397,14 +397,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                game_configuration["NUMBER_OF_TEAMS"])
         profile_payoffs.append((file_prefix, payoffs))
 
-    game_desc = "AS-IS" if not game_configuration["THROTTLING_ENABLED"] else "THROTTLING"
-    game_desc = "GATEKEEPER" if game_configuration["GATEKEEPER_CONFIG"] else game_desc
-
-    if game_configuration["THROTTLING_ENABLED"]:
-        game_desc += "_INF" + str(game_configuration['INFLATION_FACTOR'] * 100)
-
-    if game_configuration["PROJECT_FILTER"] is not None and len(game_configuration["PROJECT_FILTER"]) > 0:
-        game_desc = "_".join(game_configuration["PROJECT_FILTER"]) + "_" + game_desc
+    game_desc = get_game_description(game_configuration)
 
     print "Generating Gambit NFG file ..."
     gambit_file = gtutils.get_strategic_game_format(game_desc, player_configuration, strategies_catalog,
@@ -416,6 +409,27 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
 
     print "Equilibria found: ", len(equilibrium_list), equilibrium_list
     return equilibrium_list
+
+
+def get_game_description(game_configuration):
+    """
+    Returns a descriptive name for the game in place
+    :param game_configuration: Game parameters
+    :return: A name
+    """
+    game_desc = "AS-IS" if not game_configuration["THROTTLING_ENABLED"] else "THROTTLING"
+    game_desc = "GATEKEEPER" if game_configuration["GATEKEEPER_CONFIG"] else game_desc
+
+    if game_configuration["THROTTLING_ENABLED"]:
+        game_desc += "_INF" + str(game_configuration['INFLATION_FACTOR'] * 100)
+
+    if game_configuration["GATEKEEPER_CONFIG"] and game_configuration["SUCCESS_RATE"]:
+        game_desc += "_RATE" + str(game_configuration['SUCCESS_RATE'] * 100)
+
+    if game_configuration["PROJECT_FILTER"] is not None and len(game_configuration["PROJECT_FILTER"]) > 0:
+        game_desc = "_".join(game_configuration["PROJECT_FILTER"]) + "_" + game_desc
+
+    return game_desc
 
 
 def main():
