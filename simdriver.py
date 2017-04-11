@@ -767,13 +767,20 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
     :param enhanced_dataframe: Dataframe with additional fields
     :return: None
     """
+
+    print "Number of issues before valid filtering: ", len(enhanced_dataframe.index)
+    print "Number of reporters before valid filtering: ", enhanced_dataframe[simdata.REPORTER_COLUMN].nunique()
+    print "Report Start before valid filtering: ", enhanced_dataframe[simdata.CREATED_DATE_COLUMN].min()
+    print "Report End before valid filtering: ", enhanced_dataframe[simdata.CREATED_DATE_COLUMN].max()
+    print "Number of projects before valid filtering: ", enhanced_dataframe[simdata.PROJECT_KEY_COUMN].nunique()
+
     issues_in_range = get_valid_reports(project_key, enhanced_dataframe, exclude_priority=None)
     issues_in_range = issues_in_range.sort_values(by=simdata.CREATED_DATE_COLUMN, ascending=True)
 
     analytics.run_project_analysis(project_key, issues_in_range)
 
     keys_in_range = issues_in_range[simdata.ISSUE_KEY_COLUMN].unique()
-    print "Number of issue keys after starting point filtering: ", len(keys_in_range)
+    print "Number of issue keys after valid filtering: ", len(keys_in_range)
 
     simulation_results = []
 
@@ -888,7 +895,7 @@ def main():
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-    max_iterations = 200
+    max_iterations = 1000
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
     parallel = True
     test_sizes = [.2]

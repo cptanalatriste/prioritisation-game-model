@@ -7,9 +7,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import datetime
 import pytz
+import config
 
-GIT_HOME = "D:\git"
-ALL_ISSUES_CSV = GIT_HOME + "\github-data-miner\UNFILTERED\Release_Counter_UNFILTERED.csv"
+GIT_HOME = config.git_home
+ALL_ISSUES_CSV = config.all_issues_csv
 
 PROJECT_KEY_COUMN = "Project Key"
 PRIORITY_CHANGER_COLUMN = "Priority Changer"
