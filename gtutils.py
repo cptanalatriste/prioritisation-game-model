@@ -87,13 +87,13 @@ def calculate_equilibrium(strategies_catalog, gambit_file):
             break
 
     start_index = 3
-    last_index = -2
 
     equilibrium_list = []
     for index, nash_equilibrium in enumerate(nash_equilibrium_strings):
         print "Equilibrium ", str(index + 1), " of ", len(nash_equilibrium_strings)
 
-        nash_equilibrium = nash_equilibrium[start_index:last_index].split(",")
+        nash_equilibrium = nash_equilibrium.strip()
+        nash_equilibrium = nash_equilibrium[start_index:].split(",")
 
         team_index = 0
         strategy_index = 0
