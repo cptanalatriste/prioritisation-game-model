@@ -25,11 +25,16 @@ from sklearn.metrics import mean_squared_error
 from sklearn.metrics import median_absolute_error
 from sklearn.metrics import r2_score
 
-import matplotlib.pyplot as plt
-
 import progressbar
 import simdata
 import simmodel
+import config
+
+import matplotlib
+
+if not config.is_windows:
+    matplotlib.use("TkAgg")
+from matplotlib import pyplot as plt
 
 MINIMUM_OBSERVATIONS = 3
 
@@ -446,7 +451,7 @@ def launch_simulation_parallel(team_capacity, reporters_config,
                                inflation_factor=None,
                                catcher_generator=None,
                                quota_system=False,
-                               parallel_blocks=4,
+                               parallel_blocks=config.parallel_blocks,
                                show_progress=True):
     """
     Parallelized version of the simulation launch, to maximize CPU utilization.

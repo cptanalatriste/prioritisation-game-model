@@ -6,13 +6,14 @@ import subprocess
 from string import Template
 from collections import defaultdict
 import fractions
+import config
 
-GAMBIT_FOLDER = "C:\Program Files (x86)\Gambit\\"
+GAMBIT_FOLDER = config.gambit_folder
 
-ENUMERATE_EQUILIBRIA_SOLVER = "gambit-enummixed.exe"
+ENUMERATE_EQUILIBRIA_SOLVER = config.enumerate_equilibria_solver
 NO_BANNER_OPTION = "-q"
 
-QUANTAL_RESPONSE_SOLVER = "gambit-logit.exe"
+QUANTAL_RESPONSE_SOLVER = config.quantal_response_solver
 ONLY_NASH_OPTION = "-e"
 
 

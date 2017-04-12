@@ -17,7 +17,10 @@ import simvalid
 import simutils
 import siminput
 
-import winsound
+import config
+
+if config.is_windows:
+    import winsound
 
 DEBUG = False
 
@@ -895,9 +898,9 @@ def main():
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-    max_iterations = 1000
+    max_iterations = config.replications_per_profile
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
-    parallel = True
+    parallel = config.parallel
     test_sizes = [.2]
     per_project = False
     consolidated = True
@@ -953,6 +956,7 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        winsound.Beep(2500, 1000)
+        if config.is_windows:
+            winsound.Beep(2500, 1000)
 
     print "Execution time in seconds: ", (time.time() - start_time)

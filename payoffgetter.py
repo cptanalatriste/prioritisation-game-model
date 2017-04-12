@@ -5,8 +5,8 @@ gambit and calculating the equilibrium.
 
 import time
 import sys
-import winsound
-import copy
+
+import config
 import collections
 
 import pandas as pd
@@ -21,6 +21,10 @@ import simdriver
 import simutils
 import simcruncher
 import gtutils
+import config
+
+if config.is_windows:
+    import winsound
 
 DEFAULT_CONFIGURATION = {
     # General game configuration
@@ -445,8 +449,8 @@ def main():
     consolidated = True
 
     simulation_configuration = dict(DEFAULT_CONFIGURATION)
-    simulation_configuration['REPLICATIONS_PER_PROFILE'] = 200
-    simulation_configuration['EMPIRICAL_STRATEGIES'] = True
+    simulation_configuration['REPLICATIONS_PER_PROFILE'] = config.replications_per_profile
+    simulation_configuration['EMPIRICAL_STRATEGIES'] = config.use_empirical_strategies
     simulation_configuration['N_CLUSTERS'] = 5
 
     valid_projects = all_valid_projects
@@ -488,6 +492,7 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        winsound.Beep(2500, 1000)
+        if config.is_windows:
+            winsound.Beep(2500, 1000)
 
     print "Execution time in seconds: ", (time.time() - start_time)

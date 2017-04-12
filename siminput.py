@@ -5,11 +5,16 @@ import simdata
 import datetime
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy import stats
 from scipy import arange
 
-from math import ceil
+import config
+
+import matplotlib
+
+if not config.is_windows:
+    matplotlib.use("TkAgg")
+from matplotlib import pyplot as plt
 
 
 # ALL_ISSUES_CSV = "C:\Users\Carlos G. Gavidia\git\github-data-miner\UNFILTERED\Release_Counter_UNFILTERED_SPARK.csv"

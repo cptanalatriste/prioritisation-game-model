@@ -5,10 +5,15 @@ This is a module for detecting default priority overuse.
 import pandas as pd
 import numpy as np
 
-import matplotlib.pyplot as plt
-
 import simdata
 import simdriver
+import config
+
+import matplotlib
+
+if not config.is_windows:
+    matplotlib.use("TkAgg")
+from matplotlib import pyplot as plt
 
 
 def get_default_usage_data(enhanced_dataframe):

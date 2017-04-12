@@ -4,10 +4,15 @@ This module contains the data providing logic for the simulation random variate 
 import dateutil.parser
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import datetime
 import pytz
 import config
+
+import matplotlib
+
+if not config.is_windows:
+    matplotlib.use("TkAgg")
+from matplotlib import pyplot as plt
 
 GIT_HOME = config.git_home
 ALL_ISSUES_CSV = config.all_issues_csv

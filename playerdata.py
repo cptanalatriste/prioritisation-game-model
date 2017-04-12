@@ -5,7 +5,13 @@ This modules contain some data analysis do detect players actions and strategies
 import simdata
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import config
+
+import matplotlib
+
+if not config.is_windows:
+    matplotlib.use("TkAgg")
+from matplotlib import pyplot as plt
 
 SIMPLE_ORIG_PRIORITY_COLUMN = 'Simplified Original Priority'
 

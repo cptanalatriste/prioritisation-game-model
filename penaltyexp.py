@@ -5,7 +5,6 @@ penalty
 
 import pandas as pd
 
-import winsound
 import time
 from fractions import Fraction
 
@@ -16,6 +15,10 @@ import simmodel
 import payoffgetter
 import gtutils
 import simutils
+import config
+
+if config.is_windows:
+    import winsound
 
 
 def get_profile_for_plotting(equilibrium_list):
@@ -95,7 +98,7 @@ def do_penalty_experiments(input_params, game_configuration):
 
     experiment_results = []
 
-    inflation_factors = [0.01, 0.03, 0.05]
+    inflation_factors = config.inflation_factors
     for raw_inflation in inflation_factors:
         game_configuration['INFLATION_FACTOR'] = raw_inflation
 
@@ -136,7 +139,7 @@ def do_gatekeeper_experiments(input_params, game_configuration):
     :return: None
     """
 
-    success_rates = [1.0, 0.9]
+    success_rates = config.success_rates
     for success_rate in success_rates:
         game_configuration['SUCCESS_RATE'] = success_rate
 
@@ -167,8 +170,8 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
     game_configuration['EMPIRICAL_STRATEGIES'] = use_empirical
 
     # TODO(cgavidia): Only for testing
-    do_gatekeeper = True
-    do_throttling = False
+    do_gatekeeper = config.do_gatekeeper
+    do_throttling = config.do_throttling
 
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
                                                           game_configuration)
@@ -208,18 +211,19 @@ def main():
     per_project = False
     consolidated = True
 
-    replications_per_profile = 200
+    replications_per_profile = config.replications_per_profile
 
     if per_project:
         print "Running per-project analysis ..."
         for project in valid_projects:
             analyse_project([project], enhanced_dataframe, valid_projects,
                             replications_per_profile=replications_per_profile,
-                            use_empirical=True, use_heuristic=True)
+                            use_empirical=config.use_empirical_strategies,
+                            use_heuristic=config.use_heuristic_strategies)
 
     if consolidated:
         analyse_project(None, enhanced_dataframe, valid_projects, replications_per_profile=replications_per_profile,
-                        use_empirical=True, use_heuristic=True)
+                        use_empirical=config.use_empirical_strategies, use_heuristic=config.use_heuristic_strategies)
 
 
 if __name__ == "__main__":
@@ -227,6 +231,7 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        winsound.Beep(2500, 1000)
+        if config.is_windows:
+            winsound.Beep(2500, 1000)
 
     print "Execution time in seconds: ", (time.time() - start_time)
