@@ -108,13 +108,15 @@ def get_team_metrics(file_prefix, game_period, teams, overall_dataframes, number
 
     consolidated_result = []
 
-    print "Dataframes under analysis: ", len(overall_dataframes)
+    print "Dataframes under analysis: ", len(
+        overall_dataframes), ". Number of runs: ", len(runs), " Number of teams: ", teams
     for run in runs:
 
         team_results = {}
         for team in range(teams):
 
             for index, overall_dataframe in enumerate(overall_dataframes):
+
                 period_reports = overall_dataframe[overall_dataframe['period'] == game_period]
                 reports_in_run = period_reports[period_reports['run'] == run]
 
@@ -132,6 +134,7 @@ def get_team_metrics(file_prefix, game_period, teams, overall_dataframes, number
 
         for team_index in range(number_of_teams):
             team_prefix = "team_" + str(team_index + 1) + "_"
+
             simulation_result[team_prefix + "results"] = team_results[team_index]['team_resolved']
             simulation_result[team_prefix + "reports"] = team_results[team_index]['team_reported']
             simulation_result[team_prefix + "score"] = team_results[team_index]['team_score']

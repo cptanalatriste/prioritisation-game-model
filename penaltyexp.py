@@ -50,7 +50,7 @@ def get_profile_for_plotting(equilibrium_list):
     return profile
 
 
-def simulate_and_obtain_equilibria(input_params, game_configuration, prefix=""):
+def simulate_and_obtain_equilibria(input_params, game_configuration, prefix="", file_name=None):
     """
     Given a game configuration, it computes the heuristic payoff matrix and calculates the symmetric Nash Equilibrium
     :param input_params: Simulation parameters.
@@ -76,7 +76,8 @@ def simulate_and_obtain_equilibria(input_params, game_configuration, prefix=""):
     symmetric_equilibrium = [profile for profile in equilibrium_list if gtutils.is_symmetric_equilibrium(profile)]
     print "Symmetric Equilibria: ", len(symmetric_equilibrium)
 
-    file_name = "csv/" + prefix + "_equilibrium_results.csv"
+    if file_name is None:
+        file_name = "csv/" + prefix + "_equilibrium_results.csv"
     pd.DataFrame(
         [gtutils.get_equilibrium_as_dict(identifier=prefix, profile=profile) for profile in equilibrium_list]).to_csv(
         file_name)

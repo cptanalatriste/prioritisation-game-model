@@ -6,9 +6,7 @@ gambit and calculating the equilibrium.
 import time
 import sys
 
-import config
-import collections
-
+from recordtype import recordtype
 import pandas as pd
 
 import itertools
@@ -54,29 +52,41 @@ DEFAULT_CONFIGURATION = {
     'GATEKEEPER_CONFIG': None,
     'SUCCESS_RATE': 1.0,
     # Team Configuration
+    'PLAYER_CRITERIA': '3RD_PARTY_CORRECTIONS',
     'NUMBER_OF_TEAMS': 2,
+    'TWINS_REDUCTION': True,
     'AGGREGATE_AGENT_TEAM': -1,
-    'SYMMETRIC': True  # If all the players have the same strategic vision, i.e  there are no advantages per player.
+    'ENABLE_RECYCLING': True,  # Remembers previous simulation execution. Currently working for symmetric with twins.
+    'SYMMETRIC': True,  # If all the players have the same strategic vision, i.e  there are no advantages per player.
+    'ALL_EQUILIBRIA': True  # Instructs gambit to find all equilibria. Only supported for 2 player games.
 }
 
 
-def select_reporters_for_simulation(reporter_configuration):
+def select_reporters_for_simulation(reporter_configuration, game_configuration):
     """
     The production of these reporters will be considered for simulation extraction parameters
     :param reporter_configuration: All valid reporters.
     :return: A filtered list of reporters.
     """
 
-    reporters_with_corrections = [config for config in reporter_configuration if
-                                  config['with_modified_priority'] > 0]
+    selection_criteria = game_configuration['PLAYER_CRITERIA']
 
-    corrections_size = len(reporters_with_corrections)
-    print "Original Reporters: ", len(
-        reporter_configuration), " Reporters with corrected priorities: ", corrections_size
+    if selection_criteria == '3RD_PARTY_CORRECTIONS':
+        reporters_with_corrections = [config for config in reporter_configuration if
+                                      config['with_modified_priority'] > 0]
 
-    if corrections_size == 0:
-        print "In the current dataset there is NO THIRD PARTY CORRECTIONS. Using the unfiltered reporters for simulation"
-        return reporter_configuration
+        corrections_size = len(reporters_with_corrections)
+        print "Original Reporters: ", len(
+            reporter_configuration), " Reporters with corrected priorities: ", corrections_size
+
+        if corrections_size == 0:
+            print "In the current dataset there is NO THIRD PARTY CORRECTIONS. Using the unfiltered reporters for simulation"
+            return reporter_configuration
+
+    elif selection_criteria == 'TOP_FROM_TEAMS':
+        print "PLAYER SELECTION CRITERIA: Top ", game_configuration["NUMBER_OF_TEAMS"], " most productive testers."
+        sorted_by_productivity = sorted(reporter_configuration, key=lambda reporter: reporter['reports'], reverse=True)
+        return sorted_by_productivity[: game_configuration["NUMBER_OF_TEAMS"]]
 
     return reporters_with_corrections
 
@@ -254,7 +264,7 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
         strategies_catalog.extend(get_heuristic_strategies())
 
     # This are the reporters whose reported bugs will be used to configure the simulation.
-    reporter_configuration = select_reporters_for_simulation(valid_reporters)
+    reporter_configuration = select_reporters_for_simulation(valid_reporters, game_configuration)
 
     # This is the configuration of the actual game players.
     player_configuration = reporter_configuration
@@ -298,17 +308,27 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     print "Project ", project_keys, " Test Period: ", "ALL", " Reporters: ", test_team_size, " Developers:", dev_team_size, \
         " Resolved in Period: ", issues_resolved,
 
-    input_params = collections.namedtuple('SimulationParams',
-                                          ['strategy_maps', 'strategies_catalog',
-                                           'player_configuration', 'dev_team_size',
-                                           'resolution_time_gen', 'teams', 'ignored_gen',
-                                           'reporter_gen', 'target_fixes', 'batch_size_gen',
-                                           'interarrival_time_gen', 'priority_generator', 'review_time_gen',
-                                           'catcher_generator'])
+    input_params = recordtype('SimulationParams',
+                              ['strategy_maps', 'strategies_catalog',
+                               'player_configuration', 'dev_team_size',
+                               'resolution_time_gen', 'teams', 'ignored_gen',
+                               'reporter_gen', 'target_fixes', 'batch_size_gen',
+                               'interarrival_time_gen', 'priority_generator', 'review_time_gen',
+                               'catcher_generator'])
 
     return input_params(strategy_maps, strategies_catalog, player_configuration, dev_team_size,
                         resolution_time_gen, teams, ignored_gen, reporter_gen, target_fixes, batch_size_gen,
                         interarrival_time_gen, priority_generator, review_time_gen, catcher_generator)
+
+
+def assign_teams(player_configuration):
+    """
+    Regular team assignment without aggregation.
+    :param player_configuration: List of player configurations.
+    :return: None.
+    """
+    for team, player in enumerate(player_configuration):
+        player['team'] = team
 
 
 def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_team_size, resolution_time_gen, teams,
@@ -344,6 +364,11 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
     print "Simulating ", len(strategy_maps), " strategy profiles..."
 
     simulation_history = []
+
+    if not game_configuration['TWINS_REDUCTION'] and game_configuration["NUMBER_OF_TEAMS"] == len(player_configuration):
+        print "PLAYER AGGREGATION: Agents are not agregated. No player reduction is applied."
+        assign_teams(player_configuration)
+
     for index, map_info in enumerate(strategy_maps):
         print "Simulating profile ", (index + 1), " of ", len(strategy_maps)
 
@@ -353,13 +378,25 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
 
         for team, strategy in strategy_map.iteritems():
             print "Getting payoff for team ", team, " on profile ", file_prefix
-            simtwins.aggregate_players(team, player_configuration, game_configuration["AGGREGATE_AGENT_TEAM"])
-            twins_strategy_map = simtwins.get_twins_strategy_map(team, strategy_map,
-                                                                 game_configuration["AGGREGATE_AGENT_TEAM"])
 
-            configure_strategies_per_team(player_configuration, twins_strategy_map)
-            overall_dataframe = simtwins.check_simulation_history(simulation_history, player_configuration,
-                                                                  game_configuration["AGGREGATE_AGENT_TEAM"])
+            if game_configuration['TWINS_REDUCTION']:
+                print "PLAYER AGGREGATION: Applying Twin Player Reduction aggregation... "
+
+                simtwins.aggregate_players(team, player_configuration, game_configuration["AGGREGATE_AGENT_TEAM"])
+                strategy_map = simtwins.get_twins_strategy_map(team, strategy_map,
+                                                               game_configuration["AGGREGATE_AGENT_TEAM"])
+
+            configure_strategies_per_team(player_configuration, strategy_map)
+
+            overall_dataframe = None
+            if game_configuration['SYMMETRIC'] and game_configuration['ENABLE_RECYCLING']:
+
+                aggregate_team = None
+                if game_configuration['TWINS_REDUCTION']:
+                    aggregate_team = game_configuration["AGGREGATE_AGENT_TEAM"]
+
+                overall_dataframe = simtwins.check_simulation_history(simulation_history, player_configuration,
+                                                                      aggregate_team)
 
             if overall_dataframe is None:
 
@@ -391,7 +428,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                 simulation_history.append(overall_dataframe)
 
             else:
-                print "Profile ", twins_strategy_map, " has being already executed. Recycling dataframe."
+                print "Profile ", strategy_map, " has being already executed. Recycling dataframe."
 
             overall_dataframe.to_csv("csv/agent_team_" + str(team) + "_" + file_prefix + '_simulation_results.csv',
                                      index=False)
@@ -409,7 +446,8 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
     print "NFG File created at ", gambit_file
 
     print "Executing Gambit for equilibrium calculation..."
-    equilibrium_list = gtutils.calculate_equilibrium(strategies_catalog, gambit_file)
+    equilibrium_list = gtutils.calculate_equilibrium(strategies_catalog=strategies_catalog, gambit_file=gambit_file,
+                                                     all_equilibria=game_configuration['ALL_EQUILIBRIA'])
 
     print "Equilibria found: ", len(equilibrium_list), equilibrium_list
     return equilibrium_list

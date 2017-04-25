@@ -46,8 +46,8 @@ def get_twins_strategy_map(agent_team, strategy_map, aggregate_agent_team):
 
 def check_simulation_history(overall_dataframes, player_configuration, aggregate_agent_team):
     """
-    Recycles a previous execution result in case it is consistent with the profile to execute. Specially usefull
-    while simulating simetric games.
+    Recycles a previous execution result in case it is consistent with the profile to execute. Specially useful
+    while simulating symmetric games.
 
     :param overall_dataframes: Data from previous simulations.
     :param twins_strategy_map: Strategy map to execute

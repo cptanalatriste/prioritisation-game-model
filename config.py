@@ -5,8 +5,8 @@ gambit_folder = "C:\Program Files (x86)\Gambit\\"
 enumerate_equilibria_solver = "gambit-enummixed.exe"
 quantal_response_solver = "gambit-logit.exe"
 
-replications_per_profile = 1000
-use_empirical_strategies = True
+replications_per_profile = 4
+use_empirical_strategies = False
 use_heuristic_strategies = True
 
 parallel = True

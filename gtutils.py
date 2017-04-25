@@ -10,7 +10,7 @@ import config
 
 GAMBIT_FOLDER = config.gambit_folder
 
-ENUMERATE_EQUILIBRIA_SOLVER = config.enumerate_equilibria_solver
+ENUMERATE_EQUILIBRIA_SOLVER = config.enumerate_equilibria_solver  # It only works with two players.
 NO_BANNER_OPTION = "-q"
 
 QUANTAL_RESPONSE_SOLVER = config.quantal_response_solver
@@ -65,7 +65,7 @@ def get_strategic_game_format(game_desc, reporter_configuration, strategies_cata
     return file_name
 
 
-def calculate_equilibrium(strategies_catalog, gambit_file):
+def calculate_equilibrium(strategies_catalog, gambit_file, all_equilibria=True, debug=True):
     """
     Executes Gambit for equilibrium calculation.
     :param strategies_catalog: Catalog of available strategies.
@@ -73,10 +73,17 @@ def calculate_equilibrium(strategies_catalog, gambit_file):
     :return: List of equilibrium profiles.
     """
 
-    process = GAMBIT_FOLDER + ENUMERATE_EQUILIBRIA_SOLVER
+    if all_equilibria:
+        process = GAMBIT_FOLDER + ENUMERATE_EQUILIBRIA_SOLVER
+        command_line = [process, NO_BANNER_OPTION, gambit_file]
+    else:
+        print "NOTE: Only one equilibrium will be found."
+        process = GAMBIT_FOLDER + QUANTAL_RESPONSE_SOLVER
+        command_line = [process, ONLY_NASH_OPTION, gambit_file]
+
     print "Calculating equilibrium for: ", gambit_file, " using ", process
 
-    solver_process = subprocess.Popen([process, NO_BANNER_OPTION, gambit_file], stdout=subprocess.PIPE)
+    solver_process = subprocess.Popen(command_line, stdout=subprocess.PIPE)
 
     nash_equilibrium_strings = []
     while True:
@@ -86,10 +93,16 @@ def calculate_equilibrium(strategies_catalog, gambit_file):
         else:
             break
 
+    if debug:
+        print "len(nash_equilibrium_strings): ", len(nash_equilibrium_strings)
+
     start_index = 3
 
     equilibrium_list = []
     for index, nash_equilibrium in enumerate(nash_equilibrium_strings):
+        if debug:
+            print "nash_equilibrium: ", nash_equilibrium
+
         print "Equilibrium ", str(index + 1), " of ", len(nash_equilibrium_strings)
 
         nash_equilibrium = nash_equilibrium.strip()
