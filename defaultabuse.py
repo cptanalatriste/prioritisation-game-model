@@ -7,11 +7,11 @@ import numpy as np
 
 import simdata
 import simdriver
-import config
+import gtconfig
 
 import matplotlib
 
-if not config.is_windows:
+if not gtconfig.is_windows:
     matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 

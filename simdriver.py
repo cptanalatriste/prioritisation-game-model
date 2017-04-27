@@ -17,9 +17,9 @@ import simvalid
 import simutils
 import siminput
 
-import config
+import gtconfig
 
-if config.is_windows:
+if gtconfig.is_windows:
     import winsound
 
 DEBUG = False
@@ -47,7 +47,8 @@ def get_reporter_groups(bug_dataset):
     return tester_groups
 
 
-def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_filter=True, batching=True, debug=False):
+def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_filter=True,
+                               debug=False):
     """
     Returns the reporting information required for the simulation to run.
 
@@ -63,6 +64,13 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
     if tester_groups is None or len(tester_groups) == 0:
         tester_groups = get_reporter_groups(training_dataset)
 
+    batching = gtconfig.report_stream_batching
+
+    if batching:
+        print "Report stream: The bug report arrival will be batched using a window."
+    else:
+        print "Report Stream: No batching is made for the bug arrival."
+
     for index, reporter_list in enumerate(tester_groups):
 
         bug_reports = simdata.filter_by_reporter(training_dataset, reporter_list)
@@ -74,20 +82,22 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
 
             batch_sizes_sample = [batch["batch_count"] for batch in batches]
             sample_as_observations = pd.Series(data=batch_sizes_sample)
+
+            batch_size_gen = simutils.DiscreteEmpiricalDistribution(name="batch_dist",
+                                                                    observations=sample_as_observations,
+                                                                    inverse_cdf=True)
         else:
             report_dates = bug_reports[simdata.CREATED_DATE_COLUMN]
             arrival_times = report_dates.sort_values().values
             sample_as_observations = 1
+
+            batch_size_gen = simutils.ConstantGenerator(name="batch_dist", value=sample_as_observations)
 
         inter_arrival_sample = simdata.get_interarrival_times(arrival_times, period_start)
 
         try:
 
             inter_arrival_time_gen = simutils.ContinuousEmpiricalDistribution(observations=inter_arrival_sample)
-            batch_size_gen = simutils.DiscreteEmpiricalDistribution(name="batch_dist",
-                                                                    observations=sample_as_observations,
-                                                                    inverse_cdf=True)
-
             reporter_name = "Consolidated Testers (" + str(len(reporter_list)) + ")"
             if len(reporter_list) == 1:
                 reporter_name = reporter_list[0]
@@ -617,7 +627,8 @@ def get_report_stream_params(training_issues, reporters_config, symmetric=False)
     fit_reporter_distributions(global_reporter_config)
 
     batch_size_gen = global_reporter_config[0]['batch_size_gen']
-    print "Current batch size information: \n", global_reporter_config[0]['batch_size_sample'].describe()
+    if gtconfig.report_stream_batching:
+        print "Current batch size information: \n", global_reporter_config[0]['batch_size_sample'].describe()
 
     interarrival_time_gen = global_reporter_config[0]['interarrival_time_gen']
 
@@ -898,9 +909,9 @@ def main():
     print "Adding calculated fields..."
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-    max_iterations = config.replications_per_profile
+    max_iterations = gtconfig.replications_per_profile
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
-    parallel = config.parallel
+    parallel = gtconfig.parallel
     test_sizes = [.2]
     per_project = False
     consolidated = True
@@ -956,7 +967,7 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        if config.is_windows:
+        if gtconfig.is_windows:
             winsound.Beep(2500, 1000)
 
     print "Execution time in seconds: ", (time.time() - start_time)

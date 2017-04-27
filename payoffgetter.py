@@ -19,9 +19,9 @@ import simdriver
 import simutils
 import simcruncher
 import gtutils
-import config
+import gtconfig
 
-if config.is_windows:
+if gtconfig.is_windows:
     import winsound
 
 DEFAULT_CONFIGURATION = {
@@ -430,6 +430,10 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
             'catcher_generator': catcher_generator
         }
 
+        if not gtconfig.parallel:
+            print "PARALLEL EXECUTION: Has been disabled."
+            simfunction = simutils.launch_simulation
+
         if game_configuration['TWINS_REDUCTION']:
             overall_dataframes += simtwins.get_simulation_results(file_prefix, strategy_map, player_configuration,
                                                                   game_configuration, simfunction,
@@ -492,8 +496,8 @@ def main():
     consolidated = True
 
     simulation_configuration = dict(DEFAULT_CONFIGURATION)
-    simulation_configuration['REPLICATIONS_PER_PROFILE'] = config.replications_per_profile
-    simulation_configuration['EMPIRICAL_STRATEGIES'] = config.use_empirical_strategies
+    simulation_configuration['REPLICATIONS_PER_PROFILE'] = gtconfig.replications_per_profile
+    simulation_configuration['EMPIRICAL_STRATEGIES'] = gtconfig.use_empirical_strategies
     simulation_configuration['N_CLUSTERS'] = 5
 
     valid_projects = all_valid_projects
@@ -535,7 +539,7 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        if config.is_windows:
+        if gtconfig.is_windows:
             winsound.Beep(2500, 1000)
 
     print "Execution time in seconds: ", (time.time() - start_time)

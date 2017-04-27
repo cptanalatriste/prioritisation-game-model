@@ -6,9 +6,10 @@ enumerate_equilibria_solver = "gambit-enummixed.exe"
 quantal_response_solver = "gambit-logit.exe"
 
 replications_per_profile = 30
-use_empirical_strategies = False
-use_heuristic_strategies = True
+report_stream_batching = True
+simple_reporting_model = False
 
+#Only for testing
 parallel = True
 parallel_blocks = 4
 
@@ -19,3 +20,7 @@ do_throttling = False
 inflation_factors = [0.01, 0.03, 0.05]
 
 is_windows = True
+
+# This parameters are only used in the experiments module (penaltyexp)
+use_empirical_strategies = False
+use_heuristic_strategies = True

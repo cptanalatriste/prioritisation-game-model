@@ -6,16 +6,16 @@ import pandas as pd
 import numpy as np
 import datetime
 import pytz
-import config
+import gtconfig
 
 import matplotlib
 
-if not config.is_windows:
+if not gtconfig.is_windows:
     matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 
-GIT_HOME = config.git_home
-ALL_ISSUES_CSV = config.all_issues_csv
+GIT_HOME = gtconfig.git_home
+ALL_ISSUES_CSV = gtconfig.all_issues_csv
 
 PROJECT_KEY_COUMN = "Project Key"
 PRIORITY_CHANGER_COLUMN = "Priority Changer"
@@ -456,6 +456,7 @@ def get_report_batches(bug_reports, window_size=1):
     :param window_size: Size of the window that represents a batch. In DAYS
     :return: List containing batch start and batch count.
     """
+
 
     report_dates = bug_reports[CREATED_DATE_COLUMN]
     report_dates = report_dates.sort_values()

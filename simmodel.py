@@ -7,6 +7,7 @@ from SimPy.SimPlot import *
 
 import simdata
 import simutils
+import gtconfig
 
 SIMPLE_INFLATE_STRATEGY = 'SIMPLEINFLATE'
 HONEST_STRATEGY = 'HONEST'
@@ -374,7 +375,12 @@ class BugReportSource(Process):
 
                 if gatekeeper_resource is None and inflation_penalty is None:
                     # The Vanilla Bug Reporting Process
-                    bug_report = VanillaBugReport(basic_report=report_information)
+
+                    if not gtconfig.simple_reporting_model:
+                        bug_report = VanillaBugReport(basic_report=report_information)
+                    else:
+                        bug_report = SimpleBugReport(basic_report=report_information)
+
                     activate(bug_report,
                              bug_report.arrive(developer_resource=developer_resource,
                                                resolution_monitors=resolution_monitors,
@@ -516,6 +522,34 @@ class GatekeeperBugReport(Process):
         yield release, self, developer_resource
 
         self.basic_report.update_monitors(resolution_monitors, now(), debug=debug)
+
+
+class SimpleBugReport(Process):
+    """
+    A report for the simple bug reporting process. It has the following characteristics
+    - The priority is the reported priority.
+    - It doesn't take the ignore probability into account.
+    
+    """
+
+    def __init__(self, basic_report):
+        Process.__init__(self, basic_report.name)
+        self.basic_report = basic_report
+
+    def arrive(self, developer_resource, resolution_monitors, testing_context, debug=True):
+        if debug:
+            self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context)
+
+        yield request, self, developer_resource, self.basic_report.report_priority
+
+        if debug:
+            self.basic_report.notify_developer_start(time=now())
+
+        # Finally, here we're using our development time budget.
+        yield hold, self, abs(self.basic_report.fix_effort)
+        yield release, self, developer_resource
+
+        self.basic_report.update_monitors(resolution_monitors, time=now(), debug=debug)
 
 
 class VanillaBugReport(Process):

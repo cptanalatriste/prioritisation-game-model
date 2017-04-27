@@ -28,11 +28,11 @@ from sklearn.metrics import r2_score
 import progressbar
 import simdata
 import simmodel
-import config
+import gtconfig
 
 import matplotlib
 
-if not config.is_windows:
+if not gtconfig.is_windows:
     matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 
@@ -451,7 +451,7 @@ def launch_simulation_parallel(team_capacity, reporters_config,
                                inflation_factor=None,
                                catcher_generator=None,
                                quota_system=False,
-                               parallel_blocks=config.parallel_blocks,
+                               parallel_blocks=gtconfig.parallel_blocks,
                                show_progress=True):
     """
     Parallelized version of the simulation launch, to maximize CPU utilization.

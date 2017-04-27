@@ -6,14 +6,14 @@ import subprocess
 from string import Template
 from collections import defaultdict
 import fractions
-import config
+import gtconfig
 
-GAMBIT_FOLDER = config.gambit_folder
+GAMBIT_FOLDER = gtconfig.gambit_folder
 
-ENUMERATE_EQUILIBRIA_SOLVER = config.enumerate_equilibria_solver  # It only works with two players.
+ENUMERATE_EQUILIBRIA_SOLVER = gtconfig.enumerate_equilibria_solver  # It only works with two players.
 NO_BANNER_OPTION = "-q"
 
-QUANTAL_RESPONSE_SOLVER = config.quantal_response_solver
+QUANTAL_RESPONSE_SOLVER = gtconfig.quantal_response_solver
 ONLY_NASH_OPTION = "-e"
 
 

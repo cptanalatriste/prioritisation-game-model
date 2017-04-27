@@ -12,10 +12,10 @@ import pandas as pd
 import simdata
 import simdriver
 import payoffgetter
-import config
+import gtconfig
 import penaltyexp
 
-if config.is_windows:
+if gtconfig.is_windows:
     import winsound
 
 TWINS_REDUCTION = False
@@ -26,9 +26,13 @@ def get_base_configuration():
     Produce the configuration parameters that are common to all experiment executions.
     :return: 
     """
+
+    gtconfig.report_stream_batching = False
+    gtconfig.simple_reporting_model = True
+
     game_configuration = dict(payoffgetter.DEFAULT_CONFIGURATION)
     game_configuration['PROJECT_FILTER'] = None
-    game_configuration['REPLICATIONS_PER_PROFILE'] = config.replications_per_profile
+    game_configuration['REPLICATIONS_PER_PROFILE'] = gtconfig.replications_per_profile
     game_configuration['HEURISTIC_STRATEGIES'] = True
     game_configuration['EMPIRICAL_STRATEGIES'] = False
     game_configuration['THROTTLING_ENABLED'] = False
@@ -42,7 +46,7 @@ def get_base_configuration():
     return game_configuration
 
 
-def main(parameter_list):
+def main(parameter_list, game_configuration):
     testers, developers, target_bugs, file_name = parameter_list
     print "testers: ", testers, "developers: ", developers, "target_bugs: ", target_bugs, " file_name: ", file_name
 
@@ -53,12 +57,9 @@ def main(parameter_list):
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
     all_valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
 
-    game_configuration = get_base_configuration()
-
     if not TWINS_REDUCTION:
         game_configuration["NUMBER_OF_TEAMS"] = int(testers)
 
-    # TODO: Disable batching
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe=enhanced_dataframe,
                                                           all_project_keys=all_valid_projects,
                                                           game_configuration=game_configuration)
@@ -72,12 +73,13 @@ def main(parameter_list):
 if __name__ == "__main__":
     start_time = time.time()
     try:
+        game_configuration = get_base_configuration()
         # TODO: Remove later. Only for testing
         # main(sys.argv[1:])
-        main(['3', '3', '10', 'demo_equilibrium.csv'])
+        main(['3', '100', '100', 'demo_equilibrium.csv'], game_configuration)
 
     finally:
-        if config.is_windows:
+        if gtconfig.is_windows:
             winsound.Beep(2500, 1000)
 
     print "Execution time in seconds: ", (time.time() - start_time)

@@ -5,11 +5,11 @@ This modules contain some data analysis do detect players actions and strategies
 import simdata
 import pandas as pd
 import numpy as np
-import config
+import gtconfig
 
 import matplotlib
 
-if not config.is_windows:
+if not gtconfig.is_windows:
     matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 
