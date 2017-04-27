@@ -562,6 +562,8 @@ class VanillaBugReport(Process):
         self.basic_report = basic_report
 
     def arrive(self, developer_resource, resolution_monitors, testing_context, debug=False):
+
+
         if debug:
             self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context)
 
