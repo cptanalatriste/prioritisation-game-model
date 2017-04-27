@@ -188,16 +188,6 @@ def get_strategy_map(strategy_list, teams):
     return strategy_maps
 
 
-def configure_strategies_per_team(player_configuration, strategy_map):
-    """
-    Assigns the strategies corresponding to teams according to an specific strategy profile.
-    :return: Player index whose payoff value is of interest.
-    """
-
-    for config in player_configuration:
-        config['strategy'] = strategy_map[config['team']]
-
-
 def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuration):
     """
     Given a strategy profile list, calculates payoffs per player thorugh simulation.
@@ -331,6 +321,57 @@ def assign_teams(player_configuration):
         player['team'] = team
 
 
+def configure_strategies_per_team(player_configuration, strategy_map):
+    """
+    Assigns the strategies corresponding to teams according to an specific strategy profile.
+    :return: Player index whose payoff value is of interest.
+    """
+
+    for config in player_configuration:
+        config['strategy'] = strategy_map[config['team']]
+
+
+def get_simulation_results(file_prefix, strategy_map, player_configuration, game_configuration, simfunction, simparams,
+                           simulation_history):
+    """
+    For a given strategy profile, it returns the results of its simulation execution.
+    :return: 
+    """
+    configure_strategies_per_team(player_configuration, strategy_map)
+
+    simulation_output = simfunction(
+        team_capacity=simparams['dev_team_size'],
+        ignored_gen=simparams['ignored_gen'],
+        reporter_gen=simparams['reporter_gen'],
+        target_fixes=simparams['target_fixes'],
+        batch_size_gen=simparams['batch_size_gen'],
+        interarrival_time_gen=simparams['interarrival_time_gen'],
+        priority_generator=simparams['priority_generator'],
+        reporters_config=player_configuration,
+        resolution_time_gen=simparams['resolution_time_gen'],
+        max_time=simparams['simulation_time'],
+        catcher_generator=simparams['catcher_generator'],
+        max_iterations=game_configuration["REPLICATIONS_PER_PROFILE"],
+        inflation_factor=game_configuration["INFLATION_FACTOR"],
+        quota_system=game_configuration["THROTTLING_ENABLED"],
+        gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
+
+    simulation_result = simcruncher.consolidate_payoff_results("ALL", player_configuration,
+                                                               simulation_output["completed_per_reporter"],
+                                                               simulation_output["bugs_per_reporter"],
+                                                               simulation_output["reports_per_reporter"],
+                                                               simulation_output["resolved_per_reporter"],
+                                                               game_configuration["SCORE_MAP"],
+                                                               game_configuration["PRIORITY_SCORING"])
+    overall_dataframe = pd.DataFrame(simulation_result)
+    simulation_history.append(overall_dataframe)
+
+    overall_dataframe.to_csv("csv/all_teams_" + file_prefix + '_simulation_results.csv',
+                             index=False)
+
+    return overall_dataframe
+
+
 def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_team_size, resolution_time_gen, teams,
                    game_configuration, ignored_gen=None, reporter_gen=None, target_fixes=None, batch_size_gen=None,
                    interarrival_time_gen=None, catcher_generator=None, priority_generator=None,
@@ -376,63 +417,27 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
 
         overall_dataframes = []
 
-        for team, strategy in strategy_map.iteritems():
-            print "Getting payoff for team ", team, " on profile ", file_prefix
+        simparams = {
+            'dev_team_size': dev_team_size,
+            'ignored_gen': ignored_gen,
+            'reporter_gen': reporter_gen,
+            'target_fixes': target_fixes,
+            'batch_size_gen': batch_size_gen,
+            'interarrival_time_gen': interarrival_time_gen,
+            'priority_generator': priority_generator,
+            'resolution_time_gen': resolution_time_gen,
+            'simulation_time': simulation_time,
+            'catcher_generator': catcher_generator
+        }
 
-            if game_configuration['TWINS_REDUCTION']:
-                print "PLAYER AGGREGATION: Applying Twin Player Reduction aggregation... "
-
-                simtwins.aggregate_players(team, player_configuration, game_configuration["AGGREGATE_AGENT_TEAM"])
-                strategy_map = simtwins.get_twins_strategy_map(team, strategy_map,
-                                                               game_configuration["AGGREGATE_AGENT_TEAM"])
-
-            configure_strategies_per_team(player_configuration, strategy_map)
-
-            overall_dataframe = None
-            if game_configuration['SYMMETRIC'] and game_configuration['ENABLE_RECYCLING']:
-
-                aggregate_team = None
-                if game_configuration['TWINS_REDUCTION']:
-                    aggregate_team = game_configuration["AGGREGATE_AGENT_TEAM"]
-
-                overall_dataframe = simtwins.check_simulation_history(simulation_history, player_configuration,
-                                                                      aggregate_team)
-
-            if overall_dataframe is None:
-
-                simulation_output = simfunction(
-                    team_capacity=dev_team_size,
-                    ignored_gen=ignored_gen,
-                    reporter_gen=reporter_gen,
-                    target_fixes=target_fixes,
-                    batch_size_gen=batch_size_gen,
-                    interarrival_time_gen=interarrival_time_gen,
-                    priority_generator=priority_generator,
-                    reporters_config=player_configuration,
-                    resolution_time_gen=resolution_time_gen,
-                    max_time=simulation_time,
-                    catcher_generator=catcher_generator,
-                    max_iterations=game_configuration["REPLICATIONS_PER_PROFILE"],
-                    inflation_factor=game_configuration["INFLATION_FACTOR"],
-                    quota_system=game_configuration["THROTTLING_ENABLED"],
-                    gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
-
-                simulation_result = simcruncher.consolidate_payoff_results("ALL", player_configuration,
-                                                                           simulation_output["completed_per_reporter"],
-                                                                           simulation_output["bugs_per_reporter"],
-                                                                           simulation_output["reports_per_reporter"],
-                                                                           simulation_output["resolved_per_reporter"],
-                                                                           game_configuration["SCORE_MAP"],
-                                                                           game_configuration["PRIORITY_SCORING"])
-                overall_dataframe = pd.DataFrame(simulation_result)
-                simulation_history.append(overall_dataframe)
-
-            else:
-                print "Profile ", strategy_map, " has being already executed. Recycling dataframe."
-
-            overall_dataframe.to_csv("csv/agent_team_" + str(team) + "_" + file_prefix + '_simulation_results.csv',
-                                     index=False)
-            overall_dataframes.append(overall_dataframe)
+        if game_configuration['TWINS_REDUCTION']:
+            overall_dataframes += simtwins.get_simulation_results(file_prefix, strategy_map, player_configuration,
+                                                                  game_configuration, simfunction,
+                                                                  simparams, simulation_history)
+        else:
+            overall_dataframes.append(get_simulation_results(file_prefix, strategy_map, player_configuration,
+                                                             game_configuration, simfunction,
+                                                             simparams, simulation_history))
 
         payoffs = simcruncher.get_team_metrics(str(index) + "-" + file_prefix, "ALL", teams, overall_dataframes,
                                                game_configuration["NUMBER_OF_TEAMS"])
