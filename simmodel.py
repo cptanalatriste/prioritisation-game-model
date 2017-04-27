@@ -563,6 +563,7 @@ class VanillaBugReport(Process):
 
     def arrive(self, developer_resource, resolution_monitors, testing_context, debug=False):
 
+        print "Is this remote?"
 
         if debug:
             self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context)
