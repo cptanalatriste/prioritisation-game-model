@@ -2,7 +2,7 @@
 This collection of Python scripts make use of a simulation model of bug reporting for obtaining the Nash-Equilibrium of its empirical game-theoretic Model.
 
 ## Pre-requisites
-The code was built and tested using the [https://www.continuum.io/DOWNLOADS](Anaconda distribution for Python 2.7). For equilibrium calculation, it relies on the [http://www.gambit-project.org/](Gambit Software version 15).
+The code was built and tested using the [Anaconda distribution for Python 2.7](https://www.continuum.io/DOWNLOADS). For equilibrium calculation, it relies on the [Gambit Software version 15](http://www.gambit-project.org/).
 
 Besides the libraries available in Anaconda, we also need the following:
 - *Simpy* version 2.3.1, for the simulation model implementation.
