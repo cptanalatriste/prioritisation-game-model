@@ -74,9 +74,7 @@ if __name__ == "__main__":
     start_time = time.time()
     try:
         game_configuration = get_base_configuration()
-        # TODO: Remove later. Only for testing
-        # main(sys.argv[1:])
-        main(['3', '100', '100', 'demo_equilibrium.csv'], game_configuration)
+        main(sys.argv[1:])
 
     finally:
         if gtconfig.is_windows:
