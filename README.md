@@ -23,14 +23,14 @@ The file `gtconfig.py` exposes the configurations parameters. Edit following acc
 The search-based mechanism design experiments are based on games with the following characteristics:
 
 - *Simulation model:* Bug reports arrive individually to a priority queue based on the priority contained in the report.
-- *Strategy Catalog:* Contains only the always-honest and always-dishonest strategies.
-- *Game Reduction:* No game reduction is performed, nor any symmetry assumption is made.
+- *Strategy catalog:* Contains only the always-honest and always-dishonest strategies.
+- *Game reduction:* No game reduction is performed, nor any symmetry assumption is made.
 - *Player selection:* From the bug tracking system data, we pick the most productive bug reporters as players.
 - *Equilibrium algorithm:* Quantal response equilibrium, since is the one recommended by Gambit for games with more than 2 players.
 
 To execute this scenario, you can do the following: 
 
-`getequilibrium.py testers developers target_bugs  file_name`
+`python getequilibrium.py testers developers target_bugs  file_name`
 
 Where:
 
