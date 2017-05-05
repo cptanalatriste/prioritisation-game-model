@@ -18,6 +18,7 @@ The file `gtconfig.py` exposes the configurations parameters. Edit following acc
 - `replications_per_profile`, is the number of replications to execute per strategy profile. 
 - `parallel`, to enable the parallel execution of simulation replications.
 - `parallel_blocks`, the number of parallel blocks to divide simulation execution. It can be set to the number of cores available on your system.
+- `is_windows`, should be `False` if you are not using a Windows operating system.
 
 ## Execution
 The search-based mechanism design experiments are based on games with the following characteristics:
