@@ -74,7 +74,7 @@ if __name__ == "__main__":
     start_time = time.time()
     try:
         game_configuration = get_base_configuration()
-        main(sys.argv[1:])
+        main(sys.argv[1:], game_configuration)
 
     finally:
         if gtconfig.is_windows:
