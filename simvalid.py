@@ -13,6 +13,39 @@ from statsmodels.stats import power
 PLOT = None
 
 
+def get_data_priority_value(metrics_on_test, data_item, target_priority):
+    """
+    Collect a priority metric from the dataset.
+    :param metrics_on_test: Metrics on dataset
+    :param data_item: Metric name
+    :param target_priority: Priority
+    :return: List of values from dataset.
+    """
+    results_per_priority = [data['results_per_priority'] for data in metrics_on_test]
+
+    metric_values = []
+    for priority_list in results_per_priority:
+        metric_values.append(
+            [data[data_item] for data in priority_list if data['priority'] == target_priority][0])
+
+    return metric_values
+
+
+def get_simulation_priority_value(simulation_result, data_item, target_priority):
+    """
+    Collect a priority metric from the simulation.
+    :param simulation_result: Metrics on simulation
+    :param data_item: Metric name
+    :param target_priority: Priority
+    :return: List of values from simulation.
+    """
+
+    resolved_samples = [data[data_item] for data in simulation_result['results_per_priority'] if
+                        data['priority'] == target_priority][0]
+
+    return resolved_samples
+
+
 def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, prefix=""):
     """
     Validate the results applying hypothesis testing, according to Discrete-Event Simulation by Jerry Banks.
@@ -41,22 +74,21 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
     resolved_in_data = {}
 
     for target_priority in simdata.SUPPORTED_PRIORITIES:
-        results_per_priority = [data['results_per_priority'] for data in metrics_on_test]
-
-        resolved_bugs = []
-        for priority_list in results_per_priority:
-            resolved_bugs.append(
-                [data['true_resolved'] for data in priority_list if data['priority'] == target_priority][0])
-
+        resolved_bugs = get_data_priority_value(metrics_on_test, 'true_resolved', target_priority)
         resolved_in_data['Priority_' + str(target_priority)] = resolved_bugs
-
-        resolved_samples = [data['resolved_samples'] for data in simulation_result['results_per_priority'] if
-                            data['priority'] == target_priority][0]
-
+        resolved_samples = get_simulation_priority_value(simulation_result, 'resolved_samples', target_priority)
         desc = prefix + "_" + "RESOLVED_BUGS_FROM_PRIORITY_" + str(target_priority)
-
         print "Response variable: ", desc
+
         result = statistical_validation(resolved_bugs, resolved_samples, desc=desc, difference=difference)
+        validation_results.append(result)
+
+        time_ratios = get_data_priority_value(metrics_on_test, 'true_time_ratio', target_priority)
+        time_ratio_samples = get_simulation_priority_value(simulation_result, 'time_ratio_samples', target_priority)
+        desc = prefix + "_" + "TIME_RATIO_FROM_PRIORITY_" + str(target_priority)
+        print "Response variable: ", desc
+        ratio_difference = 0.2
+        result = statistical_validation(time_ratios, time_ratio_samples, desc=desc, difference=ratio_difference)
         validation_results.append(result)
 
     file_name = "csv/" + prefix + "_resolved_in_population.csv"
@@ -66,7 +98,7 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
     return validation_results
 
 
-def statistical_validation(population_data, sample_data, alpha=0.05, difference=1.0, desc="", plot=True):
+def statistical_validation(population_data, sample_data, alpha=0.05, difference=1.0, desc="", plot=False):
     """
     Triggers the statistical validation procedures: t-test and confidence interval.
     :param population_data: Data points gathered from the system.

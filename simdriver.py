@@ -205,19 +205,26 @@ def get_reporting_metrics(reported_dataset, resolved_dataset, reporters_config):
     last_report = reported_dataset[simdata.CREATED_DATE_COLUMN].max()
 
     reporting_time = ((last_report - first_report).total_seconds()) / simdata.TIME_FACTOR
+    total_time_spent = resolved_dataset[simdata.RESOLUTION_TIME_COLUMN].sum()
 
     resolution_metrics = {"results_per_priority": [],
                           "results_per_reporter": [],
                           'true_resolved': len(resolved_dataset.index),
-                          'reporting_time': reporting_time}
+                          'reporting_time': reporting_time,
+                          'true_time': total_time_spent}
 
     for priority in simdata.SUPPORTED_PRIORITIES:
         resolved_per_priority = resolved_dataset[resolved_dataset[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
         reported_per_priority = reported_dataset[reported_dataset[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
 
+        time_spent_per_priority = resolved_per_priority[simdata.RESOLUTION_TIME_COLUMN].sum()
+        time_ratio_per_priority = time_spent_per_priority / float(total_time_spent) if total_time_spent > 0 else 0.0
+
         resolution_metrics['results_per_priority'].append({'priority': priority,
                                                            'true_resolved': len(resolved_per_priority.index),
-                                                           'true_reported': len(reported_per_priority.index)})
+                                                           'true_reported': len(reported_per_priority.index),
+                                                           'true_time': time_spent_per_priority,
+                                                           'true_time_ratio': time_ratio_per_priority})
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
@@ -231,8 +238,8 @@ def get_reporting_metrics(reported_dataset, resolved_dataset, reporters_config):
     return resolution_metrics
 
 
-def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, completed_per_reporter,
-                        completed_per_priority, reports_per_priority, reporting_times, project_keys,
+def consolidate_results(year_month, issues_for_period, resolved_in_month, reporters_config, simulation_metrics,
+                        project_keys,
                         debug=False):
     """
     It consolidates the results from the simulation with the information contained in the data.
@@ -242,30 +249,26 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
     :param issues_for_period: Issues reported on the same period of report.
     :param resolved_in_month: Issues resolved on the same period of report.
     :param reporters_config:   Reporter configuration.
-    :param completed_per_reporter: Simulation results per reporter.
-    :param completed_per_priority: Simulation results per priority.
     :return:
     """
 
     resolution_metrics = None
     true_resolved = None
+    total_true_time = None
     if issues_for_period is not None and resolved_in_month is not None:
         resolution_metrics = get_reporting_metrics(issues_for_period, resolved_in_month, reporters_config)
         true_resolved = resolution_metrics['true_resolved']
+        total_true_time = resolution_metrics['true_time']
 
     simulation_result = {"period": year_month,
                          "results_per_reporter": [],
                          "results_per_priority": [],
-                         "true_resolved": true_resolved}
-    results = []
-    for report in completed_per_reporter:
-        total_resolved = 0
-        for reporter_config in reporters_config:
-            total_resolved += report[reporter_config['name']]
-        results.append(total_resolved)
+                         "true_resolved": true_resolved,
+                         "true_time": total_true_time}
 
+    results = simulation_metrics.get_total_resolved(reporters_config)
     simulation_result["resolved_samples"] = results
-    simulation_result["reporting_times_samples"] = reporting_times
+    simulation_result["reporting_times_samples"] = simulation_metrics.reporting_times
     simulation_result["predicted_resolved"] = np.mean(results)
 
     # TODO: This reporter/priority logic can be refactored.
@@ -276,28 +279,41 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
 
         true_resolved = None
         true_reported = None
+        true_time = None
         if resolution_metrics is not None:
             true_results = [result for result in resolution_metrics['results_per_priority'] if
                             result['priority'] == priority][0]
 
             true_resolved = true_results['true_resolved']
             true_reported = true_results['true_reported']
+            true_time = true_results['true_time']
 
-        resolved_on_simulation = [report[priority] for report in completed_per_priority]
+        resolved_on_simulation = simulation_metrics.get_completed_per_priority(priority)
         predicted_resolved = np.mean(resolved_on_simulation)
 
-        reported_on_simulation = [report[priority] for report in reports_per_priority]
+        reported_on_simulation = simulation_metrics.get_reported_per_priority(priority)
         predicted_reported = np.mean(reported_on_simulation)
 
+        time_on_simulation = simulation_metrics.get_time_per_priority(priority)
+        time_ratio_on_simulation = simulation_metrics.get_time_ratio_per_priority(priority)
+
+        true_time_ratio = true_time / float(
+            total_true_time) if total_true_time is not None and total_true_time > 0 else 0.0
         simulation_result['results_per_priority'].append({'priority': priority,
                                                           'true_resolved': true_resolved,
                                                           'true_reported': true_reported,
+                                                          'true_time': true_time,
+                                                          'true_time_ratio': true_time_ratio,
                                                           'predicted_resolved': predicted_resolved,
                                                           'resolved_samples': resolved_on_simulation,
-                                                          'predicted_reported': predicted_reported})
+                                                          'predicted_reported': predicted_reported,
+                                                          'time_samples': time_on_simulation,
+                                                          'time_ratio_samples': time_ratio_on_simulation})
 
         simulation_details["Resolved_Pri_" + str(priority)] = resolved_on_simulation
         simulation_details["Reported_Pri_" + str(priority)] = reported_on_simulation
+        simulation_details["Time_Pri_" + str(priority)] = time_on_simulation
+        simulation_details["Time_Ratio_Pri_" + str(priority)] = time_ratio_on_simulation
 
     details_dataframe = pd.DataFrame(data=simulation_details)
     filename = "csv/" + "_".join(project_keys) + "_sim_details.csv"
@@ -317,7 +333,7 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
             true_resolved = true_results['true_resolved']
             true_reported = true_results['true_reported']
 
-        resolved_on_simulation = [report[reporter_name] for report in completed_per_reporter]
+        resolved_on_simulation = simulation_metrics.get_completed_per_reporter(reporter_name)
         predicted_resolved = np.mean(resolved_on_simulation)
 
         sample_median, sample_std, sample_size = predicted_resolved, np.std(resolved_on_simulation), len(
@@ -712,10 +728,7 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
 
     simulation_result = consolidate_results("SIMULATION", None, None,
                                             reporters_config,
-                                            simulation_output["completed_per_reporter"],
-                                            simulation_output["completed_per_priority"],
-                                            simulation_output["reported_per_priotity"],
-                                            simulation_output["reporting_times"],
+                                            simulation_output,
                                             project_key)
 
     print "Project ", project_key, " - Assessing simulation on TRAINING DATASET: "
@@ -875,7 +888,8 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
                  'accept_simulation_validation': False}]
 
     training_results, validation_results = simulation_output
-    performance_meassures = ['RESOLVED_BUGS_FROM_PRIORITY_1', 'RESOLVED_BUGS_FROM_PRIORITY_3']
+    performance_meassures = ['RESOLVED_BUGS_FROM_PRIORITY_1', 'RESOLVED_BUGS_FROM_PRIORITY_3',
+                             'TIME_RATIO_FROM_PRIORITY_1', 'TIME_RATIO_FROM_PRIORITY_3']
 
     results = []
     for meassure in performance_meassures:

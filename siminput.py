@@ -155,8 +155,9 @@ def launch_input_analysis(data_series, desc="default", show_data_plot=True, save
     xmin = None
     xmax = None
 
-    plt.clf()
-    plot_empirical_data(data_series)
+    if show_data_plot or save_plot:
+        plt.clf()
+        plot_empirical_data(data_series)
 
     p_values = []
 

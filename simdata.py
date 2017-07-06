@@ -213,7 +213,7 @@ def include_batch_information(bug_reports, target_fixes=20, only_with_commits=Tr
     :return: Dataframe with a batch column
     """
 
-    print "Starting batch assignment for ", len(bug_reports.index), " bug reports ..."
+    print "Starting batch assignment for ", len(bug_reports.index), " bug reports. Target fixes ", target_fixes
     with_refreshed_index = bug_reports.sort_values(by=[CREATED_DATE_COLUMN], ascending=[1])
     with_refreshed_index = with_refreshed_index.reset_index()
 
@@ -240,9 +240,12 @@ def include_batch_information(bug_reports, target_fixes=20, only_with_commits=Tr
             (with_refreshed_index[CREATED_DATE_COLUMN] <= current_creation_date) &
             (with_refreshed_index[RESOLUTION_DATE_COLUMN] <= current_creation_date)]
 
-        current_fixes = filter_resolved(previous_reports, only_with_commits, only_valid_resolution)
+        fixes_so_far = 0
+        if not previous_reports.empty:
+            current_fixes = filter_resolved(previous_reports, only_with_commits, only_valid_resolution)
+            fixes_so_far = len(current_fixes.index)
 
-        if len(current_fixes.index) >= target_fixes:
+        if fixes_so_far >= target_fixes:
             current_batch += 1
             report_counter = 0
             current_batch_start = None
@@ -376,9 +379,9 @@ def filter_resolved(bug_reports, only_with_commits=True, only_valid_resolution=T
     :return: Only resolved issues.
     """
 
-    resolved_issues = bug_reports[
-        bug_reports.apply(lambda report: resolved_definition(report, only_with_commits, only_valid_resolution), axis=1)]
 
+    resolved_mask = bug_reports.apply(lambda report: resolved_definition(report, only_with_commits, only_valid_resolution), axis=1)
+    resolved_issues = bug_reports[resolved_mask]
     return resolved_issues
 
 

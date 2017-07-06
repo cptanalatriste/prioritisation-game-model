@@ -15,6 +15,10 @@ HONEST_STRATEGY = 'HONEST'
 # DEFAULT_TIMEOUT = 2 * 30 * 24
 DEFAULT_TIMEOUT = None
 
+METRIC_BUGS_FIXED = 'completed'
+METRIC_BUGS_REPORTED = 'reported'
+METRIC_TIME_INVESTED = 'time'
+
 
 class EmpiricalInflationStrategy:
     """
@@ -92,12 +96,15 @@ class TestingContext:
         self.catcher_generator = catcher_generator
         self.timeout = timeout
 
-        self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {'completed': Monitor(),
-                                                                'reported': 0},
-                                  simdata.NORMAL_PRIORITY: {'completed': Monitor(),
-                                                            'reported': 0},
-                                  simdata.SEVERE_PRIORITY: {'completed': Monitor(),
-                                                            'reported': 0}}
+        self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {METRIC_BUGS_FIXED: Monitor(),
+                                                                METRIC_BUGS_REPORTED: 0,
+                                                                METRIC_TIME_INVESTED: 0.0},
+                                  simdata.NORMAL_PRIORITY: {METRIC_BUGS_FIXED: Monitor(),
+                                                            METRIC_BUGS_REPORTED: 0,
+                                                            METRIC_TIME_INVESTED: 0.0},
+                                  simdata.SEVERE_PRIORITY: {METRIC_BUGS_FIXED: Monitor(),
+                                                            METRIC_BUGS_REPORTED: 0,
+                                                            METRIC_TIME_INVESTED: 0.0}}
 
         self.bug_counter = 0
 
@@ -139,7 +146,7 @@ class TestingContext:
         :return: Number of fixes
         """
 
-        return sum([monitors['completed'].count() for priority, monitors in self.priority_monitors.iteritems()])
+        return sum([monitors[METRIC_BUGS_FIXED].count() for priority, monitors in self.priority_monitors.iteritems()])
 
     def stop_simulation(self):
         """
@@ -278,9 +285,18 @@ class BasicBugReport:
         """
         self.report_priority = self.real_priority
 
+    def track_effort(self, priority_monitors):
+        """
+        Keep track of the effort invested in bug fixing.
+        :param priority_monitors: The metrics per priority, on a dict.
+        :return: None
+        """
+        priority_monitors[self.real_priority][METRIC_TIME_INVESTED] += self.fix_effort
+
     def update_monitors(self, resolution_monitors, time, debug=False):
         """
         Updates the resolution counters
+        :param time: Simulation time.
         :param resolution_monitors: Resolution counters,
         :param debug: True for seeing debug messages,
         :return: None
@@ -359,7 +375,8 @@ class BugReportSource(Process):
                                                     review_time=review_time,
                                                     arrival_time=arrival_time)
 
-                reported_priority_monitor = self.testing_context.priority_monitors[report_priority]['completed']
+                reported_priority_monitor = self.testing_context.priority_monitors[report_priority][METRIC_BUGS_FIXED]
+                time_spent_monitor = self.testing_context.priority_monitors[report_priority][METRIC_TIME_INVESTED]
 
                 reporter_metrics = reporter_monitors[reporter]
                 reporter_monitor = reporter_metrics['resolved_monitor']
@@ -404,7 +421,7 @@ class BugReportSource(Process):
 
                 reporter_metrics['priority_counters'][real_priority] += 1
                 reporter_metrics['report_counters'][report_priority] += 1
-                self.testing_context.priority_monitors[report_priority]['reported'] += 1
+                self.testing_context.priority_monitors[report_priority][METRIC_BUGS_REPORTED] += 1
 
             interarrival_time = self.get_interarrival_time()
             yield hold, self, abs(interarrival_time)
@@ -472,7 +489,8 @@ class GatekeeperBugReport(Process):
         Process.__init__(self, basic_report.name)
         self.basic_report = basic_report
 
-    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, testing_context, debug=False):
+    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, time_spent_monitor, testing_context,
+               debug=False):
         if debug:
             self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context)
 
@@ -521,7 +539,8 @@ class GatekeeperBugReport(Process):
         yield hold, self, abs(self.basic_report.fix_effort)
         yield release, self, developer_resource
 
-        self.basic_report.update_monitors(resolution_monitors, now(), debug=debug)
+        self.basic_report.update_monitors(resolution_monitors, time_spent_monitor, now(), debug=debug)
+        self.basic_report.track_effort(testing_context.priority_monitors)
 
 
 class SimpleBugReport(Process):
@@ -550,6 +569,7 @@ class SimpleBugReport(Process):
         yield release, self, developer_resource
 
         self.basic_report.update_monitors(resolution_monitors, time=now(), debug=debug)
+        self.basic_report.track_effort(testing_context.priority_monitors)
 
 
 class VanillaBugReport(Process):
@@ -588,6 +608,7 @@ class VanillaBugReport(Process):
         yield release, self, developer_resource
 
         self.basic_report.update_monitors(resolution_monitors, time=now(), debug=debug)
+        self.basic_report.track_effort(testing_context.priority_monitors)
 
 
 class ThrottlingBugReport(Process):
@@ -625,6 +646,7 @@ class ThrottlingBugReport(Process):
         yield release, self, developer_resource
 
         self.basic_report.update_monitors(resolution_monitors, time=now(), debug=debug)
+        self.basic_report.track_effort(testing_context.priority_monitors)
 
         if self.basic_report.is_false_report() and inflation_penalty > 0 and testing_context.catch_inflation():
             if debug:
@@ -793,33 +815,3 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
     simulation_result = simulate(until=max_time)
     return reporter_monitors, testing_context.priority_monitors, testing_context.get_reporting_time()
 
-
-def main():
-    """
-    Initial execution point.
-    :return: None
-    """
-    max_time = 400.0
-
-    report_number = 20
-    mean_arrival_time = 10
-    mean_fix_effort = 12.0
-
-    team_capacity = 1
-
-    # random_seeds = [393939, 31555999, 777999555, 319999771]
-    random_seeds = [393939]
-    for a_seed in random_seeds:
-        wait_monitor = run_model(random_seed=a_seed, team_capacity=team_capacity, report_number=report_number,
-                                 mean_arrival_time=mean_arrival_time, mean_fix_effort=mean_fix_effort,
-                                 max_time=max_time)
-        print "Average wait for ", wait_monitor.count(), " completitions is ", wait_monitor.mean()
-
-        wait_histogram = wait_monitor.histogram(low=0.0, high=200.0, nbins=20)
-        # plt = SimPlot()
-        # plt.plotHistogram(wait_histogram, xlab="Total Bug Time (days)", title="Total Bug Time", color="red", width=2)
-        # plt.mainloop()
-
-
-if __name__ == "__main__":
-    main()
