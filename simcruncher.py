@@ -28,8 +28,7 @@ def get_payoff_score(severe_completed, non_severe_completed, normal_completed, s
     return score
 
 
-def consolidate_payoff_results(period, reporter_configuration, completed_per_reporter, bugs_per_reporter,
-                               reports_per_reporter, resolved_per_reporter, score_map, priority_based):
+def consolidate_payoff_results(period, reporter_configuration, simulation_output, score_map, priority_based):
     """
     Gather per-run metrics according to a simulation result.
     :param resolved_per_reporter: Resolved issues per priority, including a priority detail.
@@ -40,16 +39,16 @@ def consolidate_payoff_results(period, reporter_configuration, completed_per_rep
     :param reports_per_reporter: ist containing reported (sic) reports per reporter per priority per run.
     :return: Consolidated metrics in a list.
     """
-    if len(completed_per_reporter) != len(bugs_per_reporter):
+    if len(simulation_output.completed_per_reporter) != len(simulation_output.bugs_per_reporter):
         raise Exception("The output of the simulation doesn't match!")
 
     simulation_results = []
 
-    for run in range(len(completed_per_reporter)):
-        run_resolved = completed_per_reporter[run]
-        run_found = bugs_per_reporter[run]
-        run_reported = reports_per_reporter[run]
-        run_resolved_priority = resolved_per_reporter[run]
+    for run in range(len(simulation_output.completed_per_reporter)):
+        run_resolved = simulation_output.completed_per_reporter[run]
+        run_found = simulation_output.bugs_per_reporter[run]
+        run_reported = simulation_output.reports_per_reporter[run]
+        run_resolved_priority = simulation_output.resolved_per_reporter[run]
 
         for reporter_config in reporter_configuration:
             reporter_name = reporter_config['name']

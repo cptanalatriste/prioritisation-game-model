@@ -376,7 +376,6 @@ class BugReportSource(Process):
                                                     arrival_time=arrival_time)
 
                 reported_priority_monitor = self.testing_context.priority_monitors[report_priority][METRIC_BUGS_FIXED]
-                time_spent_monitor = self.testing_context.priority_monitors[report_priority][METRIC_TIME_INVESTED]
 
                 reporter_metrics = reporter_monitors[reporter]
                 reporter_monitor = reporter_metrics['resolved_monitor']

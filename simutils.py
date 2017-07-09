@@ -366,6 +366,7 @@ def get_reporter_behavior_dataframe(reporters_config):
     """
 
     reporter_records = []
+    reporter_names = []
     for config in reporters_config:
         total_nonsevere = float(config['reports_per_priority'][simdata.NON_SEVERE_PRIORITY])
         total_severe = float(config['reports_per_priority'][simdata.SEVERE_PRIORITY])
@@ -373,11 +374,12 @@ def get_reporter_behavior_dataframe(reporters_config):
         non_severe_false = config['modified_details']['priority_1_false']
         severe_false = config['modified_details']['priority_3_false']
 
+        reporter_names.append(config['name'])
         reporter_records.append(
             [non_severe_false / total_nonsevere if total_nonsevere != 0 else 0,
              severe_false / total_severe if total_severe != 0 else 0])
 
-    reporter_dataframe = pd.DataFrame(reporter_records)
+    reporter_dataframe = pd.DataFrame(data=reporter_records, index=reporter_names)
 
     reporter_dataframe.columns = REPORTER_COLUMNS
     return reporter_dataframe
@@ -663,6 +665,22 @@ def launch_simulation_wrapper(input_params):
     return simulation_results
 
 
+def print_strategy_report(reporters_config):
+    """
+    Informative information regarding the strategies adopted by the reporters
+    :param reporters_config:
+    :return:
+    """
+
+    strategies = set([reporter['strategy'].name for reporter in reporters_config])
+    print "Strategies found: ", len(strategies)
+
+    for strategy_name in strategies:
+
+        print "Strategy: ", strategy_name, " Reporters: ", len(
+            [reporter for reporter in reporters_config if reporter['strategy'].name == strategy_name])
+
+
 def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
                       batch_size_gen,
                       interarrival_time_gen,
@@ -700,10 +718,13 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
             gatekeeper_params = " Capacity " + str(gatekeeper_config['capacity']) + " Time Generator " + str(
                 gatekeeper_config['review_time_gen'])
 
+        print_strategy_report(reporters_config)
+
         print "Running ", max_iterations, " replications. Target fixes: ", target_fixes, \
             " .Throttling enabled: ", quota_system, " . Inflation penalty: ", inflation_factor, \
             " Developers in team: ", team_capacity, " Success probabilities: ", str(catcher_generator), \
-            " Gatekeeper Config: ", gatekeeper_params
+            " Gatekeeper Config: ", gatekeeper_params, " Max Reporter Probability: ", max(
+            reporter_gen.probabilities), " Min Reporter Probability ", min(reporter_gen.probabilities)
 
     progress_bar = None
     if show_progress:

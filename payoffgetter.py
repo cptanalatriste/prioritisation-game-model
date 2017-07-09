@@ -76,7 +76,7 @@ def select_reporters_for_simulation(reporter_configuration, game_configuration):
                                       config['with_modified_priority'] > 0]
 
         corrections_size = len(reporters_with_corrections)
-        print "Original Reporters: ", len(
+        print "PLAYER SELECTION CRITERIA: 3RD_PARTY_CORRECTIONS Original Reporters: ", len(
             reporter_configuration), " Reporters with corrected priorities: ", corrections_size
 
         if corrections_size == 0:
@@ -108,6 +108,26 @@ def get_heuristic_strategies():
 
     return [honest_strategy,
             simple_inflate_strategy]
+
+
+def assign_empirical_strategy(reporter_configuration, correction_dataframe, strategy_catalog):
+    """
+    Adds a strategy instance per reporter, on the reporter_configuration catalog.
+
+    :param reporter_configuration: Reporter catalog.
+    :param correction_dataframe: Contain reporter behaviour information.
+    :param strategies_per_team: Strategy catalog.
+    :return: None.
+    """
+
+    print "Assigning each reporter the corresponding Empirical Strategy ..."
+
+    for reporter in reporter_configuration:
+        reporter_name = reporter['name']
+
+        if reporter_name in correction_dataframe.index:
+            strategy_index = int(correction_dataframe.loc[reporter_name]['cluster'])
+            reporter['strategy'] = strategy_catalog[strategy_index]
 
 
 def get_empirical_strategies(reporter_configuration, n_clusters=3):
@@ -160,7 +180,7 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
              })
 
     print "Cluster distribution: \n", correction_dataframe[cluster_column].value_counts()
-    return strategies_per_team
+    return strategies_per_team, correction_dataframe
 
 
 def get_strategy_map(strategy_list, teams):
@@ -236,6 +256,8 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
 
     strategies_catalog = []
 
+    empirical_strategies = None
+    reporter_behaviour = None
     if game_configuration["EMPIRICAL_STRATEGIES"]:
         print "Empirical Strategy extraction over ", len(all_project_keys), " project datasets ..."
         all_reports = simdriver.get_valid_reports(all_project_keys, enhanced_dataframe)
@@ -244,9 +266,11 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
         print "Generating elbow-method plot..."
         simutils.elbow_method_for_reporters(all_reporters, file_prefix="_".join(all_project_keys))
 
+        strategy_params, reporter_behaviour = get_empirical_strategies(all_reporters,
+                                                                       n_clusters=game_configuration["N_CLUSTERS"])
         empirical_strategies = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config
                                 in
-                                get_empirical_strategies(all_reporters, n_clusters=game_configuration["N_CLUSTERS"])]
+                                strategy_params]
 
         strategies_catalog.extend(empirical_strategies)
 
@@ -260,6 +284,9 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     player_configuration = reporter_configuration
 
     print "Reporters selected for playing the game ", len(player_configuration)
+
+    if game_configuration["EMPIRICAL_STRATEGIES"]:
+        assign_empirical_strategy(player_configuration, reporter_behaviour, empirical_strategies)
 
     teams = game_configuration["NUMBER_OF_TEAMS"]
     strategy_maps = get_strategy_map(strategies_catalog, teams)

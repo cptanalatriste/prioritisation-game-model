@@ -621,6 +621,8 @@ def get_reporter_generator(reporters_config, symmetric=False):
     if symmetric:
         print "THIS IS A SYMMETRIC GENERATOR: All reporter's have the same probability."
         probability_values = [1.0 / len(reporters_config) for _ in reporters_config]
+    else:
+        print "THIS IS NOT A SYMMETRIC GENERATOR: Each reporter has a probability according to our dataset."
 
     reporter_gen = simutils.DiscreteEmpiricalDistribution(name="Reporter_Generator",
                                                           values=[config['name'] for config in reporters_config],
