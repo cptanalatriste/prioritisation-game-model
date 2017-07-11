@@ -9,8 +9,16 @@ import simdata
 import simutils
 import gtconfig
 
+STRATEGY_KEY = 'strategy'
 SIMPLE_INFLATE_STRATEGY = 'SIMPLEINFLATE'
+SIMPLE_INFLATE_CONFIG = {'name': SIMPLE_INFLATE_STRATEGY,
+                         simutils.NON_SEVERE_INFLATED_COLUMN: 1.0,
+                         simutils.SEVERE_DEFLATED_COLUMN: 0.0}
+
 HONEST_STRATEGY = 'HONEST'
+HONEST_CONFIG = {'name': HONEST_STRATEGY,
+                 simutils.NON_SEVERE_INFLATED_COLUMN: 0.0,
+                 simutils.SEVERE_DEFLATED_COLUMN: 0.0}
 
 # DEFAULT_TIMEOUT = 2 * 30 * 24
 DEFAULT_TIMEOUT = None
@@ -27,6 +35,7 @@ class EmpiricalInflationStrategy:
 
     def __init__(self, strategy_config):
         self.name = strategy_config['name']
+        self.strategy_config = strategy_config
 
         inflation_prob = strategy_config[simutils.NON_SEVERE_INFLATED_COLUMN]
         self.inflation_generator = simutils.DiscreteEmpiricalDistribution(name="inflation_generator",
@@ -59,12 +68,56 @@ class EmpiricalInflationStrategy:
         return str(self)
 
 
+class BugStream:
+    """
+    Generates a sequence of bug reports to be used in the simulation.
+    """
+
+    def __init__(self, priority_generator, reporter_gen, resolution_time_gen):
+        self.priority_generator = priority_generator
+        self.reporter_gen = reporter_gen
+        self.resolution_time_gen = resolution_time_gen
+
+        self.bug_counter = 0
+
+    def pop(self):
+        """
+        Removes an item from the bug catalog.
+        :return: The removed item.
+        """
+
+        priority = self.priority_generator.generate()
+        reporter = self.reporter_gen.generate()
+        index = self.bug_counter
+
+        bug_config = {'report_key': 'Priotity_' + str(priority) + "_Index_" + str(index),
+                      'real_priority': priority,
+                      'fix_effort': self.get_fix_effort(priority),
+                      'reporter': reporter}
+
+        self.bug_counter += 1
+        return bug_config
+
+    def get_fix_effort(self, report_priority):
+        """
+        Return the time required for a bug to be fixed.
+        :return: Effort required to fix a bug.
+        """
+        generator = self.resolution_time_gen[int(report_priority)]
+
+        fix_effort = 0.0
+        if generator is not None:
+            fix_effort = generator.generate().item()
+
+        return fix_effort
+
+
 class TestingContext:
     """
     This class will produce the characteristics of the discovered defects.
     """
 
-    def __init__(self, resolution_time_gen, ignore_generators, reporter_gen, default_review_time, priority_generator,
+    def __init__(self, bug_stream, ignore_generators, default_review_time,
                  quota_system,
                  review_time_gen,
                  target_fixes,
@@ -81,11 +134,9 @@ class TestingContext:
         :param devtime_level: Level containing the number of developer time hours available for bug fixing.
         :param quota_system: If true, the number of developer hours available will be distributed among testers, penalizing inflators.
         """
+        self.bug_stream = bug_stream
 
-        self.resolution_time_gen = resolution_time_gen
         self.ignore_generators = ignore_generators
-        self.reporter_gen = reporter_gen
-        self.priority_generator = priority_generator
         self.default_review_time = default_review_time
         self.review_time_gen = review_time_gen
         self.first_report_time = None
@@ -106,8 +157,6 @@ class TestingContext:
                                                             METRIC_BUGS_REPORTED: 0,
                                                             METRIC_TIME_INVESTED: 0.0}}
 
-        self.bug_counter = 0
-
         if self.quota_system:
             self.inflation_factor = inflation_factor
 
@@ -117,17 +166,7 @@ class TestingContext:
         :return: The removed item.
         """
 
-        priority = self.priority_generator.generate()[0]
-        reporter = self.reporter_gen.generate()
-        index = self.bug_counter
-
-        bug_config = {'report_key': 'Priotity_' + str(priority) + "_Index_" + str(index),
-                      'real_priority': priority,
-                      'fix_effort': self.get_fix_effort(priority),
-                      'reporter': reporter}
-
-        self.bug_counter += 1
-        return bug_config
+        return self.bug_stream.pop()
 
     def get_reporting_time(self):
         """
@@ -163,19 +202,6 @@ class TestingContext:
             return False
 
         return True
-
-    def get_fix_effort(self, report_priority):
-        """
-        Return the time required for a bug to be fixed.
-        :return: Effort required to fix a bug.
-        """
-        generator = self.resolution_time_gen[int(report_priority)]
-
-        fix_effort = 0.0
-        if generator is not None:
-            fix_effort = generator.generate().item()
-
-        return fix_effort
 
     def get_timeout(self):
         """
@@ -436,6 +462,7 @@ class BugReportSource(Process):
 
         reporter_strategy = self.get_reporter_strategy(reporter_name)
 
+        # Default behaviour is the Empirical Honest strategy.
         if reporter_strategy is None:
             return real_priority
 
@@ -706,7 +733,7 @@ def configure_strategy_map(reporters_config):
     """
 
     strategy_map = {}
-    strategy_key = 'strategy'
+    strategy_key = STRATEGY_KEY
 
     for config in reporters_config:
         strategy = None
@@ -726,6 +753,7 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
               interarrival_time_gen=None,
               batch_size_gen=None,
               views_to_discard=0,
+              bug_stream=None,
               quota_system=False, inflation_factor=None, catcher_generator=None, debug=False):
     """
     Triggers the simulation, according to the provided parameters.
@@ -773,10 +801,14 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
     initialize()
 
     timeout = DEFAULT_TIMEOUT
-    testing_context = TestingContext(resolution_time_gen=resolution_time_gen,
+
+    if bug_stream is None:
+        bug_stream = BugStream(resolution_time_gen=resolution_time_gen, reporter_gen=reporter_gen,
+                               priority_generator=priority_generator)
+
+    testing_context = TestingContext(bug_stream=bug_stream,
                                      ignore_generators=ignore_generators,
-                                     reporter_gen=reporter_gen,
-                                     priority_generator=priority_generator, default_review_time=default_review_time,
+                                     default_review_time=default_review_time,
                                      quota_system=quota_system,
                                      inflation_factor=inflation_factor,
                                      review_time_gen=review_time_gen,
@@ -813,4 +845,3 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
 
     simulation_result = simulate(until=max_time)
     return reporter_monitors, testing_context.priority_monitors, testing_context.get_reporting_time()
-

@@ -53,7 +53,11 @@ class SimulationMetrics:
     def __init__(self):
         self.completed_per_reporter = []
         self.completed_per_priority = []
+
+        # This is according to the real priority of the bug.
         self.bugs_per_reporter = []
+
+        # This is according to the priority contained in the report.
         self.reports_per_reporter = []
         self.resolved_per_reporter = []
 
@@ -158,12 +162,36 @@ class SimulationMetrics:
         :param reporters_config: List of reporters
         :return: List containing the replication values.
         """
+        return SimulationMetrics.consolidate_reporter_metrics(reporters_config, self.completed_per_reporter)
+
+    def get_total_reported(self, reporters_config):
+        """
+        Gets the total number of reports, according to the reporter information.
+        :param reporters_config: List of reporters
+        :return: List containing the replication values.
+        """
+
+        reports_list = [{reporter_name: sum(reports[reporter_name].values()) for
+                         reporter_name in reports.keys()} for
+                        reports in
+                        self.reports_per_reporter]
+
+        return SimulationMetrics.consolidate_reporter_metrics(reporters_config, reports_list)
+
+    @staticmethod
+    def consolidate_reporter_metrics(reporters_config, metrics):
+        """
+        Accumulates reporter information.
+        :param reporters_config: Reporter catalog.
+        :param metrics: Reporter metrics
+        :return:
+        """
         results = []
-        for report in self.completed_per_reporter:
-            total_resolved = 0
+        for report in metrics:
+            total = 0
             for reporter_config in reporters_config:
-                total_resolved += report[reporter_config['name']]
-            results.append(total_resolved)
+                total += report[reporter_config['name']]
+            results.append(total)
 
         return results
 
@@ -280,7 +308,11 @@ class DiscreteEmpiricalDistribution:
             # http://stackoverflow.com/questions/11373192/generating-discrete-random-variables-with-specified-weights-using-scipy-or-numpy
 
             variate_index = self.disc_distribution.rvs(size=1)
-            return self.values[variate_index]
+
+            if isinstance(self.values[variate_index], np.ndarray):
+                return self.values[variate_index][0]
+            else:
+                return self.values[variate_index]
 
         if self.inverse_cdf is not None:
             # This is the Quantile Method implementation for discrete variables, according to Discrete-Event Simulation
@@ -468,7 +500,7 @@ def assign_strategies(reporters_config, training_issues, n_clusters=3, debug=Fal
         predicted_clusters]
 
     for index, strategy in enumerate(reporter_dataframe[strategy_column].values):
-        reporters_config[index]['strategy'] = strategy
+        reporters_config[index][simmodel.STRATEGY_KEY] = strategy
 
     for strategy in [simmodel.NOT_INFLATE_STRATEGY, simmodel.INFLATE_STRATEGY]:
         reporters_per_strategy = reporter_dataframe[reporter_dataframe[strategy_column] == strategy]
@@ -672,13 +704,25 @@ def print_strategy_report(reporters_config):
     :return:
     """
 
-    strategies = set([reporter['strategy'].name for reporter in reporters_config])
+    default_strategy = simmodel.HONEST_STRATEGY
+
+    strategies = set(
+        [reporter[simmodel.STRATEGY_KEY].name if simmodel.STRATEGY_KEY in reporter else default_strategy for reporter in
+         reporters_config])
     print "Strategies found: ", len(strategies)
 
     for strategy_name in strategies:
 
-        print "Strategy: ", strategy_name, " Reporters: ", len(
-            [reporter for reporter in reporters_config if reporter['strategy'].name == strategy_name])
+        if strategy_name is not default_strategy:
+            reporters_with_strategy = [reporter for reporter in reporters_config if
+                                       simmodel.STRATEGY_KEY in reporter and reporter[
+                                           simmodel.STRATEGY_KEY].name == strategy_name]
+        else:
+            reporters_with_strategy = [reporter for reporter in reporters_config if
+                                       simmodel.STRATEGY_KEY not in reporter or reporter[
+                                           simmodel.STRATEGY_KEY].name == strategy_name]
+
+        print "Strategy: ", strategy_name, " Reporters: ", len(reporters_with_strategy)
 
 
 def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
@@ -724,7 +768,8 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
             " .Throttling enabled: ", quota_system, " . Inflation penalty: ", inflation_factor, \
             " Developers in team: ", team_capacity, " Success probabilities: ", str(catcher_generator), \
             " Gatekeeper Config: ", gatekeeper_params, " Max Reporter Probability: ", max(
-            reporter_gen.probabilities), " Min Reporter Probability ", min(reporter_gen.probabilities)
+            reporter_gen.probabilities), " Min Reporter Probability ", min(
+            reporter_gen.probabilities), " Priority distribution: ", str(priority_generator)
 
     progress_bar = None
     if show_progress:

@@ -15,13 +15,16 @@ import gtconfig
 import payoffgetter
 import simdata
 import simdriver
+import simmodel
 import simutils
 
 if gtconfig.is_windows:
     import winsound
 
 
-def compare_with_independent_sampling(first_system_replications, second_system_replications, alpha=0.05):
+def compare_with_independent_sampling(first_system_replications, second_system_replications,
+                                      first_system_desc="System 1",
+                                      second_system_desc="System 2", alpha=0.05):
     """
     Different and independent random number streams will be used to simulate the two systems. We are not assuming that
     the variances are equal.
@@ -31,14 +34,16 @@ def compare_with_independent_sampling(first_system_replications, second_system_r
     :return:
     """
 
+    print "Comparing systems performance: ", first_system_desc, " vs ", second_system_desc
+
     first_system_mean = np.mean(first_system_replications)
     first_system_variance = np.var(first_system_replications, ddof=1)
-    print "System 1: Sample mean ", first_system_mean, " Sample variance: ", first_system_variance
+    print first_system_desc, ": Sample mean ", first_system_mean, " Sample variance: ", first_system_variance
 
     second_system_mean = np.mean(second_system_replications)
     second_system_variance = np.var(second_system_replications, ddof=1)
 
-    print "System 2: Sample mean ", second_system_mean, " Sample variance: ", second_system_variance
+    print second_system_desc, ": Sample mean ", second_system_mean, " Sample variance: ", second_system_variance
 
     point_estimate = first_system_mean - second_system_mean
     print "Point estimate: ", point_estimate
@@ -57,8 +62,7 @@ def test():
     compare_with_independent_sampling(first_system_replications, second_system_replications)
 
 
-def run_scenario(simfunction, input_params, simulation_configuration, quota_system,
-                 gatekeeper_config):
+def run_scenario(simfunction, input_params, simulation_configuration):
     """
     Convenient method, to avoid copy-pasting.
     :param simfunction:
@@ -69,23 +73,86 @@ def run_scenario(simfunction, input_params, simulation_configuration, quota_syst
     :return: Samples for the variable of interest.
     """
     simulation_output = simfunction(
+        # TODO: Remove later. Only for experiment purposes.
         team_capacity=input_params.dev_team_size,
+        # team_capacity=int(input_params.dev_team_size * 0.05),
         ignored_gen=input_params.ignored_gen,
         reporter_gen=input_params.reporter_gen,
         target_fixes=input_params.target_fixes,
         batch_size_gen=input_params.batch_size_gen,
         interarrival_time_gen=input_params.interarrival_time_gen,
         priority_generator=input_params.priority_generator,
+        # TODO: Remove later. Only for experiment purposes.
+        # priority_generator=simutils.DiscreteEmpiricalDistribution(name="ProbabilityGenerator", values=[1.0, 3.0],
+        #                                                          probabilities=[0.5, 0.5]),
         reporters_config=input_params.player_configuration,
         resolution_time_gen=input_params.resolution_time_gen,
         max_time=sys.maxint,
         catcher_generator=input_params.catcher_generator,
         max_iterations=simulation_configuration["REPLICATIONS_PER_PROFILE"],
         inflation_factor=simulation_configuration["INFLATION_FACTOR"],
-        quota_system=quota_system,
-        gatekeeper_config=gatekeeper_config)
+        quota_system=simulation_configuration["THROTTLING_ENABLED"],
+        gatekeeper_config=simulation_configuration["GATEKEEPER_CONFIG"])
 
-    return simulation_output.get_time_ratio_per_priority(simdata.NON_SEVERE_PRIORITY)
+    return simulation_output
+
+
+def apply_strategy_profile(player_configuration, strategy_profile):
+    """
+    Applies a strategy profile to a list of players
+    :param player_configuration: List of players.
+    :param strategy_profile: Profile to apply
+    :return: None
+    """
+
+    for reporter in player_configuration:
+        reporter[simmodel.STRATEGY_KEY] = simmodel.EmpiricalInflationStrategy(
+            strategy_config=strategy_profile[reporter['name']])
+
+
+def evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configuration, empirical_profile,
+                                   equilibrium_profile, desc):
+    print "Simulating Empirical Profile for: ", desc
+    apply_strategy_profile(input_params.player_configuration, empirical_profile)
+    empirical_output = run_scenario(simfunction, input_params, simulation_configuration)
+
+    print "Simulating Equilibrium Profile for: ", desc
+    apply_strategy_profile(input_params.player_configuration, equilibrium_profile)
+    equilibrium_output = run_scenario(simfunction, input_params, simulation_configuration)
+
+    compare_with_independent_sampling(empirical_output.get_time_ratio_per_priority(simdata.SEVERE_PRIORITY),
+                                      equilibrium_output.get_time_ratio_per_priority(simdata.SEVERE_PRIORITY),
+                                      first_system_desc=desc + "_TIME_RATIO_EMPIRICAL",
+                                      second_system_desc=desc + "_TIME_RATIO_EQUILIBRIUM")
+
+    compare_with_independent_sampling(empirical_output.get_completed_per_priority(simdata.SEVERE_PRIORITY),
+                                      equilibrium_output.get_completed_per_priority(simdata.SEVERE_PRIORITY),
+                                      first_system_desc=desc + "_FIXED_EMPIRICAL",
+                                      second_system_desc=desc + "_FIXED_EQUILIBRIUM")
+
+    compare_with_independent_sampling(empirical_output.get_total_reported(input_params.player_configuration),
+                                      equilibrium_output.get_total_reported(input_params.player_configuration),
+                                      first_system_desc=desc + "_REPORTED_EMPIRICAL",
+                                      second_system_desc=desc + "_REPORTED_EQUILIBRIUM")
+
+
+def extract_empirical_profile(player_configuration):
+    """
+    Given a list of players, extracts its strategy configuration.
+    :param player_configuration: List of players.
+    :return: A dict with strategy configs
+    """
+
+    return {reporter['name']: reporter[simmodel.STRATEGY_KEY].strategy_config for reporter in player_configuration}
+
+
+def generate_single_strategy_profile(player_configuration, strategy_config):
+    """
+    Returns a strategy profile with a single strategy
+    :return: None
+    """
+
+    return {reporter['name']: strategy_config for reporter in player_configuration}
 
 
 def main():
@@ -113,23 +180,24 @@ def main():
         print "PARALLEL EXECUTION: Has been disabled."
         simfunction = simutils.launch_simulation
 
-    print "Simulating unsupervised prioritization ..."
+    desc = "THROTTLING"
+    simulation_configuration["THROTTLING_ENABLED"] = True
+    simulation_configuration["INFLATION_FACTOR"] = 0.03
+    equilibrium_profile = generate_single_strategy_profile(input_params.player_configuration, simmodel.HONEST_CONFIG)
 
-    gatekeeper_config = None
-    quota_system = False
+    empirical_profile = extract_empirical_profile(input_params.player_configuration)
+    evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configuration, empirical_profile,
+                                   equilibrium_profile,
+                                   desc)
 
-    print "Simulating unsupervised prioritization ..."
-    unsupervised_ratio_samples = run_scenario(simfunction, input_params, simulation_configuration, quota_system,
-                                              gatekeeper_config)
-
-    simulation_configuration['INFLATION_FACTOR'] = 0.5
-    quota_system = True
-
-    print "Simulating Throttling with an inflatio factor of ", simulation_configuration['INFLATION_FACTOR']
-    throttling_ratio_samples = run_scenario(simfunction, input_params, simulation_configuration, quota_system,
-                                            gatekeeper_config)
-
-    compare_with_independent_sampling(unsupervised_ratio_samples, throttling_ratio_samples)
+    desc = "UNSUPERVISED"
+    simulation_configuration["THROTTLING_ENABLED"] = False
+    simulation_configuration["GATEKEEPER_CONFIG"] = None
+    equilibrium_profile = generate_single_strategy_profile(input_params.player_configuration,
+                                                           simmodel.SIMPLE_INFLATE_CONFIG)
+    evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configuration, empirical_profile,
+                                   equilibrium_profile,
+                                   desc)
 
 
 if __name__ == "__main__":

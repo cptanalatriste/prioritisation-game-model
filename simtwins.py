@@ -7,6 +7,7 @@ from collections import defaultdict
 import pandas as pd
 
 import simcruncher
+import simmodel
 
 
 def aggregate_players(agent_team, reporter_configuration, aggregate_agent_team):
@@ -65,7 +66,7 @@ def get_simulation_results(file_prefix, strategy_map, player_configuration, game
                                                     game_configuration["AGGREGATE_AGENT_TEAM"])
 
         for config in player_configuration:
-            config['strategy'] = twins_strategy_map[config['team']]
+            config[simmodel.STRATEGY_KEY] = twins_strategy_map[config['team']]
 
         aggregate_team = game_configuration["AGGREGATE_AGENT_TEAM"]
         overall_dataframe = check_simulation_history(simulation_history, player_configuration,
@@ -126,7 +127,7 @@ def check_simulation_history(overall_dataframes, player_configuration, aggregate
                                              team_key: set()})
 
     for player in player_configuration:
-        strategy_name = player['strategy'].name
+        strategy_name = player[simmodel.STRATEGY_KEY].name
         strategy_counters[strategy_name][counter_key] += 1
 
         strategy_counters[strategy_name][team_key].add(player[team_key])

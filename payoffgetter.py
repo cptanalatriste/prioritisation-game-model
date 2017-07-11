@@ -97,14 +97,8 @@ def get_heuristic_strategies():
     :return:
     """
 
-    honest_strategy = simmodel.EmpiricalInflationStrategy(strategy_config={'name': simmodel.HONEST_STRATEGY,
-                                                                           simutils.NON_SEVERE_INFLATED_COLUMN: 0.0,
-                                                                           simutils.SEVERE_DEFLATED_COLUMN: 0.0})
-
-    simple_inflate_strategy = simmodel.EmpiricalInflationStrategy(
-        strategy_config={'name': simmodel.SIMPLE_INFLATE_STRATEGY,
-                         simutils.NON_SEVERE_INFLATED_COLUMN: 1.0,
-                         simutils.SEVERE_DEFLATED_COLUMN: 0.0})
+    honest_strategy = simmodel.EmpiricalInflationStrategy(strategy_config=simmodel.HONEST_CONFIG)
+    simple_inflate_strategy = simmodel.EmpiricalInflationStrategy(strategy_config=simmodel.SIMPLE_INFLATE_CONFIG)
 
     return [honest_strategy,
             simple_inflate_strategy]
@@ -127,7 +121,7 @@ def assign_empirical_strategy(reporter_configuration, correction_dataframe, stra
 
         if reporter_name in correction_dataframe.index:
             strategy_index = int(correction_dataframe.loc[reporter_name]['cluster'])
-            reporter['strategy'] = strategy_catalog[strategy_index]
+            reporter[simmodel.STRATEGY_KEY] = strategy_catalog[strategy_index]
 
 
 def get_empirical_strategies(reporter_configuration, n_clusters=3):
@@ -355,7 +349,7 @@ def configure_strategies_per_team(player_configuration, strategy_map):
     """
 
     for config in player_configuration:
-        config['strategy'] = strategy_map[config['team']]
+        config[simmodel.STRATEGY_KEY] = strategy_map[config['team']]
 
 
 def get_simulation_results(file_prefix, strategy_map, player_configuration, game_configuration, simfunction, simparams,

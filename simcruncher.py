@@ -7,6 +7,8 @@ import pandas as pd
 
 import scipy.stats as st
 
+import simmodel
+
 
 def get_payoff_score(severe_completed, non_severe_completed, normal_completed, score_map, priority_based=True):
     """
@@ -53,7 +55,7 @@ def consolidate_payoff_results(period, reporter_configuration, simulation_output
         for reporter_config in reporter_configuration:
             reporter_name = reporter_config['name']
             reporter_team = reporter_config['team']
-            reporter_strategy = reporter_config['strategy'].name
+            reporter_strategy = reporter_config[simmodel.STRATEGY_KEY].name
 
             reported_completed = run_resolved[reporter_name]
 
