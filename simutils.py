@@ -38,10 +38,47 @@ from matplotlib import pyplot as plt
 
 MINIMUM_OBSERVATIONS = 3
 
-NON_SEVERE_INFLATED_COLUMN = "Non-Severe-Inflated"
-SEVERE_DEFLATED_COLUMN = "Severe-Deflated"
+REPORTER_COLUMNS = [simmodel.NON_SEVERE_INFLATED_COLUMN, simmodel.SEVERE_DEFLATED_COLUMN]
 
-REPORTER_COLUMNS = [NON_SEVERE_INFLATED_COLUMN, SEVERE_DEFLATED_COLUMN]
+
+class EmpiricalInflationStrategy:
+    """
+    Empirical Strategy for a two-level priority hierarchy
+    """
+
+    def __init__(self, strategy_config):
+        self.name = strategy_config['name']
+        self.strategy_config = strategy_config
+
+        inflation_prob = strategy_config[simmodel.NON_SEVERE_INFLATED_COLUMN]
+        self.inflation_generator = DiscreteEmpiricalDistribution(name="inflation_generator",
+                                                                 values=[True, False],
+                                                                 probabilities=[inflation_prob,
+                                                                                (1 - inflation_prob)])
+
+        deflation_prob = strategy_config[simmodel.SEVERE_DEFLATED_COLUMN]
+        self.deflation_generator = DiscreteEmpiricalDistribution(name="deflation_generator",
+                                                                 values=[True, False],
+                                                                 probabilities=[deflation_prob,
+                                                                                (1 - deflation_prob)])
+
+    def priority_to_report(self, original_priority):
+        result = original_priority
+
+        if original_priority == simdata.NON_SEVERE_PRIORITY:
+            if self.inflation_generator.generate():
+                result = simdata.SEVERE_PRIORITY
+        elif original_priority == simdata.SEVERE_PRIORITY:
+            if self.deflation_generator.generate():
+                result = simdata.NON_SEVERE_PRIORITY
+
+        return result
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return str(self)
 
 
 class SimulationMetrics:
@@ -52,19 +89,17 @@ class SimulationMetrics:
 
     def __init__(self):
         self.completed_per_reporter = []
+        # This is according to the priority contained in the report.
+        self.reports_per_reporter = []
         self.completed_per_priority = []
+        self.reported_per_priotity = []  # TODO(cgavidia): Correct this awful typo
 
         # This is according to the real priority of the bug.
         self.bugs_per_reporter = []
-
-        # This is according to the priority contained in the report.
-        self.reports_per_reporter = []
         self.resolved_per_reporter = []
-
-        # TODO(cgavidia): Correct this awful typo
-        self.reported_per_priotity = []
-        self.reporting_times = []
         self.time_per_priority = []
+
+        self.reporting_times = []
 
     def append_results(self, simulation_metrics):
         """
@@ -112,9 +147,48 @@ class SimulationMetrics:
 
         self.reporting_times.append(reporting_time)
 
+    def get_reporter_performance(self, run, reporter_name):
+        """
+        Returns how the reporter did in an specific simulation run.
+        :param run: Run identifier
+        :param reporter_name: Reporter name.
+        :return: A dict containing all the metrics.
+        """
+
+        run_resolved = self.completed_per_reporter[run]
+        run_found = self.bugs_per_reporter[run]
+        run_reported = self.reports_per_reporter[run]
+        run_resolved_priority = self.resolved_per_reporter[run]
+
+        reported_completed = run_resolved[reporter_name]
+
+        severe_completed = run_resolved_priority[reporter_name][simdata.SEVERE_PRIORITY]
+        non_severe_completed = run_resolved_priority[reporter_name][simdata.NON_SEVERE_PRIORITY]
+        normal_completed = run_resolved_priority[reporter_name][simdata.NORMAL_PRIORITY]
+
+        severe_found = run_found[reporter_name][simdata.SEVERE_PRIORITY]
+        non_severe_found = run_found[reporter_name][simdata.NON_SEVERE_PRIORITY]
+        normal_found = run_found[reporter_name][simdata.NORMAL_PRIORITY]
+
+        severe_reported = run_reported[reporter_name][simdata.SEVERE_PRIORITY]
+        non_severe_reported = run_reported[reporter_name][simdata.NON_SEVERE_PRIORITY]
+        normal_reported = run_reported[reporter_name][simdata.NORMAL_PRIORITY]
+
+        return {'reported_completed': reported_completed,
+                'severe_completed': severe_completed,
+                'non_severe_completed': non_severe_completed,
+                'normal_completed': normal_completed,
+                'severe_found': severe_found,
+                'non_severe_found': non_severe_found,
+                'normal_found': normal_found,
+                'severe_reported': severe_reported,
+                'non_severe_reported': non_severe_reported,
+                'normal_reported': normal_reported,
+                "reported": severe_reported + non_severe_reported + normal_reported}
+
     def get_completed_per_priority(self, priority):
         """
-        Get the number of reports that were completed according to a priority
+        Get the number of reports that were completed according to the REPORTED priority
         :param priority: Priority
         :return: List containing the replication values.
         """
@@ -122,11 +196,29 @@ class SimulationMetrics:
 
     def get_reported_per_priority(self, priority):
         """
-        Get the number of reports that were reported according to a priority
+        Get the number of reports that were REPORTED (not real) according to a priority
         :param priority: Priority
         :return: List containing the replication values.
         """
         return [report[priority] for report in self.reported_per_priotity]
+
+    def get_completed_per_real_priority(self, priority):
+        """
+        Get the number of reports that were completed according to the REAL priority
+        :param priority: Priority
+        :return: List containing the replication values.
+        """
+
+        return SimulationMetrics.consolidate_per_priority(priority, self.resolved_per_reporter)
+
+    def get_reported_by_real_priority(self, priority):
+        """
+        Get the number of reports that were REPORTED according to the REAL priority
+        :param priority: Priority
+        :return: List containing the replication values.
+        """
+
+        return SimulationMetrics.consolidate_per_priority(priority, self.bugs_per_reporter)
 
     def get_time_per_priority(self, priority):
         """
@@ -147,6 +239,18 @@ class SimulationMetrics:
 
         return [priority_time / float(total_time) if total_time > 0 else 0.0 for priority_time, total_time in
                 zip(priority_times, total_times)]
+
+    def get_fixed_ratio_per_priority(self, priority):
+        """
+        Get the fixes as a ratio on bugs according to a priority
+        :param priority: Priority
+        :return: List containing the replication values.
+        """
+        fixed = self.get_completed_per_real_priority(priority)
+        reported = self.get_reported_by_real_priority(priority)
+
+        return [fixed_bugs / float(reported_bugs) if reported_bugs > 0 else 0.0 for fixed_bugs, reported_bugs in
+                zip(fixed, reported)]
 
     def get_completed_per_reporter(self, reporter_name):
         """
@@ -191,6 +295,25 @@ class SimulationMetrics:
             total = 0
             for reporter_config in reporters_config:
                 total += report[reporter_config['name']]
+            results.append(total)
+
+        return results
+
+    @staticmethod
+    def consolidate_per_priority(priority, metrics):
+        """
+        Accumulates reporter information according to a priority.
+        :param priority: Priority
+        :return: List containing the replication values.
+        """
+
+        results = []
+        for run_stats in metrics:
+            total = 0
+
+            for reporter, reporter_stats in run_stats.iteritems():
+                total += reporter_stats[priority]
+
             results.append(total)
 
         return results

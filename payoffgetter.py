@@ -97,8 +97,8 @@ def get_heuristic_strategies():
     :return:
     """
 
-    honest_strategy = simmodel.EmpiricalInflationStrategy(strategy_config=simmodel.HONEST_CONFIG)
-    simple_inflate_strategy = simmodel.EmpiricalInflationStrategy(strategy_config=simmodel.SIMPLE_INFLATE_CONFIG)
+    honest_strategy = simutils.EmpiricalInflationStrategy(strategy_config=simmodel.HONEST_CONFIG)
+    simple_inflate_strategy = simutils.EmpiricalInflationStrategy(strategy_config=simmodel.SIMPLE_INFLATE_CONFIG)
 
     return [honest_strategy,
             simple_inflate_strategy]
@@ -169,8 +169,8 @@ def get_empirical_strategies(reporter_configuration, n_clusters=3):
 
         strategies_per_team.append(
             {'name': 'EMPIRICAL' + str(index) + "_INF" + inflation_as_string + "DEF" + deflation_as_string,
-             simutils.NON_SEVERE_INFLATED_COLUMN: centroid[nonsevere_inflation_index],
-             simutils.SEVERE_DEFLATED_COLUMN: centroid[severe_deflation_index]
+             simmodel.NON_SEVERE_INFLATED_COLUMN: centroid[nonsevere_inflation_index],
+             simmodel.SEVERE_DEFLATED_COLUMN: centroid[severe_deflation_index]
              })
 
     print "Cluster distribution: \n", correction_dataframe[cluster_column].value_counts()
@@ -262,7 +262,7 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
 
         strategy_params, reporter_behaviour = get_empirical_strategies(all_reporters,
                                                                        n_clusters=game_configuration["N_CLUSTERS"])
-        empirical_strategies = [simmodel.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config
+        empirical_strategies = [simutils.EmpiricalInflationStrategy(strategy_config=strategy_config) for strategy_config
                                 in
                                 strategy_params]
 

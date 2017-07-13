@@ -47,50 +47,29 @@ def consolidate_payoff_results(period, reporter_configuration, simulation_output
     simulation_results = []
 
     for run in range(len(simulation_output.completed_per_reporter)):
-        run_resolved = simulation_output.completed_per_reporter[run]
-        run_found = simulation_output.bugs_per_reporter[run]
-        run_reported = simulation_output.reports_per_reporter[run]
-        run_resolved_priority = simulation_output.resolved_per_reporter[run]
 
         for reporter_config in reporter_configuration:
             reporter_name = reporter_config['name']
             reporter_team = reporter_config['team']
             reporter_strategy = reporter_config[simmodel.STRATEGY_KEY].name
 
-            reported_completed = run_resolved[reporter_name]
+            reporter_performance = simulation_output.get_reporter_performance(run, reporter_name)
 
-            severe_completed = run_resolved_priority[reporter_name][simdata.SEVERE_PRIORITY]
-            non_severe_completed = run_resolved_priority[reporter_name][simdata.NON_SEVERE_PRIORITY]
-            normal_completed = run_resolved_priority[reporter_name][simdata.NORMAL_PRIORITY]
+            payoff_score = get_payoff_score(severe_completed=reporter_performance['severe_completed'],
+                                            non_severe_completed=reporter_performance['non_severe_completed'],
+                                            normal_completed=reporter_performance['normal_completed'],
+                                            score_map=score_map, priority_based=priority_based)
 
-            severe_found = run_found[reporter_name][simdata.SEVERE_PRIORITY]
-            non_severe_found = run_found[reporter_name][simdata.NON_SEVERE_PRIORITY]
-            normal_found = run_found[reporter_name][simdata.NORMAL_PRIORITY]
+            consolidate_result = {"period": period,
+                                  "run": run,
+                                  "reporter_name": reporter_name,
+                                  "reporter_team": reporter_team,
+                                  "reporter_strategy": reporter_strategy,
+                                  "payoff_score": payoff_score}
 
-            severe_reported = run_reported[reporter_name][simdata.SEVERE_PRIORITY]
-            non_severe_reported = run_reported[reporter_name][simdata.NON_SEVERE_PRIORITY]
-            normal_reported = run_reported[reporter_name][simdata.NORMAL_PRIORITY]
+            consolidate_result.update(reporter_performance)
 
-            payoff_score = get_payoff_score(severe_completed, non_severe_completed, normal_completed,
-                                            score_map, priority_based)
-
-            simulation_results.append({"period": period,
-                                       "run": run,
-                                       "reporter_name": reporter_name,
-                                       "reporter_team": reporter_team,
-                                       "reporter_strategy": reporter_strategy,
-                                       "reported": severe_reported + non_severe_reported + normal_reported,
-                                       "reported_completed": reported_completed,
-                                       "severe_found": severe_found,
-                                       "non_severe_found": non_severe_found,
-                                       "normal_found": normal_found,
-                                       "severe_reported": severe_reported,
-                                       "non_severe_reported": non_severe_reported,
-                                       "normal_reported": normal_reported,
-                                       "severe_completed": severe_completed,
-                                       "non_severe_completed": non_severe_completed,
-                                       "normal_completed": normal_completed,
-                                       "payoff_score": payoff_score})
+            simulation_results.append(consolidate_result)
 
     return simulation_results
 

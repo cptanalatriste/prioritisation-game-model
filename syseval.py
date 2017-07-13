@@ -106,7 +106,7 @@ def apply_strategy_profile(player_configuration, strategy_profile):
     """
 
     for reporter in player_configuration:
-        reporter[simmodel.STRATEGY_KEY] = simmodel.EmpiricalInflationStrategy(
+        reporter[simmodel.STRATEGY_KEY] = simutils.EmpiricalInflationStrategy(
             strategy_config=strategy_profile[reporter['name']])
 
 
@@ -125,15 +125,15 @@ def evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configu
                                       first_system_desc=desc + "_TIME_RATIO_EMPIRICAL",
                                       second_system_desc=desc + "_TIME_RATIO_EQUILIBRIUM")
 
-    compare_with_independent_sampling(empirical_output.get_completed_per_priority(simdata.SEVERE_PRIORITY),
-                                      equilibrium_output.get_completed_per_priority(simdata.SEVERE_PRIORITY),
+    compare_with_independent_sampling(empirical_output.get_completed_per_real_priority(simdata.SEVERE_PRIORITY),
+                                      equilibrium_output.get_completed_per_real_priority(simdata.SEVERE_PRIORITY),
                                       first_system_desc=desc + "_FIXED_EMPIRICAL",
                                       second_system_desc=desc + "_FIXED_EQUILIBRIUM")
 
-    compare_with_independent_sampling(empirical_output.get_total_reported(input_params.player_configuration),
-                                      equilibrium_output.get_total_reported(input_params.player_configuration),
-                                      first_system_desc=desc + "_REPORTED_EMPIRICAL",
-                                      second_system_desc=desc + "_REPORTED_EQUILIBRIUM")
+    compare_with_independent_sampling(empirical_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY),
+                                      equilibrium_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY),
+                                      first_system_desc=desc + "_FIXED_RATIO_EMPIRICAL",
+                                      second_system_desc=desc + "_FIXED_RATIO_EQUILIBRIUM")
 
 
 def extract_empirical_profile(player_configuration):
@@ -180,15 +180,7 @@ def main():
         print "PARALLEL EXECUTION: Has been disabled."
         simfunction = simutils.launch_simulation
 
-    desc = "THROTTLING"
-    simulation_configuration["THROTTLING_ENABLED"] = True
-    simulation_configuration["INFLATION_FACTOR"] = 0.03
-    equilibrium_profile = generate_single_strategy_profile(input_params.player_configuration, simmodel.HONEST_CONFIG)
-
     empirical_profile = extract_empirical_profile(input_params.player_configuration)
-    evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configuration, empirical_profile,
-                                   equilibrium_profile,
-                                   desc)
 
     desc = "UNSUPERVISED"
     simulation_configuration["THROTTLING_ENABLED"] = False
@@ -198,6 +190,16 @@ def main():
     evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configuration, empirical_profile,
                                    equilibrium_profile,
                                    desc)
+
+    desc = "THROTTLING"
+    simulation_configuration["THROTTLING_ENABLED"] = True
+    simulation_configuration["INFLATION_FACTOR"] = 0.03
+    equilibrium_profile = generate_single_strategy_profile(input_params.player_configuration, simmodel.HONEST_CONFIG)
+
+    evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configuration, empirical_profile,
+                                   equilibrium_profile,
+                                   desc)
+
 
 
 if __name__ == "__main__":

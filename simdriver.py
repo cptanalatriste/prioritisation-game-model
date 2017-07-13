@@ -288,6 +288,7 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
             true_reported = true_results['true_reported']
             true_time = true_results['true_time']
 
+        # Since in validation we're only concerned with dev team output, it's indifferent to real or reported priority.
         resolved_on_simulation = simulation_metrics.get_completed_per_priority(priority)
         predicted_resolved = np.mean(resolved_on_simulation)
 

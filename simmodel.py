@@ -6,19 +6,21 @@ from SimPy.Simulation import *
 from SimPy.SimPlot import *
 
 import simdata
-import simutils
 import gtconfig
 
 STRATEGY_KEY = 'strategy'
 SIMPLE_INFLATE_STRATEGY = 'SIMPLEINFLATE'
+NON_SEVERE_INFLATED_COLUMN = "Non-Severe-Inflated"
+SEVERE_DEFLATED_COLUMN = "Severe-Deflated"
+
 SIMPLE_INFLATE_CONFIG = {'name': SIMPLE_INFLATE_STRATEGY,
-                         simutils.NON_SEVERE_INFLATED_COLUMN: 1.0,
-                         simutils.SEVERE_DEFLATED_COLUMN: 0.0}
+                         NON_SEVERE_INFLATED_COLUMN: 1.0,
+                         SEVERE_DEFLATED_COLUMN: 0.0}
 
 HONEST_STRATEGY = 'HONEST'
 HONEST_CONFIG = {'name': HONEST_STRATEGY,
-                 simutils.NON_SEVERE_INFLATED_COLUMN: 0.0,
-                 simutils.SEVERE_DEFLATED_COLUMN: 0.0}
+                 NON_SEVERE_INFLATED_COLUMN: 0.0,
+                 SEVERE_DEFLATED_COLUMN: 0.0}
 
 # DEFAULT_TIMEOUT = 2 * 30 * 24
 DEFAULT_TIMEOUT = None
@@ -26,46 +28,6 @@ DEFAULT_TIMEOUT = None
 METRIC_BUGS_FIXED = 'completed'
 METRIC_BUGS_REPORTED = 'reported'
 METRIC_TIME_INVESTED = 'time'
-
-
-class EmpiricalInflationStrategy:
-    """
-    Empirical Strategy for a two-level priority hierarchy
-    """
-
-    def __init__(self, strategy_config):
-        self.name = strategy_config['name']
-        self.strategy_config = strategy_config
-
-        inflation_prob = strategy_config[simutils.NON_SEVERE_INFLATED_COLUMN]
-        self.inflation_generator = simutils.DiscreteEmpiricalDistribution(name="inflation_generator",
-                                                                          values=[True, False],
-                                                                          probabilities=[inflation_prob,
-                                                                                         (1 - inflation_prob)])
-
-        deflation_prob = strategy_config[simutils.SEVERE_DEFLATED_COLUMN]
-        self.deflation_generator = simutils.DiscreteEmpiricalDistribution(name="deflation_generator",
-                                                                          values=[True, False],
-                                                                          probabilities=[deflation_prob,
-                                                                                         (1 - deflation_prob)])
-
-    def priority_to_report(self, original_priority):
-        result = original_priority
-
-        if original_priority == simdata.NON_SEVERE_PRIORITY:
-            if self.inflation_generator.generate():
-                result = simdata.SEVERE_PRIORITY
-        elif original_priority == simdata.SEVERE_PRIORITY:
-            if self.deflation_generator.generate():
-                result = simdata.NON_SEVERE_PRIORITY
-
-        return result
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return str(self)
 
 
 class BugStream:
@@ -466,7 +428,8 @@ class BugReportSource(Process):
         if reporter_strategy is None:
             return real_priority
 
-        if reporter_strategy is not None and isinstance(reporter_strategy, EmpiricalInflationStrategy):
+        if reporter_strategy is not None:
+            # We expect an instance of simutils.EmpiricalInflationStrategy here
             return reporter_strategy.priority_to_report(real_priority)
 
         priority_for_report = real_priority
