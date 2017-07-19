@@ -430,7 +430,7 @@ class DiscreteEmpiricalDistribution:
             # This procedure was inspired by:
             # http://stackoverflow.com/questions/11373192/generating-discrete-random-variables-with-specified-weights-using-scipy-or-numpy
 
-            variate_index = self.disc_distribution.rvs(size=1)
+            variate_index = self.disc_distribution.rvs(size=1)[0]
 
             if isinstance(self.values[variate_index], np.ndarray):
                 return self.values[variate_index][0]

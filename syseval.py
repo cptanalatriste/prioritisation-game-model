@@ -3,7 +3,6 @@ This module contains too for system comparison anc evaluation with simulation mo
 
 The approach is the one proposed by Jeremy Banks in Discrete-Event System Simulation (Chapter 12)
 """
-
 import numpy as np
 import statsmodels.stats.api as sms
 import pandas as pd
@@ -21,6 +20,8 @@ import simutils
 if gtconfig.is_windows:
     import winsound
 
+logger = gtconfig.get_logger("process_comparison", "process_comparison.txt")
+
 
 def compare_with_independent_sampling(first_system_replications, second_system_replications,
                                       first_system_desc="System 1",
@@ -34,24 +35,26 @@ def compare_with_independent_sampling(first_system_replications, second_system_r
     :return:
     """
 
-    print "Comparing systems performance: ", first_system_desc, " vs ", second_system_desc
+    logger.info("Comparing systems performance: " + first_system_desc + " vs " + second_system_desc)
 
     first_system_mean = np.mean(first_system_replications)
     first_system_variance = np.var(first_system_replications, ddof=1)
-    print first_system_desc, ": Sample mean ", first_system_mean, " Sample variance: ", first_system_variance
+    logger.info(first_system_desc + ": Sample mean " + str(first_system_mean) + " Sample variance: " + str(
+        first_system_variance))
 
     second_system_mean = np.mean(second_system_replications)
     second_system_variance = np.var(second_system_replications, ddof=1)
 
-    print second_system_desc, ": Sample mean ", second_system_mean, " Sample variance: ", second_system_variance
+    logger.info(second_system_desc + ": Sample mean " + str(second_system_mean) + " Sample variance: " + str(
+        second_system_variance))
 
     point_estimate = first_system_mean - second_system_mean
-    print "Point estimate: ", point_estimate
+    logger.info("Point estimate: " + str(point_estimate))
 
     compare_means = sms.CompareMeans(sms.DescrStatsW(data=first_system_replications),
                                      sms.DescrStatsW(data=second_system_replications))
     conf_interval = compare_means.tconfint_diff(usevar="unequal", alpha=alpha)
-    print "Confidence Interval with alpha ", alpha, " : ", conf_interval
+    logger.info("Confidence Interval with alpha " + str(alpha) + " : " + str(conf_interval))
 
 
 def test():
@@ -112,11 +115,11 @@ def apply_strategy_profile(player_configuration, strategy_profile):
 
 def evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configuration, empirical_profile,
                                    equilibrium_profile, desc):
-    print "Simulating Empirical Profile for: ", desc
+    logger.info("Simulating Empirical Profile for: " + desc)
     apply_strategy_profile(input_params.player_configuration, empirical_profile)
     empirical_output = run_scenario(simfunction, input_params, simulation_configuration)
 
-    print "Simulating Equilibrium Profile for: ", desc
+    logger.info("Simulating Equilibrium Profile for: " + desc)
     apply_strategy_profile(input_params.player_configuration, equilibrium_profile)
     equilibrium_output = run_scenario(simfunction, input_params, simulation_configuration)
 
@@ -143,7 +146,11 @@ def extract_empirical_profile(player_configuration):
     :return: A dict with strategy configs
     """
 
-    return {reporter['name']: reporter[simmodel.STRATEGY_KEY].strategy_config for reporter in player_configuration}
+    if gtconfig.use_empirical_strategies:
+        return {reporter['name']: reporter[simmodel.STRATEGY_KEY].strategy_config for reporter in player_configuration}
+    else:
+        raise Exception(
+            "Cannot extract empirical profile if the flag gtconfig.use_empirical_strategies is not active!!")
 
 
 def generate_single_strategy_profile(player_configuration, strategy_config):
@@ -156,10 +163,10 @@ def generate_single_strategy_profile(player_configuration, strategy_config):
 
 
 def main():
-    print "Loading information from ", simdata.ALL_ISSUES_CSV
+    logger.info("Loading information from " + simdata.ALL_ISSUES_CSV)
     all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
 
-    print "Adding calculated fields..."
+    logger.info("Adding calculated fields...")
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     all_valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
@@ -177,7 +184,7 @@ def main():
 
     simfunction = simutils.launch_simulation_parallel
     if not gtconfig.parallel:
-        print "PARALLEL EXECUTION: Has been disabled."
+        logger.info("PARALLEL EXECUTION: Has been disabled.")
         simfunction = simutils.launch_simulation
 
     empirical_profile = extract_empirical_profile(input_params.player_configuration)
@@ -191,7 +198,7 @@ def main():
                                    equilibrium_profile,
                                    desc)
 
-    desc = "THROTTLING"
+    desc = "THROTTLING_INF003"
     simulation_configuration["THROTTLING_ENABLED"] = True
     simulation_configuration["INFLATION_FACTOR"] = 0.03
     equilibrium_profile = generate_single_strategy_profile(input_params.player_configuration, simmodel.HONEST_CONFIG)
@@ -199,7 +206,6 @@ def main():
     evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configuration, empirical_profile,
                                    equilibrium_profile,
                                    desc)
-
 
 
 if __name__ == "__main__":
@@ -210,4 +216,4 @@ if __name__ == "__main__":
         if gtconfig.is_windows:
             winsound.Beep(2500, 1000)
 
-    print "Execution time in seconds: ", (time.time() - start_time)
+    logger.info("Execution time in seconds: " + str(time.time() - start_time))

@@ -91,6 +91,13 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
         result = statistical_validation(time_ratios, time_ratio_samples, desc=desc, difference=ratio_difference)
         validation_results.append(result)
 
+        fix_ratios = get_data_priority_value(metrics_on_test, 'true_fixed_ratio', target_priority)
+        fix_ratio_samples = get_simulation_priority_value(simulation_result, 'fixed_ratio_samples', target_priority)
+        desc = prefix + "_" + "FIX_RATIO_FROM_PRIORITY_" + str(target_priority)
+        print "Response variable: ", desc
+        result = statistical_validation(fix_ratios, fix_ratio_samples, desc=desc, difference=ratio_difference)
+        validation_results.append(result)
+
     file_name = "csv/" + prefix + "_resolved_in_population.csv"
     pd.DataFrame(resolved_in_data).to_csv(file_name)
     print "Resolution report stored in ", file_name

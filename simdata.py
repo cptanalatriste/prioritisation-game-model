@@ -379,8 +379,8 @@ def filter_resolved(bug_reports, only_with_commits=True, only_valid_resolution=T
     :return: Only resolved issues.
     """
 
-
-    resolved_mask = bug_reports.apply(lambda report: resolved_definition(report, only_with_commits, only_valid_resolution), axis=1)
+    resolved_mask = bug_reports.apply(
+        lambda report: resolved_definition(report, only_with_commits, only_valid_resolution), axis=1)
     resolved_issues = bug_reports[resolved_mask]
     return resolved_issues
 
@@ -459,7 +459,6 @@ def get_report_batches(bug_reports, window_size=1):
     :param window_size: Size of the window that represents a batch. In DAYS
     :return: List containing batch start and batch count.
     """
-
 
     report_dates = bug_reports[CREATED_DATE_COLUMN]
     report_dates = report_dates.sort_values()

@@ -9,6 +9,8 @@ from scipy import stats
 import numpy as np
 
 import pandas as pd
+from collections import defaultdict
+
 
 import analytics
 import defaultabuse
@@ -31,7 +33,6 @@ DIFFERENCE = 2
 # Also, it was found in Discrete Event Simulation by George Fishman (Chapter 100
 MINIMUM_P_VALUE = 0.05
 
-from collections import defaultdict
 
 
 def get_reporter_groups(bug_dataset):
@@ -48,7 +49,7 @@ def get_reporter_groups(bug_dataset):
 
 
 def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_filter=True,
-                               debug=False):
+                               debug=False, window_size=1):
     """
     Returns the reporting information required for the simulation to run.
 
@@ -67,9 +68,9 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
     batching = gtconfig.report_stream_batching
 
     if batching:
-        print "Report stream: The bug report arrival will be batched using a window."
+        print "REPORT STREAM: The bug report arrival will be batched using a window size of ", window_size, " days"
     else:
-        print "Report Stream: No batching is made for the bug arrival."
+        print "REPORT STREAM: No batching is made for the bug arrival."
 
     for index, reporter_list in enumerate(tester_groups):
 
@@ -77,7 +78,7 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
         reports = len(bug_reports.index)
 
         if batching:
-            batches = simdata.get_report_batches(bug_reports)
+            batches = simdata.get_report_batches(bug_reports, window_size)
             arrival_times = [batch["batch_head"] for batch in batches]
 
             batch_sizes_sample = [batch["batch_count"] for batch in batches]
@@ -167,7 +168,7 @@ def fit_reporter_distributions(reporters_config):
     """
     for config in reporters_config:
         inter_arrival_sample = config['inter_arrival_sample']
-        print "Fitting distribution according to the current sample: ", inter_arrival_sample.describe()
+        print "INTERARRIVAL TIME: Fitting distribution according to the current sample: ", inter_arrival_sample.describe()
 
         reporter_list = config['name']
 
@@ -217,14 +218,19 @@ def get_reporting_metrics(reported_dataset, resolved_dataset, reporters_config):
         resolved_per_priority = resolved_dataset[resolved_dataset[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
         reported_per_priority = reported_dataset[reported_dataset[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
 
+        true_resolved = len(resolved_per_priority.index)
+        true_reported = len(reported_per_priority.index)
+
         time_spent_per_priority = resolved_per_priority[simdata.RESOLUTION_TIME_COLUMN].sum()
         time_ratio_per_priority = time_spent_per_priority / float(total_time_spent) if total_time_spent > 0 else 0.0
+        fixed_ratio_per_priority = true_resolved / float(true_reported) if true_reported > 0 else 0.0
 
         resolution_metrics['results_per_priority'].append({'priority': priority,
-                                                           'true_resolved': len(resolved_per_priority.index),
-                                                           'true_reported': len(reported_per_priority.index),
+                                                           'true_resolved': true_resolved,
+                                                           'true_reported': true_reported,
                                                            'true_time': time_spent_per_priority,
-                                                           'true_time_ratio': time_ratio_per_priority})
+                                                           'true_time_ratio': time_ratio_per_priority,
+                                                           'true_fixed_ratio': fixed_ratio_per_priority})
 
     for reporter_config in reporters_config:
         reporter_name = reporter_config['name']
@@ -297,24 +303,32 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
 
         time_on_simulation = simulation_metrics.get_time_per_priority(priority)
         time_ratio_on_simulation = simulation_metrics.get_time_ratio_per_priority(priority)
+        fixed_ratio_on_simulation = simulation_metrics.get_fixed_ratio_per_priority(priority)
 
         true_time_ratio = true_time / float(
             total_true_time) if total_true_time is not None and total_true_time > 0 else 0.0
+
+        true_fixed_ratio = true_resolved / float(
+            true_reported) if true_reported is not None and true_reported > 0 else 0.0
+
         simulation_result['results_per_priority'].append({'priority': priority,
                                                           'true_resolved': true_resolved,
                                                           'true_reported': true_reported,
                                                           'true_time': true_time,
                                                           'true_time_ratio': true_time_ratio,
+                                                          'true_fixed_ratio': true_fixed_ratio,
                                                           'predicted_resolved': predicted_resolved,
                                                           'resolved_samples': resolved_on_simulation,
                                                           'predicted_reported': predicted_reported,
                                                           'time_samples': time_on_simulation,
-                                                          'time_ratio_samples': time_ratio_on_simulation})
+                                                          'time_ratio_samples': time_ratio_on_simulation,
+                                                          'fixed_ratio_samples': fixed_ratio_on_simulation})
 
         simulation_details["Resolved_Pri_" + str(priority)] = resolved_on_simulation
         simulation_details["Reported_Pri_" + str(priority)] = reported_on_simulation
         simulation_details["Time_Pri_" + str(priority)] = time_on_simulation
         simulation_details["Time_Ratio_Pri_" + str(priority)] = time_ratio_on_simulation
+        simulation_details["Fixed_Ratio_Pri_" + str(priority)] = fixed_ratio_on_simulation
 
     details_dataframe = pd.DataFrame(data=simulation_details)
     filename = "csv/" + "_".join(project_keys) + "_sim_details.csv"
@@ -711,7 +725,6 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
     dev_team_series, dev_bandwith_series, training_metrics = get_team_training_data(training_issues,
                                                                                     reporters_config)
 
-    print "Development Team Size sample: \n", dev_team_series.describe(),
     dev_size_generator = simutils.DiscreteEmpiricalDistribution(observations=dev_team_series, inverse_cdf=True)
 
     reporter_gen, batch_size_gen, interarrival_time_gen = get_report_stream_params(training_issues, reporters_config)
@@ -892,7 +905,8 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
 
     training_results, validation_results = simulation_output
     performance_meassures = ['RESOLVED_BUGS_FROM_PRIORITY_1', 'RESOLVED_BUGS_FROM_PRIORITY_3',
-                             'TIME_RATIO_FROM_PRIORITY_1', 'TIME_RATIO_FROM_PRIORITY_3']
+                             'TIME_RATIO_FROM_PRIORITY_1', 'TIME_RATIO_FROM_PRIORITY_3', 'FIX_RATIO_FROM_PRIORITY_1',
+                             'FIX_RATIO_FROM_PRIORITY_3']
 
     results = []
     for meassure in performance_meassures:
