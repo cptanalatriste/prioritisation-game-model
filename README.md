@@ -6,7 +6,7 @@ The code was built and tested using the [Anaconda distribution for Python 2.7](h
 
 Besides the libraries available in Anaconda, we also need the following:
 - *Simpy* version 2.3.1, for the simulation model implementation.
-- *Pathos* version 0.2.0, for the parallel execution of simulation replications.
+- *Pathos* version 0.2.0, for the parallel execution of simulation replications. If you're working on Windows, be sure to [install a C++ compiler first](https://www.microsoft.com/en-gb/download/details.aspx?id=44266).
 - *Recordtype*, for mutable named tuples support.
 
 ## Configuration
