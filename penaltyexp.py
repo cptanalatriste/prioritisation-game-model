@@ -20,6 +20,9 @@ import gtconfig
 if gtconfig.is_windows:
     import winsound
 
+DEFAULT_GATEKEEPER_CONFIG = {'review_time_gen': simutils.ConstantGenerator(name="review_time_gen", value=20.0 / 60.0),
+                             'capacity': 2}
+
 
 def get_profile_for_plotting(equilibrium_list):
     """
@@ -185,13 +188,8 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
     if do_gatekeeper:
         print "Starting gatekeeper analysis ..."
 
-        gatekeepers = 2
-        review_time_minutes = 20.0
-        review_time_gen = simutils.ConstantGenerator(name="review_time_gen", value=review_time_minutes / 60.0)
-
         game_configuration['THROTTLING_ENABLED'] = False
-        game_configuration['GATEKEEPER_CONFIG'] = {'review_time_gen': review_time_gen,
-                                                   'capacity': gatekeepers}
+        game_configuration['GATEKEEPER_CONFIG'] = DEFAULT_GATEKEEPER_CONFIG
 
         do_gatekeeper_experiments(input_params, game_configuration)
 
@@ -224,7 +222,8 @@ def main():
 
     if consolidated:
         analyse_project(None, enhanced_dataframe, valid_projects, replications_per_profile=replications_per_profile,
-                        use_empirical=gtconfig.use_empirical_strategies, use_heuristic=gtconfig.use_heuristic_strategies)
+                        use_empirical=gtconfig.use_empirical_strategies,
+                        use_heuristic=gtconfig.use_heuristic_strategies)
 
 
 if __name__ == "__main__":

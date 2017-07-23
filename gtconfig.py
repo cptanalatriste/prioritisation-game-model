@@ -1,4 +1,3 @@
-git_home = "D:\git"
 import logging
 
 git_home = "E:\OneDrive\phd2\jira_github_ds"
@@ -8,8 +7,8 @@ gambit_folder = "C:\Program Files (x86)\Gambit\\"
 enumerate_equilibria_solver = "gambit-enummixed.exe"
 quantal_response_solver = "gambit-logit.exe"
 
-replications_per_profile = 40
-report_stream_batching = False
+replications_per_profile = 200
+report_stream_batching = True
 simple_reporting_model = False
 
 parallel = True
@@ -28,7 +27,7 @@ use_empirical_strategies = True
 use_heuristic_strategies = True
 
 
-def get_logger(name="gtbugreporting", filename="gtbugreporting.log"):
+def get_logger(name="gtbugreporting", filename="gtbugreporting.log", level=logging.INFO):
     """
     Returns a logger instance, for file logging.
     :param name: Name of the module running.
@@ -48,6 +47,6 @@ def get_logger(name="gtbugreporting", filename="gtbugreporting.log"):
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
 
     return logger

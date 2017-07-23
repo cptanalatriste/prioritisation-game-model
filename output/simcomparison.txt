@@ -1,0 +1,691 @@
+C:\Users\localadmin\Anaconda2\python.exe E:/git/bug-report-simmodel/syseval.py
+C:\Users\localadmin\Anaconda2\lib\site-packages\statsmodels\compat\pandas.py:56: FutureWarning: The pandas.core.datetools module is deprecated and will be removed in a future version. Please use the pandas.tseries module instead.
+  from pandas.core import datetools
+2017-07-23 17:17:04,342 process_comparison INFO     Loading information from E:\OneDrive\phd2\jira_github_ds\apache_jira_github_ds.csv
+2017-07-23 17:17:05,311 process_comparison INFO     Adding calculated fields...
+Starting analysis for projects  ['OFBIZ']  ...
+Total issues for projects  ['OFBIZ'] :  6741
+After self-fix exclusion:  ['OFBIZ'] :  5905
+Total Reporters:  665
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  13.6131687243 overall_std  19.0243116995 overall_max 156 overall_min 3
+Original reporters:  243 Number of reporters after drive-by filtering:  93
+Starting analysis for projects  ['CASSANDRA']  ...
+Total issues for projects  ['CASSANDRA'] :  10727
+After self-fix exclusion:  ['CASSANDRA'] :  8687
+Total Reporters:  1718
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  12.9358974359 overall_std  23.5212613823 overall_max 284 overall_min 3
+Original reporters:  390 Number of reporters after drive-by filtering:  115
+Starting analysis for projects  ['CLOUDSTACK']  ...
+Total issues for projects  ['CLOUDSTACK'] :  8972
+After self-fix exclusion:  ['CLOUDSTACK'] :  6476
+Total Reporters:  655
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  14.4603960396 overall_std  18.1926139904 overall_max 123 overall_min 3
+Original reporters:  202 Number of reporters after drive-by filtering:  83
+Starting analysis for projects  ['MAHOUT']  ...
+Total issues for projects  ['MAHOUT'] :  1788
+After self-fix exclusion:  ['MAHOUT'] :  1252
+Total Reporters:  441
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  7.85333333333 overall_std  7.57133776525 overall_max 42 overall_min 3
+Original reporters:  75 Number of reporters after drive-by filtering:  18
+Starting analysis for projects  ['OPENJPA']  ...
+Total issues for projects  ['OPENJPA'] :  2616
+After self-fix exclusion:  ['OPENJPA'] :  1749
+Total Reporters:  560
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  9.78125 overall_std  11.5182853949 overall_max 68 overall_min 3
+Original reporters:  96 Number of reporters after drive-by filtering:  28
+Starting analysis for projects  ['PHOENIX']  ...
+Total issues for projects  ['PHOENIX'] :  2435
+After self-fix exclusion:  ['PHOENIX'] :  1905
+Total Reporters:  325
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  10.1060606061 overall_std  15.9925444636 overall_max 119 overall_min 3
+Original reporters:  66 Number of reporters after drive-by filtering:  18
+Starting analysis for projects  ['ISIS']  ...
+Total issues for projects  ['ISIS'] :  1269
+After self-fix exclusion:  ['ISIS'] :  519
+Total Reporters:  60
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  12.85 overall_std  22.7206403959 overall_max 107 overall_min 3
+Original reporters:  20 Number of reporters after drive-by filtering:  5
+Starting analysis for projects  ['SPARK']  ...
+Total issues for projects  ['SPARK'] :  1862
+After self-fix exclusion:  ['SPARK'] :  1423
+Total Reporters:  284
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  11.5319148936 overall_std  16.9540694466 overall_max 96 overall_min 3
+Original reporters:  47 Number of reporters after drive-by filtering:  13
+Starting analysis for projects  ['AIRAVATA']  ...
+Total issues for projects  ['AIRAVATA'] :  1823
+After self-fix exclusion:  ['AIRAVATA'] :  1167
+Total Reporters:  53
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  19.4285714286 overall_std  23.8423820889 overall_max 98 overall_min 3
+Original reporters:  28 Number of reporters after drive-by filtering:  13
+Starting analysis for projects  ['ODE']  ...
+Total issues for projects  ['ODE'] :  1038
+After self-fix exclusion:  ['ODE'] :  721
+Total Reporters:  188
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  7.71698113208 overall_std  6.59438685977 overall_max 32 overall_min 3
+Original reporters:  53 Number of reporters after drive-by filtering:  10
+Starting analysis for projects  ['SLIDER']  ...
+Total issues for projects  ['SLIDER'] :  1005
+After self-fix exclusion:  ['SLIDER'] :  462
+Total Reporters:  47
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  15.6875 overall_std  18.4415249844 overall_max 73 overall_min 3
+Original reporters:  16 Number of reporters after drive-by filtering:  7
+Starting analysis for projects  ['KYLIN']  ...
+Total issues for projects  ['KYLIN'] :  1040
+After self-fix exclusion:  ['KYLIN'] :  513
+Total Reporters:  68
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  12.375 overall_std  11.2298430532 overall_max 38 overall_min 3
+Original reporters:  16 Number of reporters after drive-by filtering:  6
+Starting analysis for projects  ['AURORA']  ...
+Total issues for projects  ['AURORA'] :  347
+After self-fix exclusion:  ['AURORA'] :  153
+Total Reporters:  25
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  8.0 overall_std  5.05355929405 overall_max 21 overall_min 3
+Original reporters:  13 Number of reporters after drive-by filtering:  4
+Starting analysis for projects  ['MESOS']  ...
+Total issues for projects  ['MESOS'] :  341
+After self-fix exclusion:  ['MESOS'] :  143
+Total Reporters:  34
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  8.16666666667 overall_std  5.24139506451 overall_max 17 overall_min 3
+Original reporters:  12 Number of reporters after drive-by filtering:  5
+Starting analysis for projects  ['HELIX']  ...
+Total issues for projects  ['HELIX'] :  616
+After self-fix exclusion:  ['HELIX'] :  387
+Total Reporters:  46
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  16.25 overall_std  18.8905840743 overall_max 58 overall_min 3
+Original reporters:  12 Number of reporters after drive-by filtering:  5
+Project catalog:  ['OFBIZ' 'CASSANDRA' 'CLOUDSTACK' 'MAHOUT' 'PHOENIX' 'ISIS' 'SPARK']
+Original projects  7 Project Filter:  None  Projects remaining after reduction:  7
+Starting analysis for projects  ['OFBIZ' 'CASSANDRA' 'CLOUDSTACK' 'MAHOUT' 'PHOENIX' 'ISIS' 'SPARK']  ...
+Total issues for projects  ['OFBIZ' 'CASSANDRA' 'CLOUDSTACK' 'MAHOUT' 'PHOENIX' 'ISIS' 'SPARK'] :  33794
+After self-fix exclusion:  ['OFBIZ' 'CASSANDRA' 'CLOUDSTACK' 'MAHOUT' 'PHOENIX' 'ISIS' 'SPARK'] :  26167
+Total Reporters:  4100
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  12.7729007634 overall_std  20.0014300629 overall_max 284 overall_min 3
+Original reporters:  1048 Number of reporters after drive-by filtering:  349
+Reporters after drive-in tester removal ... 349
+Empirical Strategy extraction over  7  project datasets ...
+Starting analysis for projects  ['OFBIZ' 'CASSANDRA' 'CLOUDSTACK' 'MAHOUT' 'PHOENIX' 'ISIS' 'SPARK']  ...
+Total issues for projects  ['OFBIZ' 'CASSANDRA' 'CLOUDSTACK' 'MAHOUT' 'PHOENIX' 'ISIS' 'SPARK'] :  33794
+After self-fix exclusion:  ['OFBIZ' 'CASSANDRA' 'CLOUDSTACK' 'MAHOUT' 'PHOENIX' 'ISIS' 'SPARK'] :  26167
+Total Reporters:  4100
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+remove_drive_in_testers->min_reports  10 overall_mean  12.7729007634 overall_std  20.0014300629 overall_max 284 overall_min 3
+Original reporters:  1048 Number of reporters after drive-by filtering:  349
+Generating elbow-method plot...
+Extracting strategies from  235  reporters with third-party corrections
+Elbow-method plot saved at  img/OFBIZ_CASSANDRA_CLOUDSTACK_MAHOUT_PHOENIX_ISIS_SPARK_elbow_for_reporters.png
+Gathering strategies from reporter behaviour ...
+Original number of reporters:  349  grouping in  5  clusters 
+Reporters with corrections:  235
+Clustering centroids ...
+  Non-Severe-Inflated :  5%   Severe-Deflated :  1%
+  Non-Severe-Inflated :  8%   Severe-Deflated :  100%
+  Non-Severe-Inflated :  4%   Severe-Deflated :  58%
+  Non-Severe-Inflated :  19%   Severe-Deflated :  2%
+  Non-Severe-Inflated :  6%   Severe-Deflated :  26%
+Cluster distribution: 
+0    109
+3     46
+4     35
+1     24
+2     21
+Name: cluster, dtype: int64
+PLAYER SELECTION CRITERIA: 3RD_PARTY_CORRECTIONS Original Reporters:  349  Reporters with corrected priorities:  235
+Reporters selected for playing the game  235
+Assigning each reporter the corresponding Empirical Strategy ...
+Issues in training after reporter filtering:  14535
+Starting simulation for project  ['OFBIZ' 'CASSANDRA' 'CLOUDSTACK' 'MAHOUT' 'PHOENIX' 'ISIS' 'SPARK']
+Simplified Priorities in Training Range: 
+  1.0    11693
+3.0     2638
+Name: Simplified Priority, dtype: int64
+Total number of ignored reports:  2406.0
+Resolution times in Training Range for  Priority_1.0 : 
+count     5229.000000
+mean      1676.770782
+std       4706.213722
+min          0.053333
+25%         27.601667
+50%        192.832778
+75%       1118.226111
+max      79296.476944
+Name: Resolution Time, dtype: float64
+Resolution time samples stored in  csv/RESOL_TIME_Priority_1.0.csv
+Fitted distribution params for  uniform :  (0.052318205949394077, 79296.427035384462)  ks_p_value:  0.0
+C:\Users\localadmin\Anaconda2\lib\site-packages\scipy\stats\_continuous_distns.py:4734: RuntimeWarning: divide by zero encountered in true_divide
+  return np.where(x < c, 2*x/c, 2*(1-x)/(1-c))
+Fitted distribution params for  triang :  (8.2160507810556857e-07, -0.015558585331982427, 79313.106532217062)  ks_p_value:  0.0
+Fitted distribution params for  norm :  (1676.7707821763242, 4705.7636891092416)  ks_p_value:  0.0
+Fitted distribution params for  gamma :  (0.0004714494260801605, 0.05333333333333333, 4.3715178030175519)  ks_p_value:  0.0
+Fitted distribution params for  lognorm :  (2.5991747690210847, 0.044865128266547295, 161.88748703323367)  ks_p_value:  1.27483077866e-05
+Fitted distribution params for  expon :  (0.053333333332190598, 1676.7173650156933)  ks_p_value:  0.0
+Fitted distribution params for  powerlaw :  (0.15194940984535432, 0.05333333333333333, 108314.11186117682)  ks_p_value:  0.0
+Using an Empirical Distribution for  Priority_1.0  Resolution Time
+Ignored probability for Priority  1.0  is  0.194560848371 . Ignored reports:  2275
+Resolution times in Training Range for  Priority_3.0 : 
+count     1392.000000
+mean       576.523716
+std       1635.044942
+min          0.025278
+25%         26.387292
+50%        125.031528
+75%        434.437639
+max      28530.304444
+Name: Resolution Time, dtype: float64
+Resolution time samples stored in  csv/RESOL_TIME_Priority_3.0.csv
+Fitted distribution params for  uniform :  (0.024719102191247219, 28530.279980810992)  ks_p_value:  0.0
+Fitted distribution params for  triang :  (0.00085331836841671602, -24.746106815224977, 28577.467307362807)  ks_p_value:  0.0
+Fitted distribution params for  norm :  (576.52371567688385, 1634.4575361198429)  ks_p_value:  0.0
+Fitted distribution params for  gamma :  (0.0008153619445306758, 0.025277777777777774, 4.3174190116860647)  ks_p_value:  0.0
+Fitted distribution params for  lognorm :  (2.1164873301133209, -0.15123675348780818, 101.83206790214523)  ks_p_value:  0.00239752597316
+Fitted distribution params for  expon :  (0.025277777767909869, 576.49823909204849)  ks_p_value:  0.0
+Fitted distribution params for  powerlaw :  (0.182769944384919, 0.025277777777777774, 52165.418814012897)  ks_p_value:  0.0
+Using an Empirical Distribution for  Priority_3.0  Resolution Time
+Ignored probability for Priority  3.0  is  0.0341167551175 . Ignored reports:  90
+MOST RELEVANT PRIORITY:  3.0
+Training Priority Map :  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+No resolution in batch information found. Considering all resolved
+Obtaining priority change distribution ...
+Priority changes per project:  
+CASSANDRA     450
+CLOUDSTACK    423
+OFBIZ         123
+SPARK          50
+MAHOUT         23
+PHOENIX         8
+ISIS            1
+Name: Project Key, dtype: int64
+Priority change times in Training Range : 
+count     1078.000000
+mean      1460.620284
+std       3430.563246
+min          0.005556
+25%         13.560764
+50%        186.641111
+75%       1243.864306
+max      40382.269722
+Name: Priority Change Time, dtype: float64
+Priority change samples stored in  csv/PRIORITY_CHANGE.csv
+Fitted distribution params for  uniform :  (0.0053266415816195962, 40382.264479315636)  ks_p_value:  0.0
+Fitted distribution params for  triang :  (4.7489987069756933e-07, -0.24034407272337543, 40410.770396901265)  ks_p_value:  0.0
+Fitted distribution params for  norm :  (1460.6202837043909, 3428.9717067559018)  ks_p_value:  0.0
+Fitted distribution params for  gamma :  (0.0009178784124860527, 0.0055555555555555549, 4.3288632478244313)  ks_p_value:  0.0
+Fitted distribution params for  lognorm :  (3.1390576490697617, 0.0047652155351928047, 108.25337399678492)  ks_p_value:  1.13668429735e-06
+Fitted distribution params for  expon :  (0.0055555555550811531, 1460.6146320870253)  ks_p_value:  0.0
+Fitted distribution params for  powerlaw :  (0.39645476018999409, 0.0055552261649986206, 40877.224406093868)  ks_p_value:  0.0
+Using an Empirical Distribution for Priority Change Time
+Getting global reporting information ...
+THIS IS NOT A SYMMETRIC GENERATOR: Each reporter has a probability according to our dataset.
+REPORT STREAM: The bug report arrival will be batched using a window size of  1  days
+No drive-by filtering was performed.
+INTERARRIVAL TIME: Fitting distribution according to the current sample:  count    1296.000000
+mean       64.166450
+std        27.779417
+min        48.000000
+25%        49.888194
+50%        53.984306
+75%        66.689236
+max       349.993333
+dtype: float64
+Inter-arrival samples stored in  csv/INTERRIVAL_TIME_Consolidated Testers (235).csv
+Fitted distribution params for  uniform :  (47.999976141793617, 301.99340181289324)  ks_p_value:  0.0
+Fitted distribution params for  triang :  (3.4552437677998047e-08, 47.999988598989646, 307.84446874624183)  ks_p_value:  0.0
+Fitted distribution params for  norm :  (64.166450188614547, 27.768697320012787)  ks_p_value:  0.0
+Fitted distribution params for  gamma :  (0.11454332576206885, 47.999999999999993, 4.2515869540188627)  ks_p_value:  0.0
+Fitted distribution params for  lognorm :  (1.5973138079603824, 47.93692007131397, 5.6784406689354849)  ks_p_value:  0.0243009739134
+Fitted distribution params for  expon :  (47.999999999771376, 16.166460761729123)  ks_p_value:  0.0
+Fitted distribution params for  powerlaw :  (0.22395682753378418, 47.999999999999986, 370.38570666663975)  ks_p_value:  0.0
+Using an Empirical Distribution for Tester  Consolidated Testers (235)  Interarrival time
+Current batch size information: 
+count    1297.000000
+mean       11.206631
+std        12.210494
+min         1.000000
+25%         4.000000
+50%         8.000000
+75%        15.000000
+max       221.000000
+dtype: float64
+The inflation detection succes rate is:  1.0
+Project  ['OFBIZ' 'CASSANDRA' 'CLOUDSTACK' 'MAHOUT' 'PHOENIX' 'ISIS' 'SPARK']  Test Period:  ALL  Reporters:  235  Developers: 205  Resolved in Period:  66252017-07-23 17:18:19,002 process_comparison INFO     Simulating Empirical Profile for: UNSUPERVISED
+ Making 50 replications per worker...
+C:\Users\localadmin\Anaconda2\lib\site-packages\statsmodels\compat\pandas.py:56: FutureWarning: The pandas.core.datetools module is deprecated and will be removed in a future version. Please use the pandas.tseries module instead.
+  from pandas.core import datetools
+C:\Users\localadmin\Anaconda2\lib\site-packages\statsmodels\compat\pandas.py:56: FutureWarning: The pandas.core.datetools module is deprecated and will be removed in a future version. Please use the pandas.tseries module instead.
+  from pandas.core import datetools
+C:\Users\localadmin\Anaconda2\lib\site-packages\statsmodels\compat\pandas.py:56: FutureWarning: The pandas.core.datetools module is deprecated and will be removed in a future version. Please use the pandas.tseries module instead.
+  from pandas.core import datetools
+C:\Users\localadmin\Anaconda2\lib\site-packages\statsmodels\compat\pandas.py:56: FutureWarning: The pandas.core.datetools module is deprecated and will be removed in a future version. Please use the pandas.tseries module instead.
+  from pandas.core import datetools
+C:\Users\localadmin\Anaconda2\lib\site-packages\statsmodels\compat\pandas.py:56: FutureWarning: The pandas.core.datetools module is deprecated and will be removed in a future version. Please use the pandas.tseries module instead.
+  from pandas.core import datetools
+C:\Users\localadmin\Anaconda2\lib\site-packages\statsmodels\compat\pandas.py:56: FutureWarning: The pandas.core.datetools module is deprecated and will be removed in a future version. Please use the pandas.tseries module instead.
+  from pandas.core import datetools
+C:\Users\localadmin\Anaconda2\lib\site-packages\statsmodels\compat\pandas.py:56: FutureWarning: The pandas.core.datetools module is deprecated and will be removed in a future version. Please use the pandas.tseries module instead.
+  from pandas.core import datetools
+C:\Users\localadmin\Anaconda2\lib\site-packages\statsmodels\compat\pandas.py:56: FutureWarning: The pandas.core.datetools module is deprecated and will be removed in a future version. Please use the pandas.tseries module instead.
+  from pandas.core import datetools
+Strategies found:  5
+Strategy:  EMPIRICAL0_INF5%DEF1%  Reporters:  109
+Strategy:  EMPIRICAL1_INF8%DEF100%  Reporters:  24
+Strategy:  EMPIRICAL2_INF4%DEF58%  Reporters:  21
+Strategy:  EMPIRICAL3_INF19%DEF2%  Reporters:  46
+Strategy:  EMPIRICAL4_INF6%DEF26%  Reporters:  35
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  None  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  327.430999994  (s)
+Workers in pool finished. Consolidating outputs...
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  SIMPLEINFLATE  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  None  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  325.978999853  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 17:29:22,730 process_comparison INFO     Comparing systems performance: UNSUPERVISED_TIME_RATIO_EMPIRICAL vs TSNE0-UNSUPERVISED_TIME_RATIO_EQUILIBRIUM
+2017-07-23 17:29:22,730 process_comparison INFO     UNSUPERVISED_TIME_RATIO_EMPIRICAL: Sample mean 0.0899780559125 Sample variance: 2.41725070543e-05
+2017-07-23 17:29:22,730 process_comparison INFO     TSNE0-UNSUPERVISED_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0792953181521 Sample variance: 1.99220431081e-05
+2017-07-23 17:29:22,730 process_comparison INFO     Point estimate: 0.0106827377603
+2017-07-23 17:29:22,730 process_comparison INFO     Confidence Interval with alpha 0.05 : (0.009759612699453581, 0.011605862821234157)
+2017-07-23 17:29:22,740 process_comparison INFO     Comparing systems performance: UNSUPERVISED_FIXED_EMPIRICAL vs TSNE0-UNSUPERVISED_FIXED_EQUILIBRIUM
+2017-07-23 17:29:22,740 process_comparison INFO     UNSUPERVISED_FIXED_EMPIRICAL: Sample mean 1389.375 Sample variance: 778.084798995
+2017-07-23 17:29:22,740 process_comparison INFO     TSNE0-UNSUPERVISED_FIXED_EQUILIBRIUM: Sample mean 1243.52 Sample variance: 860.471959799
+2017-07-23 17:29:22,740 process_comparison INFO     Point estimate: 145.855
+2017-07-23 17:29:22,740 process_comparison INFO     Confidence Interval with alpha 0.05 : (140.2278321673331, 151.48216783266693)
+2017-07-23 17:29:22,759 process_comparison INFO     Comparing systems performance: UNSUPERVISED_FIXED_RATIO_EMPIRICAL vs TSNE0-UNSUPERVISED_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 17:29:22,759 process_comparison INFO     UNSUPERVISED_FIXED_RATIO_EMPIRICAL: Sample mean 0.718447185485 Sample variance: 0.000998194941635
+2017-07-23 17:29:22,759 process_comparison INFO     TSNE0-UNSUPERVISED_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.642534691513 Sample variance: 0.000769091589085
+2017-07-23 17:29:22,759 process_comparison INFO     Point estimate: 0.0759124939726
+2017-07-23 17:29:22,759 process_comparison INFO     Confidence Interval with alpha 0.05 : (0.070068207177065495, 0.081756780768205389)
+2017-07-23 17:29:22,779 process_comparison INFO     Simulating Empirical Profile for: THROTTLING_INF001
+Making 50 replications per worker...
+Strategies found:  5
+Strategy:  EMPIRICAL0_INF5%DEF1%  Reporters:  109
+Strategy:  EMPIRICAL1_INF8%DEF100%  Reporters:  24
+Strategy:  EMPIRICAL2_INF4%DEF58%  Reporters:  21
+Strategy:  EMPIRICAL3_INF19%DEF2%  Reporters:  46
+Strategy:  EMPIRICAL4_INF6%DEF26%  Reporters:  35
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  True  . Inflation penalty:  0.01  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  396.25  (s)
+Workers in pool finished. Consolidating outputs...
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  empirical_honest  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  True  . Inflation penalty:  0.01  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  349.278999805  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 17:42:08,796 process_comparison INFO     Comparing systems performance: THROTTLING_INF001_TIME_RATIO_EMPIRICAL vs TSNE0-THROTTLING_INF001_TIME_RATIO_EQUILIBRIUM
+2017-07-23 17:42:08,796 process_comparison INFO     THROTTLING_INF001_TIME_RATIO_EMPIRICAL: Sample mean 0.0911215101709 Sample variance: 3.48955896022e-05
+2017-07-23 17:42:08,796 process_comparison INFO     TSNE0-THROTTLING_INF001_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0919301769447 Sample variance: 2.6883054288e-05
+2017-07-23 17:42:08,796 process_comparison INFO     Point estimate: -0.000808666773712
+2017-07-23 17:42:08,796 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0019013574635556572, 0.00028402391613241299)
+2017-07-23 17:42:08,805 process_comparison INFO     Comparing systems performance: THROTTLING_INF001_FIXED_EMPIRICAL vs TSNE0-THROTTLING_INF001_FIXED_EQUILIBRIUM
+2017-07-23 17:42:08,806 process_comparison INFO     THROTTLING_INF001_FIXED_EMPIRICAL: Sample mean 1397.695 Sample variance: 1069.68037688
+2017-07-23 17:42:08,806 process_comparison INFO     TSNE0-THROTTLING_INF001_FIXED_EQUILIBRIUM: Sample mean 1417.68 Sample variance: 1000.57045226
+2017-07-23 17:42:08,806 process_comparison INFO     Point estimate: -19.985
+2017-07-23 17:42:08,806 process_comparison INFO     Confidence Interval with alpha 0.05 : (-26.310119491904597, -13.659880508095657)
+2017-07-23 17:42:08,825 process_comparison INFO     Comparing systems performance: THROTTLING_INF001_FIXED_RATIO_EMPIRICAL vs TSNE0-THROTTLING_INF001_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 17:42:08,825 process_comparison INFO     THROTTLING_INF001_FIXED_RATIO_EMPIRICAL: Sample mean 0.730582545235 Sample variance: 0.00127717017622
+2017-07-23 17:42:08,825 process_comparison INFO     TSNE0-THROTTLING_INF001_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.73687510375 Sample variance: 0.00106309611488
+2017-07-23 17:42:08,825 process_comparison INFO     Point estimate: -0.00629255851503
+2017-07-23 17:42:08,825 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.01301767013970378, 0.0004325531096451788)
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  THROTTLING_INF001_TSNE2  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  True  . Inflation penalty:  0.01  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  340.208999872  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 17:47:59,440 process_comparison INFO     Comparing systems performance: THROTTLING_INF001_TIME_RATIO_EMPIRICAL vs TSNE1-THROTTLING_INF001_TIME_RATIO_EQUILIBRIUM
+2017-07-23 17:47:59,440 process_comparison INFO     THROTTLING_INF001_TIME_RATIO_EMPIRICAL: Sample mean 0.0911215101709 Sample variance: 3.48955896022e-05
+2017-07-23 17:47:59,440 process_comparison INFO     TSNE1-THROTTLING_INF001_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0922663787782 Sample variance: 3.2540120525e-05
+2017-07-23 17:47:59,440 process_comparison INFO     Point estimate: -0.00114486860725
+2017-07-23 17:47:59,440 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0022864381110031758, -3.2991035040833526e-06)
+2017-07-23 17:47:59,450 process_comparison INFO     Comparing systems performance: THROTTLING_INF001_FIXED_EMPIRICAL vs TSNE1-THROTTLING_INF001_FIXED_EQUILIBRIUM
+2017-07-23 17:47:59,450 process_comparison INFO     THROTTLING_INF001_FIXED_EMPIRICAL: Sample mean 1397.695 Sample variance: 1069.68037688
+2017-07-23 17:47:59,450 process_comparison INFO     TSNE1-THROTTLING_INF001_FIXED_EQUILIBRIUM: Sample mean 1422.985 Sample variance: 1196.39675879
+2017-07-23 17:47:59,450 process_comparison INFO     Point estimate: -25.29
+2017-07-23 17:47:59,450 process_comparison INFO     Confidence Interval with alpha 0.05 : (-31.90755045345167, -18.672449546548258)
+2017-07-23 17:47:59,467 process_comparison INFO     Comparing systems performance: THROTTLING_INF001_FIXED_RATIO_EMPIRICAL vs TSNE1-THROTTLING_INF001_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 17:47:59,467 process_comparison INFO     THROTTLING_INF001_FIXED_RATIO_EMPIRICAL: Sample mean 0.730582545235 Sample variance: 0.00127717017622
+2017-07-23 17:47:59,467 process_comparison INFO     TSNE1-THROTTLING_INF001_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.74136477723 Sample variance: 0.00100274807997
+2017-07-23 17:47:59,467 process_comparison INFO     Point estimate: -0.0107822319945
+2017-07-23 17:47:59,469 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.017420191580181703, -0.0041442724088451913)
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  HONEST  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  True  . Inflation penalty:  0.01  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  313.56799984  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 17:53:22,463 process_comparison INFO     Comparing systems performance: THROTTLING_INF001_TIME_RATIO_EMPIRICAL vs TSNE2-THROTTLING_INF001_TIME_RATIO_EQUILIBRIUM
+2017-07-23 17:53:22,463 process_comparison INFO     THROTTLING_INF001_TIME_RATIO_EMPIRICAL: Sample mean 0.0911215101709 Sample variance: 3.48955896022e-05
+2017-07-23 17:53:22,463 process_comparison INFO     TSNE2-THROTTLING_INF001_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0933508837804 Sample variance: 3.02312886303e-05
+2017-07-23 17:53:22,463 process_comparison INFO     Point estimate: -0.00222937360942
+2017-07-23 17:53:22,463 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0033512440357800835, -0.0011075031830501609)
+2017-07-23 17:53:22,474 process_comparison INFO     Comparing systems performance: THROTTLING_INF001_FIXED_EMPIRICAL vs TSNE2-THROTTLING_INF001_FIXED_EQUILIBRIUM
+2017-07-23 17:53:22,474 process_comparison INFO     THROTTLING_INF001_FIXED_EMPIRICAL: Sample mean 1397.695 Sample variance: 1069.68037688
+2017-07-23 17:53:22,474 process_comparison INFO     TSNE2-THROTTLING_INF001_FIXED_EQUILIBRIUM: Sample mean 1438.61 Sample variance: 962.379798995
+2017-07-23 17:53:22,474 process_comparison INFO     Point estimate: -40.915
+2017-07-23 17:53:22,474 process_comparison INFO     Confidence Interval with alpha 0.05 : (-47.181539051370009, -34.648460948629918)
+2017-07-23 17:53:22,496 process_comparison INFO     Comparing systems performance: THROTTLING_INF001_FIXED_RATIO_EMPIRICAL vs TSNE2-THROTTLING_INF001_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 17:53:22,496 process_comparison INFO     THROTTLING_INF001_FIXED_RATIO_EMPIRICAL: Sample mean 0.730582545235 Sample variance: 0.00127717017622
+2017-07-23 17:53:22,496 process_comparison INFO     TSNE2-THROTTLING_INF001_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.753520537185 Sample variance: 0.00128802620034
+2017-07-23 17:53:22,496 process_comparison INFO     Point estimate: -0.0229379919502
+2017-07-23 17:53:22,497 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.029978696288924519, -0.015897287611470971)
+2017-07-23 17:53:22,523 process_comparison INFO     Simulating Empirical Profile for: THROTTLING_INF003
+Making 50 replications per worker...
+Strategies found:  5
+Strategy:  EMPIRICAL0_INF5%DEF1%  Reporters:  109
+Strategy:  EMPIRICAL1_INF8%DEF100%  Reporters:  24
+Strategy:  EMPIRICAL2_INF4%DEF58%  Reporters:  21
+Strategy:  EMPIRICAL3_INF19%DEF2%  Reporters:  46
+Strategy:  EMPIRICAL4_INF6%DEF26%  Reporters:  35
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  True  . Inflation penalty:  0.03  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  375.99000001  (s)
+Workers in pool finished. Consolidating outputs...
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  HONEST  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  True  . Inflation penalty:  0.03  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  313.235000134  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 18:05:07,450 process_comparison INFO     Comparing systems performance: THROTTLING_INF003_TIME_RATIO_EMPIRICAL vs TSNE0-THROTTLING_INF003_TIME_RATIO_EQUILIBRIUM
+2017-07-23 18:05:07,450 process_comparison INFO     THROTTLING_INF003_TIME_RATIO_EMPIRICAL: Sample mean 0.0911181626558 Sample variance: 3.08706369968e-05
+2017-07-23 18:05:07,451 process_comparison INFO     TSNE0-THROTTLING_INF003_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0933431629721 Sample variance: 2.60567487845e-05
+2017-07-23 18:05:07,451 process_comparison INFO     Point estimate: -0.00222500031634
+2017-07-23 18:05:07,451 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0032738804678146488, -0.0011761201648554716)
+2017-07-23 18:05:07,461 process_comparison INFO     Comparing systems performance: THROTTLING_INF003_FIXED_EMPIRICAL vs TSNE0-THROTTLING_INF003_FIXED_EQUILIBRIUM
+2017-07-23 18:05:07,461 process_comparison INFO     THROTTLING_INF003_FIXED_EMPIRICAL: Sample mean 1409.895 Sample variance: 984.878366834
+2017-07-23 18:05:07,461 process_comparison INFO     TSNE0-THROTTLING_INF003_FIXED_EQUILIBRIUM: Sample mean 1435.995 Sample variance: 858.195954774
+2017-07-23 18:05:07,461 process_comparison INFO     Point estimate: -26.1
+2017-07-23 18:05:07,461 process_comparison INFO     Confidence Interval with alpha 0.05 : (-32.068063797253657, -20.131936202746164)
+2017-07-23 18:05:07,482 process_comparison INFO     Comparing systems performance: THROTTLING_INF003_FIXED_RATIO_EMPIRICAL vs TSNE0-THROTTLING_INF003_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 18:05:07,482 process_comparison INFO     THROTTLING_INF003_FIXED_RATIO_EMPIRICAL: Sample mean 0.731509706268 Sample variance: 0.000931419837089
+2017-07-23 18:05:07,482 process_comparison INFO     TSNE0-THROTTLING_INF003_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.746158661041 Sample variance: 0.00110381885039
+2017-07-23 18:05:07,483 process_comparison INFO     Point estimate: -0.0146489547727
+2017-07-23 18:05:07,483 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.020920476830403052, -0.0083774327149920749)
+2017-07-23 18:05:07,503 process_comparison INFO     Simulating Empirical Profile for: THROTTLING_INF005
+Making 50 replications per worker...
+Strategies found:  5
+Strategy:  EMPIRICAL0_INF5%DEF1%  Reporters:  109
+Strategy:  EMPIRICAL1_INF8%DEF100%  Reporters:  24
+Strategy:  EMPIRICAL2_INF4%DEF58%  Reporters:  21
+Strategy:  EMPIRICAL3_INF19%DEF2%  Reporters:  46
+Strategy:  EMPIRICAL4_INF6%DEF26%  Reporters:  35
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  True  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  377.770999908  (s)
+Workers in pool finished. Consolidating outputs...
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  HONEST  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  True  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:  None  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  314.766000032  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 18:16:53,917 process_comparison INFO     Comparing systems performance: THROTTLING_INF005_TIME_RATIO_EMPIRICAL vs TSNE0-THROTTLING_INF005_TIME_RATIO_EQUILIBRIUM
+2017-07-23 18:16:53,917 process_comparison INFO     THROTTLING_INF005_TIME_RATIO_EMPIRICAL: Sample mean 0.0921277384573 Sample variance: 2.47431264282e-05
+2017-07-23 18:16:53,917 process_comparison INFO     TSNE0-THROTTLING_INF005_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0935827035838 Sample variance: 2.71531645479e-05
+2017-07-23 18:16:53,917 process_comparison INFO     Point estimate: -0.00145496512658
+2017-07-23 18:16:53,918 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0024564094090992667, -0.00045352084405975981)
+2017-07-23 18:16:53,927 process_comparison INFO     Comparing systems performance: THROTTLING_INF005_FIXED_EMPIRICAL vs TSNE0-THROTTLING_INF005_FIXED_EQUILIBRIUM
+2017-07-23 18:16:53,927 process_comparison INFO     THROTTLING_INF005_FIXED_EMPIRICAL: Sample mean 1423.65 Sample variance: 1107.65577889
+2017-07-23 18:16:53,928 process_comparison INFO     TSNE0-THROTTLING_INF005_FIXED_EQUILIBRIUM: Sample mean 1437.24 Sample variance: 869.801407035
+2017-07-23 18:16:53,928 process_comparison INFO     Point estimate: -13.59
+2017-07-23 18:16:53,928 process_comparison INFO     Confidence Interval with alpha 0.05 : (-19.771992650333114, -7.4080073496667218)
+2017-07-23 18:16:53,950 process_comparison INFO     Comparing systems performance: THROTTLING_INF005_FIXED_RATIO_EMPIRICAL vs TSNE0-THROTTLING_INF005_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 18:16:53,950 process_comparison INFO     THROTTLING_INF005_FIXED_RATIO_EMPIRICAL: Sample mean 0.73613082769 Sample variance: 0.000871613093389
+2017-07-23 18:16:53,950 process_comparison INFO     TSNE0-THROTTLING_INF005_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.748125871832 Sample variance: 0.00123497008973
+2017-07-23 18:16:53,950 process_comparison INFO     Point estimate: -0.011995044142
+2017-07-23 18:16:53,950 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.018375981666441488, -0.0056141066174766443)
+2017-07-23 18:16:53,970 process_comparison INFO     Simulating Empirical Profile for: GATEKEEPER_SUCC090
+Making 50 replications per worker...
+Strategies found:  5
+Strategy:  EMPIRICAL0_INF5%DEF1%  Reporters:  109
+Strategy:  EMPIRICAL1_INF8%DEF100%  Reporters:  24
+Strategy:  EMPIRICAL2_INF4%DEF58%  Reporters:  21
+Strategy:  EMPIRICAL3_INF19%DEF2%  Reporters:  46
+Strategy:  EMPIRICAL4_INF6%DEF26%  Reporters:  35
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.09999999999999998, True: 0.9})  Gatekeeper Config:   Capacity 2 Time Generator 0.333333333333 (Constant)  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  338.935000181  (s)
+Workers in pool finished. Consolidating outputs...
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  SIMPLEINFLATE  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.09999999999999998, True: 0.9})  Gatekeeper Config:   Capacity 2 Time Generator 0.333333333333 (Constant)  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  376.871000051  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 18:29:09,160 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC090_TIME_RATIO_EMPIRICAL vs TSNE0-GATEKEEPER_SUCC090_TIME_RATIO_EQUILIBRIUM
+2017-07-23 18:29:09,161 process_comparison INFO     GATEKEEPER_SUCC090_TIME_RATIO_EMPIRICAL: Sample mean 0.0933353356627 Sample variance: 3.0193742233e-05
+2017-07-23 18:29:09,161 process_comparison INFO     TSNE0-GATEKEEPER_SUCC090_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0916097421994 Sample variance: 2.98685730482e-05
+2017-07-23 18:29:09,161 process_comparison INFO     Point estimate: 0.00172559346327
+2017-07-23 18:29:09,161 process_comparison INFO     Confidence Interval with alpha 0.05 : (0.00064824338338412128, 0.0028029435431650169)
+2017-07-23 18:29:09,171 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC090_FIXED_EMPIRICAL vs TSNE0-GATEKEEPER_SUCC090_FIXED_EQUILIBRIUM
+2017-07-23 18:29:09,171 process_comparison INFO     GATEKEEPER_SUCC090_FIXED_EMPIRICAL: Sample mean 1433.45 Sample variance: 898.329145729
+2017-07-23 18:29:09,173 process_comparison INFO     TSNE0-GATEKEEPER_SUCC090_FIXED_EQUILIBRIUM: Sample mean 1412.94 Sample variance: 1172.22753769
+2017-07-23 18:29:09,173 process_comparison INFO     Point estimate: 20.51
+2017-07-23 18:29:09,173 process_comparison INFO     Confidence Interval with alpha 0.05 : (14.184097170766869, 26.835902829233113)
+2017-07-23 18:29:09,196 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC090_FIXED_RATIO_EMPIRICAL vs TSNE0-GATEKEEPER_SUCC090_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 18:29:09,196 process_comparison INFO     GATEKEEPER_SUCC090_FIXED_RATIO_EMPIRICAL: Sample mean 0.744606321421 Sample variance: 0.00107552577079
+2017-07-23 18:29:09,196 process_comparison INFO     TSNE0-GATEKEEPER_SUCC090_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.735348901907 Sample variance: 0.00100847660782
+2017-07-23 18:29:09,196 process_comparison INFO     Point estimate: 0.0092574195139
+2017-07-23 18:29:09,196 process_comparison INFO     Confidence Interval with alpha 0.05 : (0.0029113291625704925, 0.015603509865238879)
+2017-07-23 18:29:09,220 process_comparison INFO     Simulating Empirical Profile for: GATEKEEPER_SUCC100
+Making 50 replications per worker...
+Strategies found:  5
+Strategy:  EMPIRICAL0_INF5%DEF1%  Reporters:  109
+Strategy:  EMPIRICAL1_INF8%DEF100%  Reporters:  24
+Strategy:  EMPIRICAL2_INF4%DEF58%  Reporters:  21
+Strategy:  EMPIRICAL3_INF19%DEF2%  Reporters:  46
+Strategy:  EMPIRICAL4_INF6%DEF26%  Reporters:  35
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:   Capacity 2 Time Generator 0.333333333333 (Constant)  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  430.941999912  (s)
+Workers in pool finished. Consolidating outputs...
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  persistent_deflator  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:   Capacity 2 Time Generator 0.333333333333 (Constant)  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  360.253999949  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 18:42:36,835 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL vs TSNE0-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM
+2017-07-23 18:42:36,836 process_comparison INFO     GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL: Sample mean 0.0939605384102 Sample variance: 3.53795092998e-05
+2017-07-23 18:42:36,836 process_comparison INFO     TSNE0-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0942889635331 Sample variance: 2.56577239399e-05
+2017-07-23 18:42:36,836 process_comparison INFO     Point estimate: -0.000328425122869
+2017-07-23 18:42:36,836 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0014145676033441852, 0.00075771735760560245)
+2017-07-23 18:42:36,846 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_EMPIRICAL vs TSNE0-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM
+2017-07-23 18:42:36,846 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_EMPIRICAL: Sample mean 1434.98 Sample variance: 1061.52723618
+2017-07-23 18:42:36,848 process_comparison INFO     TSNE0-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM: Sample mean 1438.12 Sample variance: 1000.24683417
+2017-07-23 18:42:36,848 process_comparison INFO     Point estimate: -3.14
+2017-07-23 18:42:36,848 process_comparison INFO     Confidence Interval with alpha 0.05 : (-9.4521524831653636, 3.1721524831656183)
+2017-07-23 18:42:36,869 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL vs TSNE0-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 18:42:36,869 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL: Sample mean 0.750937991573 Sample variance: 0.00104927919687
+2017-07-23 18:42:36,871 process_comparison INFO     TSNE0-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.749952259881 Sample variance: 0.001121111007
+2017-07-23 18:42:36,871 process_comparison INFO     Point estimate: 0.000985731691404
+2017-07-23 18:42:36,871 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0054905560456451402, 0.0074620194284525437)
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  GATEKEEPER_SUCC100_TSNE2  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:   Capacity 2 Time Generator 0.333333333333 (Constant)  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  377.045000076  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 18:49:00,282 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL vs TSNE1-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM
+2017-07-23 18:49:00,282 process_comparison INFO     GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL: Sample mean 0.0939605384102 Sample variance: 3.53795092998e-05
+2017-07-23 18:49:00,282 process_comparison INFO     TSNE1-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0939245840874 Sample variance: 3.34114117508e-05
+2017-07-23 18:49:00,282 process_comparison INFO     Point estimate: 3.59543227806e-05
+2017-07-23 18:49:00,283 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0011170273953073479, 0.0011889360408685174)
+2017-07-23 18:49:00,295 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_EMPIRICAL vs TSNE1-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM
+2017-07-23 18:49:00,296 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_EMPIRICAL: Sample mean 1434.98 Sample variance: 1061.52723618
+2017-07-23 18:49:00,296 process_comparison INFO     TSNE1-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM: Sample mean 1436.925 Sample variance: 897.426507538
+2017-07-23 18:49:00,296 process_comparison INFO     Point estimate: -1.945
+2017-07-23 18:49:00,296 process_comparison INFO     Confidence Interval with alpha 0.05 : (-8.0978618038668522, 4.2078618038669795)
+2017-07-23 18:49:00,316 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL vs TSNE1-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 18:49:00,316 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL: Sample mean 0.750937991573 Sample variance: 0.00104927919687
+2017-07-23 18:49:00,316 process_comparison INFO     TSNE1-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.746093792142 Sample variance: 0.00129701755599
+2017-07-23 18:49:00,318 process_comparison INFO     Point estimate: 0.00484419943072
+2017-07-23 18:49:00,318 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0018896284650688723, 0.011578027326517328)
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  GATEKEEPER_SUCC100_TSNE3  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:   Capacity 2 Time Generator 0.333333333333 (Constant)  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  360.654999971  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 18:55:11,039 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL vs TSNE2-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM
+2017-07-23 18:55:11,039 process_comparison INFO     GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL: Sample mean 0.0939605384102 Sample variance: 3.53795092998e-05
+2017-07-23 18:55:11,039 process_comparison INFO     TSNE2-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0939784824564 Sample variance: 2.99776470808e-05
+2017-07-23 18:55:11,039 process_comparison INFO     Point estimate: -1.7944046201e-05
+2017-07-23 18:55:11,039 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.001141801933306515, 0.0011059138409044728)
+2017-07-23 18:55:11,049 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_EMPIRICAL vs TSNE2-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM
+2017-07-23 18:55:11,049 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_EMPIRICAL: Sample mean 1434.98 Sample variance: 1061.52723618
+2017-07-23 18:55:11,049 process_comparison INFO     TSNE2-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM: Sample mean 1434.83 Sample variance: 881.237286432
+2017-07-23 18:55:11,049 process_comparison INFO     Point estimate: 0.15
+2017-07-23 18:55:11,051 process_comparison INFO     Confidence Interval with alpha 0.05 : (-5.9774145642140883, 6.2774145642142702)
+Making 50 replications per worker...
+2017-07-23 18:55:11,069 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL vs TSNE2-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 18:55:11,069 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL: Sample mean 0.750937991573 Sample variance: 0.00104927919687
+2017-07-23 18:55:11,069 process_comparison INFO     TSNE2-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.750252926264 Sample variance: 0.00143270754625
+2017-07-23 18:55:11,069 process_comparison INFO     Point estimate: 0.00068506530841
+2017-07-23 18:55:11,069 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0062410085309313407, 0.0076111391477510166)
+Strategies found:  1
+Strategy:  occasional_deflator  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:   Capacity 2 Time Generator 0.333333333333 (Constant)  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  348.351999998  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 19:01:04,177 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL vs TSNE3-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM
+2017-07-23 19:01:04,177 process_comparison INFO     GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL: Sample mean 0.0939605384102 Sample variance: 3.53795092998e-05
+2017-07-23 19:01:04,177 process_comparison INFO     TSNE3-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM: Sample mean 0.0933725880334 Sample variance: 2.66684511071e-05
+2017-07-23 19:01:04,177 process_comparison INFO     Point estimate: 0.000587950376836
+2017-07-23 19:01:04,178 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.00050712909776453978, 0.0016830298514360336)
+2017-07-23 19:01:04,187 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_EMPIRICAL vs TSNE3-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM
+2017-07-23 19:01:04,188 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_EMPIRICAL: Sample mean 1434.98 Sample variance: 1061.52723618
+2017-07-23 19:01:04,188 process_comparison INFO     TSNE3-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM: Sample mean 1438.085 Sample variance: 1046.12841709
+2017-07-23 19:01:04,188 process_comparison INFO     Point estimate: -3.105
+2017-07-23 19:01:04,188 process_comparison INFO     Confidence Interval with alpha 0.05 : (-9.4869834593314017, 3.2769834593313654)
+2017-07-23 19:01:04,207 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL vs TSNE3-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 19:01:04,207 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL: Sample mean 0.750937991573 Sample variance: 0.00104927919687
+2017-07-23 19:01:04,207 process_comparison INFO     TSNE3-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.750278770222 Sample variance: 0.00117414580962
+2017-07-23 19:01:04,207 process_comparison INFO     Point estimate: 0.000659221350456
+2017-07-23 19:01:04,209 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0058957559990138264, 0.0072141986999263519)
+Making 50 replications per worker...
+Strategies found:  1
+Strategy:  HONEST  Reporters:  235
+Running  50  replications. Target fixes:  6625  .Throttling enabled:  False  . Inflation penalty:  0.05  Developers in team:  205  Success probabilities:  defaultdict(<type 'float'>, {False: 0.0, True: 1.0})  Gatekeeper Config:   Capacity 2 Time Generator 0.333333333333 (Constant)  Max Reporter Probability:  0.0340557275542  Min Reporter Probability  0.000756793945648  Priority distribution:  defaultdict(<type 'float'>, {1.0: 0.81592352243388455, 3.0: 0.18407647756611542})
+
+------------------ % Progress -------------------1
+    1    2    3    4    5    6    7    8    9    0
+----0----0----0----0----0----0----0----0----0----0
+..................................................
+50  replications finished. Execution time:  347.005999804  (s)
+Workers in pool finished. Consolidating outputs...
+2017-07-23 19:07:01,762 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL vs TSNE4-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM
+2017-07-23 19:07:01,762 process_comparison INFO     GATEKEEPER_SUCC100_TIME_RATIO_EMPIRICAL: Sample mean 0.0939605384102 Sample variance: 3.53795092998e-05
+2017-07-23 19:07:01,762 process_comparison INFO     TSNE4-GATEKEEPER_SUCC100_TIME_RATIO_EQUILIBRIUM: Sample mean 0.094040404154 Sample variance: 3.16561511229e-05
+2017-07-23 19:07:01,762 process_comparison INFO     Point estimate: -7.9865743759e-05
+2017-07-23 19:07:01,763 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0012180506115870523, 0.0010583191240690023)
+2017-07-23 19:07:01,773 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_EMPIRICAL vs TSNE4-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM
+2017-07-23 19:07:01,773 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_EMPIRICAL: Sample mean 1434.98 Sample variance: 1061.52723618
+2017-07-23 19:07:01,773 process_comparison INFO     TSNE4-GATEKEEPER_SUCC100_FIXED_EQUILIBRIUM: Sample mean 1437.505 Sample variance: 856.512537688
+2017-07-23 19:07:01,773 process_comparison INFO     Point estimate: -2.525
+2017-07-23 19:07:01,773 process_comparison INFO     Confidence Interval with alpha 0.05 : (-8.6133514357158454, 3.5633514357156644)
+2017-07-23 19:07:01,793 process_comparison INFO     Comparing systems performance: GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL vs TSNE4-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM
+2017-07-23 19:07:01,793 process_comparison INFO     GATEKEEPER_SUCC100_FIXED_RATIO_EMPIRICAL: Sample mean 0.750937991573 Sample variance: 0.00104927919687
+2017-07-23 19:07:01,795 process_comparison INFO     TSNE4-GATEKEEPER_SUCC100_FIXED_RATIO_EQUILIBRIUM: Sample mean 0.747800117168 Sample variance: 0.00106901586925
+2017-07-23 19:07:01,795 process_comparison INFO     Point estimate: 0.00313787440518
+2017-07-23 19:07:01,795 process_comparison INFO     Confidence Interval with alpha 0.05 : (-0.0032601975058210936, 0.0095359463161815081)
+2017-07-23 19:07:02,852 process_comparison INFO     Execution time in seconds: 6598.50999999
+
+Process finished with exit code 0

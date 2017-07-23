@@ -8,6 +8,8 @@ import sys
 import math
 
 import time
+
+import logging
 from pathos.multiprocessing import ProcessingPool as Pool
 
 import scipy.interpolate as interpolate
@@ -40,6 +42,43 @@ MINIMUM_OBSERVATIONS = 3
 
 REPORTER_COLUMNS = [simmodel.NON_SEVERE_INFLATED_COLUMN, simmodel.SEVERE_DEFLATED_COLUMN]
 
+logger = gtconfig.get_logger("simulation_utils", "simulation_utils.txt", level=logging.INFO)
+
+
+class MixedEmpiricalInflationStrategy:
+    """
+    This class represents a mixed empirical strategy: It randomly selects an instance of EmpiricalInflationStrategy
+    according to probability distribution.
+    """
+
+    def __init__(self, mixed_strategy_config):
+        if len(mixed_strategy_config['strategy_configs']) != len(mixed_strategy_config['probabilities']):
+            raise Exception("The number of strategies and probabilities does not match")
+
+        self.name = mixed_strategy_config['name']
+        self.strategy_config = mixed_strategy_config
+
+        self.strategy_selector = DiscreteEmpiricalDistribution(name="strategy_selector",
+                                                               values=mixed_strategy_config['strategy_configs'],
+                                                               probabilities=mixed_strategy_config['probabilities'])
+
+        self.current_strategy = None
+
+    def configure(self):
+        self.current_strategy = EmpiricalInflationStrategy(strategy_config=self.strategy_selector.generate())
+
+    def priority_to_report(self, original_priority):
+        if self.current_strategy is None:
+            self.configure()
+
+        return self.current_strategy.priority_to_report(original_priority)
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return str(self)
+
 
 class EmpiricalInflationStrategy:
     """
@@ -47,22 +86,33 @@ class EmpiricalInflationStrategy:
     """
 
     def __init__(self, strategy_config):
+        logger.debug("strategy_config: ", strategy_config)
+
         self.name = strategy_config['name']
         self.strategy_config = strategy_config
 
-        inflation_prob = strategy_config[simmodel.NON_SEVERE_INFLATED_COLUMN]
+        self.inflation_prob = strategy_config[simmodel.NON_SEVERE_INFLATED_COLUMN]
+        self.deflation_prob = strategy_config[simmodel.SEVERE_DEFLATED_COLUMN]
+
+        self.inflation_generator = None
+        self.deflation_generator = None
+
+    def configure(self):
         self.inflation_generator = DiscreteEmpiricalDistribution(name="inflation_generator",
                                                                  values=[True, False],
-                                                                 probabilities=[inflation_prob,
-                                                                                (1 - inflation_prob)])
+                                                                 probabilities=[self.inflation_prob,
+                                                                                (1 - self.inflation_prob)])
 
-        deflation_prob = strategy_config[simmodel.SEVERE_DEFLATED_COLUMN]
         self.deflation_generator = DiscreteEmpiricalDistribution(name="deflation_generator",
                                                                  values=[True, False],
-                                                                 probabilities=[deflation_prob,
-                                                                                (1 - deflation_prob)])
+                                                                 probabilities=[self.deflation_prob,
+                                                                                (1 - self.deflation_prob)])
 
     def priority_to_report(self, original_priority):
+
+        if self.inflation_generator is None or self.deflation_generator is None:
+            self.configure()
+
         result = original_priority
 
         if original_priority == simdata.NON_SEVERE_PRIORITY:
@@ -575,7 +625,7 @@ def elbow_method_for_reporters(reporter_configuration, file_prefix=""):
     print "Elbow-method plot saved at ", file_name
 
 
-def assign_strategies(reporters_config, training_issues, n_clusters=3, debug=False):
+def assign_strategies(reporters_config, training_issues, n_clusters=3):
     """
     Assigns an inflation pattern to the reporter based on clustering.
     :param reporters_config: Reporter configuration.
@@ -586,8 +636,7 @@ def assign_strategies(reporters_config, training_issues, n_clusters=3, debug=Fal
     global_priority_map = DiscreteEmpiricalDistribution(
         observations=training_issues[simdata.SIMPLE_PRIORITY_COLUMN]).get_probabilities()
 
-    if debug:
-        print "global_priority_map: ", global_priority_map
+    logger.debug("global_priority_map: " + global_priority_map)
 
     reporter_dataframe = get_reporter_behavior_dataframe(reporters_config)
 
@@ -758,7 +807,7 @@ def launch_simulation_parallel(team_capacity, reporters_config,
 
     worker_inputs = []
 
-    for _ in range(parallel_blocks):
+    for block_id in range(parallel_blocks):
         worker_input = {'team_capacity': team_capacity,
                         'reporters_config': reporters_config,
                         'resolution_time_gen': resolution_time_gen,
@@ -775,6 +824,7 @@ def launch_simulation_parallel(team_capacity, reporters_config,
                         'dev_size_generator': dev_size_generator,
                         'catcher_generator': catcher_generator,
                         'quota_system': quota_system,
+                        'block_id': block_id,
                         'show_progress': False}
 
         worker_inputs.append(worker_input)
@@ -815,7 +865,8 @@ def launch_simulation_wrapper(input_params):
         inflation_factor=input_params['inflation_factor'],
         quota_system=input_params['quota_system'],
         catcher_generator=input_params['catcher_generator'],
-        show_progress=input_params['show_progress'])
+        show_progress=input_params['show_progress'],
+        block_id=input_params['block_id'])
 
     return simulation_results
 
@@ -862,7 +913,8 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
                       inflation_factor=None,
                       catcher_generator=None,
                       quota_system=False,
-                      show_progress=True):
+                      show_progress=True,
+                      block_id=-1):
     """
     Triggers the simulation according a given configuration. It includes the seed reset behaviour.
 
@@ -899,8 +951,12 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
         progress_bar = progressbar.ProgressBar(max_iterations)
 
     start_time = time.time()
+
     for replication_index in range(max_iterations):
-        np.random.seed()
+        current_seed = int(time.time()) + block_id
+        np.random.seed(seed=current_seed)
+
+        replication_id = "BLOCK" + str(block_id) + "-REP-" + str(replication_index) + "-SEED-" + str(current_seed)
         reporter_monitors, priority_monitors, reporting_time = simmodel.run_model(team_capacity=team_capacity,
                                                                                   reporters_config=reporters_config,
                                                                                   resolution_time_gen=resolution_time_gen,
@@ -915,7 +971,8 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
                                                                                   dev_size_generator=dev_size_generator,
                                                                                   gatekeeper_config=gatekeeper_config,
                                                                                   quota_system=quota_system,
-                                                                                  inflation_factor=inflation_factor)
+                                                                                  inflation_factor=inflation_factor,
+                                                                                  replication_id=replication_id)
 
         simulation_metrics.process_simulation_output(reporter_monitors, priority_monitors, reporting_time)
 

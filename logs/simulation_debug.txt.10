@@ -1,0 +1,543 @@
+2017-07-19 19:37:55,845 simulation_debug DEBUG    total_fixed: 5288
+2017-07-19 19:37:55,855 simulation_debug DEBUG    total_fixed: 5288
+2017-07-19 19:37:55,855 simulation_debug DEBUG    Time 53262.7170998: Report Priotity_1.0_Index_6555 by reporter jamestaylor got fixed after 1726.11063362 of reporting. Fix effort: 1705.29181753
+2017-07-19 19:37:55,857 simulation_debug DEBUG    Penalty to be applied tojamestaylor : Penalizing with 0.01
+2017-07-19 19:37:55,858 simulation_debug DEBUG    Time 53262.7170998: Report Priotity_1.0_Index_6716 is being handled by a developer now. 
+2017-07-19 19:37:55,858 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,858 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,858 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,858 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,859 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,859 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,859 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,859 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,859 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,859 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,859 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,859 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    Time 53280.9229367: Report Priotity_1.0_Index_6793 arrived at 53280.9229367 .Current fixes: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    total_fixed: 5289
+2017-07-19 19:37:55,861 simulation_debug DEBUG    Time 53282.6287355: Report Priotity_1.0_Index_6758 by reporter josephkb got fixed after 323.821867907 of reporting. Fix effort: 318.978671233
+2017-07-19 19:37:55,862 simulation_debug DEBUG    Time 53282.6287355: Report Priotity_1.0_Index_6793 is being handled by a developer now. 
+2017-07-19 19:37:55,862 simulation_debug DEBUG    Time 53282.6287355: Report Priotity_1.0_Index_6714 is being handled by a developer now. 
+2017-07-19 19:37:55,862 simulation_debug DEBUG    Time 53282.6287355: Report Priotity_1.0_Index_6713 is being handled by a developer now. 
+2017-07-19 19:37:55,864 simulation_debug DEBUG    total_fixed: 5290
+2017-07-19 19:37:55,864 simulation_debug DEBUG    total_fixed: 5290
+2017-07-19 19:37:55,864 simulation_debug DEBUG    total_fixed: 5290
+2017-07-19 19:37:55,864 simulation_debug DEBUG    total_fixed: 5290
+2017-07-19 19:37:55,864 simulation_debug DEBUG    total_fixed: 5290
+2017-07-19 19:37:55,864 simulation_debug DEBUG    Time 53287.2607179: Report Priotity_3.0_Index_4564 by reporter jbellis got fixed after 17631.5114421 of reporting. Fix effort: 7162.40338279
+2017-07-19 19:37:55,864 simulation_debug DEBUG    Time 53287.2607179: Report Priotity_1.0_Index_6707 is being handled by a developer now. 
+2017-07-19 19:37:55,864 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,864 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,864 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,864 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    Time 53300.5435526: Report Priotity_3.0_Index_6794 arrived at 53300.5435526 .Current fixes: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    total_fixed: 5291
+2017-07-19 19:37:55,865 simulation_debug DEBUG    Time 53303.1213868: Report Priotity_1.0_Index_6543 by reporter gpshilamkar got fixed after 1832.39213064 of reporting. Fix effort: 1830.73104901
+2017-07-19 19:37:55,865 simulation_debug DEBUG    Time 53303.1213868: Report Priotity_3.0_Index_6794 is being handled by a developer now. 
+2017-07-19 19:37:55,867 simulation_debug DEBUG    Time 53303.1213868: Report Priotity_1.0_Index_6706 is being handled by a developer now. 
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,867 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,868 simulation_debug DEBUG    Time 53313.1512274: Report Priotity_1.0_Index_6795 arrived at 53313.1512274 .Current fixes: 5292
+2017-07-19 19:37:55,868 simulation_debug DEBUG    total_fixed: 5292
+2017-07-19 19:37:55,868 simulation_debug DEBUG    Time 53314.8110214: Report Priotity_1.0_Index_2256 by reporter chandanp got fixed after 34954.8803073 of reporting. Fix effort: 34783.8123646
+2017-07-19 19:37:55,868 simulation_debug DEBUG    Time 53314.8110214: Report Priotity_1.0_Index_6795 is being handled by a developer now. 
+2017-07-19 19:37:55,868 simulation_debug DEBUG    Time 53314.8110214: Report Priotity_1.0_Index_6705 is being handled by a developer now. 
+2017-07-19 19:37:55,868 simulation_debug DEBUG    total_fixed: 5293
+2017-07-19 19:37:55,868 simulation_debug DEBUG    total_fixed: 5293
+2017-07-19 19:37:55,868 simulation_debug DEBUG    total_fixed: 5293
+2017-07-19 19:37:55,868 simulation_debug DEBUG    Time 53317.0369562: Report Priotity_1.0_Index_6796 arrived at 53317.0369562 .Current fixes: 5293
+2017-07-19 19:37:55,868 simulation_debug DEBUG    total_fixed: 5293
+2017-07-19 19:37:55,868 simulation_debug DEBUG    total_fixed: 5293
+2017-07-19 19:37:55,869 simulation_debug DEBUG    total_fixed: 5293
+2017-07-19 19:37:55,869 simulation_debug DEBUG    total_fixed: 5293
+2017-07-19 19:37:55,869 simulation_debug DEBUG    Time 53321.2496979: Report Priotity_1.0_Index_6775 by reporter cdaw got fixed after 269.26484739 of reporting. Fix effort: 267.21297373
+2017-07-19 19:37:55,869 simulation_debug DEBUG    Time 53321.2496979: Report Priotity_1.0_Index_6796 is being handled by a developer now. 
+2017-07-19 19:37:55,869 simulation_debug DEBUG    Time 53321.2496979: Report Priotity_1.0_Index_6703 is being handled by a developer now. 
+2017-07-19 19:37:55,869 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,869 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,869 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,871 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,871 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,871 simulation_debug DEBUG    Time 53326.8192994: Report Priotity_3.0_Index_6797 arrived at 53326.8192994 .Current fixes: 5294
+2017-07-19 19:37:55,871 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,871 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,871 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,871 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,871 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,871 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,872 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,872 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,872 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,872 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,872 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,872 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,872 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,874 simulation_debug DEBUG    Time 53339.9554305: Report Priotity_1.0_Index_6798 arrived at 53339.9554305 .Current fixes: 5294
+2017-07-19 19:37:55,874 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,874 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,874 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,875 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,875 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,875 simulation_debug DEBUG    Time 53344.283582: Report Priotity_1.0_Index_6799 arrived at 53344.283582 .Current fixes: 5294
+2017-07-19 19:37:55,875 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,875 simulation_debug DEBUG    total_fixed: 5294
+2017-07-19 19:37:55,875 simulation_debug DEBUG    Time 53346.3322527: Report Priotity_1.0_Index_6792 by reporter yanboliang got fixed after 116.463312497 of reporting. Fix effort: 113.106982542
+2017-07-19 19:37:55,875 simulation_debug DEBUG    Time 53346.3322527: Report Priotity_1.0_Index_6799 is being handled by a developer now. 
+2017-07-19 19:37:55,877 simulation_debug DEBUG    total_fixed: 5295
+2017-07-19 19:37:55,877 simulation_debug DEBUG    total_fixed: 5295
+2017-07-19 19:37:55,877 simulation_debug DEBUG    total_fixed: 5295
+2017-07-19 19:37:55,877 simulation_debug DEBUG    total_fixed: 5295
+2017-07-19 19:37:55,877 simulation_debug DEBUG    total_fixed: 5295
+2017-07-19 19:37:55,877 simulation_debug DEBUG    total_fixed: 5295
+2017-07-19 19:37:55,877 simulation_debug DEBUG    Time 53352.7844189: Report Priotity_3.0_Index_6710 by reporter prashantkm got fixed after 687.248170377 of reporting. Fix effort: 661.405510527
+2017-07-19 19:37:55,877 simulation_debug DEBUG    Penalty to be applied toprashantkm : Penalizing with 0.01
+2017-07-19 19:37:55,878 simulation_debug DEBUG    Time 53352.7844189: Report Priotity_1.0_Index_6798 is being handled by a developer now. 
+2017-07-19 19:37:55,878 simulation_debug DEBUG    total_fixed: 5296
+2017-07-19 19:37:55,878 simulation_debug DEBUG    Time 53353.1733466: Report Priotity_3.0_Index_6737 by reporter jacques.le.roux got fixed after 533.303155307 of reporting. Fix effort: 530.623723629
+2017-07-19 19:37:55,878 simulation_debug DEBUG    Time 53353.1733466: Report Priotity_3.0_Index_6797 is being handled by a developer now. 
+2017-07-19 19:37:55,880 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,880 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,880 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,880 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,880 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,880 simulation_debug DEBUG    Time 53358.4129204: Report Priotity_1.0_Index_6800 arrived at 53358.4129204 .Current fixes: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    Time 53365.3348188: Report Priotity_1.0_Index_6801 arrived at 53365.3348188 .Current fixes: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,881 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,882 simulation_debug DEBUG    Time 53369.9030587: Report Priotity_1.0_Index_6802 arrived at 53369.9030587 .Current fixes: 5297
+2017-07-19 19:37:55,882 simulation_debug DEBUG    total_fixed: 5297
+2017-07-19 19:37:55,882 simulation_debug DEBUG    Time 53370.1965259: Report Priotity_1.0_Index_6757 by reporter sailaja got fixed after 450.66257757 of reporting. Fix effort: 415.871250381
+2017-07-19 19:37:55,882 simulation_debug DEBUG    Time 53370.1965259: Report Priotity_1.0_Index_6802 is being handled by a developer now. 
+2017-07-19 19:37:55,882 simulation_debug DEBUG    Time 53370.1965259: Report Priotity_1.0_Index_6801 is being handled by a developer now. 
+2017-07-19 19:37:55,882 simulation_debug DEBUG    Time 53370.1965259: Report Priotity_1.0_Index_6800 is being handled by a developer now. 
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    Time 53371.3216955: Report Priotity_3.0_Index_6803 arrived at 53371.3216955 .Current fixes: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5298
+2017-07-19 19:37:55,884 simulation_debug DEBUG    Time 53383.6757184: Report Priotity_1.0_Index_6569 by reporter jbellis got fixed after 1777.08626474 of reporting. Fix effort: 1722.06964148
+2017-07-19 19:37:55,884 simulation_debug DEBUG    Time 53383.6757184: Report Priotity_3.0_Index_6803 is being handled by a developer now. 
+2017-07-19 19:37:55,884 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,885 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,885 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,885 simulation_debug DEBUG    Time 53386.1771031: Report Priotity_1.0_Index_6804 arrived at 53386.1771031 .Current fixes: 5299
+2017-07-19 19:37:55,885 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,887 simulation_debug DEBUG    Time 53387.7379405: Report Priotity_1.0_Index_6805 arrived at 53387.7379405 .Current fixes: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    Time 53392.3717274: Report Priotity_1.0_Index_6806 arrived at 53392.3717274 .Current fixes: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,888 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,891 simulation_debug DEBUG    Time 53397.3028667: Report Priotity_3.0_Index_6807 arrived at 53397.3028667 .Current fixes: 5299
+2017-07-19 19:37:55,891 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,891 simulation_debug DEBUG    total_fixed: 5299
+2017-07-19 19:37:55,891 simulation_debug DEBUG    Time 53399.6303285: Report Priotity_1.0_Index_6647 by reporter hansbak got fixed after 1145.45911562 of reporting. Fix effort: 1059.45595643
+2017-07-19 19:37:55,891 simulation_debug DEBUG    Time 53399.6303285: Report Priotity_3.0_Index_6807 is being handled by a developer now. 
+2017-07-19 19:37:55,891 simulation_debug DEBUG    total_fixed: 5300
+2017-07-19 19:37:55,891 simulation_debug DEBUG    Time 53400.7449142: Report Priotity_1.0_Index_6808 arrived at 53400.7449142 .Current fixes: 5300
+2017-07-19 19:37:55,891 simulation_debug DEBUG    total_fixed: 5300
+2017-07-19 19:37:55,891 simulation_debug DEBUG    total_fixed: 5300
+2017-07-19 19:37:55,891 simulation_debug DEBUG    Time 53402.9966383: Report Priotity_3.0_Index_6809 arrived at 53402.9966383 .Current fixes: 5300
+2017-07-19 19:37:55,892 simulation_debug DEBUG    total_fixed: 5300
+2017-07-19 19:37:55,892 simulation_debug DEBUG    total_fixed: 5300
+2017-07-19 19:37:55,892 simulation_debug DEBUG    total_fixed: 5300
+2017-07-19 19:37:55,892 simulation_debug DEBUG    total_fixed: 5300
+2017-07-19 19:37:55,892 simulation_debug DEBUG    total_fixed: 5300
+2017-07-19 19:37:55,892 simulation_debug DEBUG    Time 53407.0663253: Report Priotity_1.0_Index_6631 by reporter sumitp got fixed after 1242.72463966 of reporting. Fix effort: 1242.53207114
+2017-07-19 19:37:55,892 simulation_debug DEBUG    Time 53407.0663253: Report Priotity_3.0_Index_6809 is being handled by a developer now. 
+2017-07-19 19:37:55,892 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,892 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,892 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,892 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,894 simulation_debug DEBUG    Time 53411.4633966: Report Priotity_1.0_Index_6810 arrived at 53411.4633966 .Current fixes: 5301
+2017-07-19 19:37:55,894 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,894 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,894 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,894 simulation_debug DEBUG    Time 53414.438188: Report Priotity_3.0_Index_6811 arrived at 53414.438188 .Current fixes: 5301
+2017-07-19 19:37:55,894 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,894 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,895 simulation_debug DEBUG    Time 53416.5156896: Report Priotity_1.0_Index_6812 arrived at 53416.5156896 .Current fixes: 5301
+2017-07-19 19:37:55,895 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,895 simulation_debug DEBUG    total_fixed: 5301
+2017-07-19 19:37:55,895 simulation_debug DEBUG    Time 53418.2174518: Report Priotity_3.0_Index_6764 by reporter rayeesn got fixed after 422.678173343 of reporting. Fix effort: 420.241103613
+2017-07-19 19:37:55,895 simulation_debug DEBUG    Time 53418.2174518: Report Priotity_1.0_Index_6812 is being handled by a developer now. 
+2017-07-19 19:37:55,895 simulation_debug DEBUG    total_fixed: 5302
+2017-07-19 19:37:55,895 simulation_debug DEBUG    total_fixed: 5302
+2017-07-19 19:37:55,895 simulation_debug DEBUG    total_fixed: 5302
+2017-07-19 19:37:55,897 simulation_debug DEBUG    total_fixed: 5302
+2017-07-19 19:37:55,897 simulation_debug DEBUG    Time 53422.6613159: Report Priotity_3.0_Index_6813 arrived at 53422.6613159 .Current fixes: 5302
+2017-07-19 19:37:55,897 simulation_debug DEBUG    total_fixed: 5302
+2017-07-19 19:37:55,897 simulation_debug DEBUG    Time 53423.5460883: Report Priotity_3.0_Index_6612 by reporter rayeesn got fixed after 1467.8204484 of reporting. Fix effort: 1370.17277329
+2017-07-19 19:37:55,897 simulation_debug DEBUG    Time 53423.5460883: Report Priotity_3.0_Index_6813 is being handled by a developer now. 
+2017-07-19 19:37:55,898 simulation_debug DEBUG    Time 53423.572633: Report Priotity_3.0_Index_6813 by reporter JoshuaMcKenzie got fixed after 0.91131711223 of reporting. Fix effort: 0.0265446667977
+2017-07-19 19:37:55,898 simulation_debug DEBUG    Time 53423.572633: Report Priotity_3.0_Index_6811 is being handled by a developer now. 
+2017-07-19 19:37:55,898 simulation_debug DEBUG    Time 53423.572633: Report Priotity_1.0_Index_6810 is being handled by a developer now. 
+2017-07-19 19:37:55,898 simulation_debug DEBUG    Time 53423.572633: Report Priotity_1.0_Index_6808 is being handled by a developer now. 
+2017-07-19 19:37:55,898 simulation_debug DEBUG    Time 53423.572633: Report Priotity_1.0_Index_6806 is being handled by a developer now. 
+2017-07-19 19:37:55,898 simulation_debug DEBUG    Time 53423.6843417: Report Priotity_3.0_Index_6814 arrived at 53423.6843417 .Current fixes: 5304
+2017-07-19 19:37:55,898 simulation_debug DEBUG    total_fixed: 5304
+2017-07-19 19:37:55,898 simulation_debug DEBUG    Time 53424.8110759: Report Priotity_1.0_Index_6712 by reporter sudhap got fixed after 731.783715112 of reporting. Fix effort: 730.776960593
+2017-07-19 19:37:55,898 simulation_debug DEBUG    Time 53424.8110759: Report Priotity_3.0_Index_6814 is being handled by a developer now. 
+2017-07-19 19:37:55,900 simulation_debug DEBUG    total_fixed: 5305
+2017-07-19 19:37:55,900 simulation_debug DEBUG    total_fixed: 5305
+2017-07-19 19:37:55,900 simulation_debug DEBUG    total_fixed: 5305
+2017-07-19 19:37:55,900 simulation_debug DEBUG    Time 53427.2254864: Report Priotity_1.0_Index_6815 arrived at 53427.2254864 .Current fixes: 5305
+2017-07-19 19:37:55,900 simulation_debug DEBUG    Time 53427.7230882: Report Priotity_1.0_Index_6762 by reporter iamaleksey got fixed after 440.079951981 of reporting. Fix effort: 437.886447775
+2017-07-19 19:37:55,900 simulation_debug DEBUG    Time 53427.7230882: Report Priotity_1.0_Index_6815 is being handled by a developer now. 
+2017-07-19 19:37:55,901 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,901 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,901 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,901 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,901 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,901 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,901 simulation_debug DEBUG    Time 53433.3294505: Report Priotity_1.0_Index_6816 arrived at 53433.3294505 .Current fixes: 5306
+2017-07-19 19:37:55,901 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,903 simulation_debug DEBUG    Time 53434.2795631: Report Priotity_3.0_Index_6817 arrived at 53434.2795631 .Current fixes: 5306
+2017-07-19 19:37:55,903 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,903 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,903 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,903 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,903 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,903 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,903 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,904 simulation_debug DEBUG    Time 53441.402141: Report Priotity_1.0_Index_6818 arrived at 53441.402141 .Current fixes: 5306
+2017-07-19 19:37:55,904 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,904 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,904 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,904 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,904 simulation_debug DEBUG    Time 53445.5482716: Report Priotity_3.0_Index_6819 arrived at 53445.5482716 .Current fixes: 5306
+2017-07-19 19:37:55,904 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,905 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,905 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,905 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,905 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,905 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,905 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,905 simulation_debug DEBUG    total_fixed: 5306
+2017-07-19 19:37:55,907 simulation_debug DEBUG    Time 53453.4163564: Report Priotity_3.0_Index_6820 arrived at 53453.4163564 .Current fixes: 5306
+2017-07-19 19:37:55,907 simulation_debug DEBUG    Time 53453.4951227: Report Priotity_1.0_Index_6559 by reporter cdaw got fixed after 1893.79764065 of reporting. Fix effort: 1889.56661817
+2017-07-19 19:37:55,907 simulation_debug DEBUG    Time 53453.4951227: Report Priotity_3.0_Index_6820 is being handled by a developer now. 
+2017-07-19 19:37:55,907 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,907 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,908 simulation_debug DEBUG    Time 53455.9254493: Report Priotity_1.0_Index_6821 arrived at 53455.9254493 .Current fixes: 5307
+2017-07-19 19:37:55,908 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,908 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,908 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,908 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,908 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,908 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,910 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,910 simulation_debug DEBUG    Time 53462.4422556: Report Priotity_3.0_Index_6822 arrived at 53462.4422556 .Current fixes: 5307
+2017-07-19 19:37:55,911 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,911 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,911 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,911 simulation_debug DEBUG    Time 53465.7105191: Report Priotity_1.0_Index_6823 arrived at 53465.7105191 .Current fixes: 5307
+2017-07-19 19:37:55,911 simulation_debug DEBUG    total_fixed: 5307
+2017-07-19 19:37:55,911 simulation_debug DEBUG    Time 53466.2730437: Report Priotity_3.0_Index_6750 by reporter bcoverston got fixed after 576.948295049 of reporting. Fix effort: 572.870793958
+2017-07-19 19:37:55,911 simulation_debug DEBUG    Time 53466.2730437: Report Priotity_1.0_Index_6823 is being handled by a developer now. 
+2017-07-19 19:37:55,911 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,911 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,911 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,911 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,911 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,913 simulation_debug DEBUG    Time 53471.0847262: Report Priotity_1.0_Index_6824 arrived at 53471.0847262 .Current fixes: 5308
+2017-07-19 19:37:55,913 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,913 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,913 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,913 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,913 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,913 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,913 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,914 simulation_debug DEBUG    Time 53478.5362443: Report Priotity_1.0_Index_6825 arrived at 53478.5362443 .Current fixes: 5308
+2017-07-19 19:37:55,914 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,914 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,914 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,914 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,914 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,914 simulation_debug DEBUG    Time 53483.810431: Report Priotity_1.0_Index_6826 arrived at 53483.810431 .Current fixes: 5308
+2017-07-19 19:37:55,914 simulation_debug DEBUG    total_fixed: 5308
+2017-07-19 19:37:55,914 simulation_debug DEBUG    Time 53484.1056995: Report Priotity_1.0_Index_4309 by reporter JoshuaMcKenzie got fixed after 19826.440745 of reporting. Fix effort: 6492.21276741
+2017-07-19 19:37:55,914 simulation_debug DEBUG    Time 53484.1056995: Report Priotity_1.0_Index_6826 is being handled by a developer now. 
+2017-07-19 19:37:55,915 simulation_debug DEBUG    Time 53484.2638984: Report Priotity_1.0_Index_6827 arrived at 53484.2638984 .Current fixes: 5309
+2017-07-19 19:37:55,915 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,915 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,915 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,915 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,917 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,917 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,917 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,917 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,917 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,917 simulation_debug DEBUG    Time 53493.880398: Report Priotity_1.0_Index_6828 arrived at 53493.880398 .Current fixes: 5309
+2017-07-19 19:37:55,917 simulation_debug DEBUG    total_fixed: 5309
+2017-07-19 19:37:55,917 simulation_debug DEBUG    Time 53494.8992589: Report Priotity_1.0_Index_6034 by reporter samarthjain got fixed after 5873.58688401 of reporting. Fix effort: 5463.70916093
+2017-07-19 19:37:55,917 simulation_debug DEBUG    Time 53494.8992589: Report Priotity_1.0_Index_6828 is being handled by a developer now. 
+2017-07-19 19:37:55,918 simulation_debug DEBUG    Time 53494.8992589: Report Priotity_1.0_Index_6827 is being handled by a developer now. 
+2017-07-19 19:37:55,918 simulation_debug DEBUG    total_fixed: 5310
+2017-07-19 19:37:55,920 simulation_debug DEBUG    Time 53495.3768019: Report Priotity_1.0_Index_6829 arrived at 53495.3768019 .Current fixes: 5310
+2017-07-19 19:37:55,920 simulation_debug DEBUG    total_fixed: 5310
+2017-07-19 19:37:55,920 simulation_debug DEBUG    total_fixed: 5310
+2017-07-19 19:37:55,921 simulation_debug DEBUG    Time 53497.0872946: Report Priotity_1.0_Index_6830 arrived at 53497.0872946 .Current fixes: 5310
+2017-07-19 19:37:55,921 simulation_debug DEBUG    total_fixed: 5310
+2017-07-19 19:37:55,921 simulation_debug DEBUG    Time 53498.6289395: Report Priotity_1.0_Index_6583 by reporter jjordan got fixed after 1743.35502093 of reporting. Fix effort: 1673.84916597
+2017-07-19 19:37:55,921 simulation_debug DEBUG    Time 53498.6289395: Report Priotity_1.0_Index_6830 is being handled by a developer now. 
+2017-07-19 19:37:55,921 simulation_debug DEBUG    total_fixed: 5311
+2017-07-19 19:37:55,921 simulation_debug DEBUG    total_fixed: 5311
+2017-07-19 19:37:55,921 simulation_debug DEBUG    total_fixed: 5311
+2017-07-19 19:37:55,921 simulation_debug DEBUG    total_fixed: 5311
+2017-07-19 19:37:55,921 simulation_debug DEBUG    total_fixed: 5311
+2017-07-19 19:37:55,921 simulation_debug DEBUG    total_fixed: 5311
+2017-07-19 19:37:55,923 simulation_debug DEBUG    total_fixed: 5311
+2017-07-19 19:37:55,923 simulation_debug DEBUG    total_fixed: 5311
+2017-07-19 19:37:55,923 simulation_debug DEBUG    Time 53506.0217611: Report Priotity_3.0_Index_6741 by reporter sailaja got fixed after 661.744634669 of reporting. Fix effort: 300.789283073
+2017-07-19 19:37:55,923 simulation_debug DEBUG    Time 53506.0217611: Report Priotity_1.0_Index_6829 is being handled by a developer now. 
+2017-07-19 19:37:55,923 simulation_debug DEBUG    total_fixed: 5312
+2017-07-19 19:37:55,923 simulation_debug DEBUG    total_fixed: 5312
+2017-07-19 19:37:55,923 simulation_debug DEBUG    total_fixed: 5312
+2017-07-19 19:37:55,923 simulation_debug DEBUG    total_fixed: 5312
+2017-07-19 19:37:55,923 simulation_debug DEBUG    total_fixed: 5312
+2017-07-19 19:37:55,923 simulation_debug DEBUG    total_fixed: 5312
+2017-07-19 19:37:55,924 simulation_debug DEBUG    Time 53512.9412945: Report Priotity_1.0_Index_6637 by reporter swamy got fixed after 1313.04494629 of reporting. Fix effort: 1307.32185241
+2017-07-19 19:37:55,924 simulation_debug DEBUG    Time 53512.9412945: Report Priotity_1.0_Index_6825 is being handled by a developer now. 
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5313
+2017-07-19 19:37:55,924 simulation_debug DEBUG    Time 53513.6325804: Report Priotity_1.0_Index_6494 by reporter josephkb got fixed after 2372.79139577 of reporting. Fix effort: 2359.86525315
+2017-07-19 19:37:55,924 simulation_debug DEBUG    Time 53513.6325804: Report Priotity_1.0_Index_6824 is being handled by a developer now. 
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5314
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5314
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5314
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5314
+2017-07-19 19:37:55,924 simulation_debug DEBUG    Time 53517.4151645: Report Priotity_1.0_Index_6740 by reporter pfm.smits got fixed after 674.841267609 of reporting. Fix effort: 307.946084926
+2017-07-19 19:37:55,924 simulation_debug DEBUG    Time 53517.4151645: Report Priotity_3.0_Index_6822 is being handled by a developer now. 
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,924 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,926 simulation_debug DEBUG    Time 53525.3988531: Report Priotity_1.0_Index_6831 arrived at 53525.3988531 .Current fixes: 5315
+2017-07-19 19:37:55,926 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,926 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,926 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    Time 53532.4183775: Report Priotity_1.0_Index_6832 arrived at 53532.4183775 .Current fixes: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,927 simulation_debug DEBUG    Time 53539.572048: Report Priotity_1.0_Index_6833 arrived at 53539.572048 .Current fixes: 5315
+2017-07-19 19:37:55,928 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,928 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,928 simulation_debug DEBUG    Time 53541.4165627: Report Priotity_1.0_Index_6834 arrived at 53541.4165627 .Current fixes: 5315
+2017-07-19 19:37:55,928 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,928 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,928 simulation_debug DEBUG    total_fixed: 5315
+2017-07-19 19:37:55,930 simulation_debug DEBUG    Time 53544.2277623: Report Priotity_1.0_Index_6599 by reporter sudhap got fixed after 1655.98544097 of reporting. Fix effort: 1642.00021368
+2017-07-19 19:37:55,930 simulation_debug DEBUG    Time 53544.2277623: Report Priotity_1.0_Index_6834 is being handled by a developer now. 
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,930 simulation_debug DEBUG    Time 53556.3859951: Report Priotity_1.0_Index_6835 arrived at 53556.3859951 .Current fixes: 5316
+2017-07-19 19:37:55,931 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,931 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,931 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,931 simulation_debug DEBUG    total_fixed: 5316
+2017-07-19 19:37:55,931 simulation_debug DEBUG    Time 53560.5473923: Report Priotity_1.0_Index_6718 by reporter josephkb got fixed after 846.141693367 of reporting. Fix effort: 839.199966024
+2017-07-19 19:37:55,931 simulation_debug DEBUG    Time 53560.5473923: Report Priotity_1.0_Index_6835 is being handled by a developer now. 
+2017-07-19 19:37:55,933 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,933 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,933 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,933 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,933 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,933 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,933 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,933 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,933 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,934 simulation_debug DEBUG    Time 53569.3979974: Report Priotity_1.0_Index_6836 arrived at 53569.3979974 .Current fixes: 5317
+2017-07-19 19:37:55,934 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,934 simulation_debug DEBUG    Time 53570.6750908: Report Priotity_1.0_Index_6837 arrived at 53570.6750908 .Current fixes: 5317
+2017-07-19 19:37:55,934 simulation_debug DEBUG    total_fixed: 5317
+2017-07-19 19:37:55,934 simulation_debug DEBUG    Time 53571.2147008: Report Priotity_1.0_Index_766 by reporter rayeesn got fixed after 46414.5339761 of reporting. Fix effort: 46414.5339761
+2017-07-19 19:37:55,934 simulation_debug DEBUG    Time 53571.2147008: Report Priotity_1.0_Index_6837 is being handled by a developer now. 
+2017-07-19 19:37:55,934 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,934 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,934 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,934 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,936 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,936 simulation_debug DEBUG    Time 53576.0480664: Report Priotity_3.0_Index_6838 arrived at 53576.0480664 .Current fixes: 5318
+2017-07-19 19:37:55,936 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,936 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,936 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,937 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,937 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,937 simulation_debug DEBUG    Time 53581.5006149: Report Priotity_1.0_Index_6839 arrived at 53581.5006149 .Current fixes: 5318
+2017-07-19 19:37:55,937 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,937 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,937 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,937 simulation_debug DEBUG    Time 53584.0559574: Report Priotity_1.0_Index_6840 arrived at 53584.0559574 .Current fixes: 5318
+2017-07-19 19:37:55,937 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,937 simulation_debug DEBUG    total_fixed: 5318
+2017-07-19 19:37:55,938 simulation_debug DEBUG    Time 53586.5779189: Report Priotity_1.0_Index_6841 arrived at 53586.5779189 .Current fixes: 5318
+2017-07-19 19:37:55,938 simulation_debug DEBUG    Time 53586.7009746: Report Priotity_3.0_Index_6708 by reporter anilpatel got fixed after 937.115650163 of reporting. Fix effort: 929.256367093
+2017-07-19 19:37:55,938 simulation_debug DEBUG    Time 53586.7009746: Report Priotity_1.0_Index_6841 is being handled by a developer now. 
+2017-07-19 19:37:55,940 simulation_debug DEBUG    total_fixed: 5319
+2017-07-19 19:37:55,940 simulation_debug DEBUG    Time 53587.9390153: Report Priotity_1.0_Index_6760 by reporter aboudreault got fixed after 604.845633516 of reporting. Fix effort: 582.402095702
+2017-07-19 19:37:55,940 simulation_debug DEBUG    Time 53587.9390153: Report Priotity_1.0_Index_6840 is being handled by a developer now. 
+2017-07-19 19:37:55,940 simulation_debug DEBUG    Time 53587.9390153: Report Priotity_1.0_Index_6839 is being handled by a developer now. 
+2017-07-19 19:37:55,940 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,940 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,940 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,940 simulation_debug DEBUG    Time 53590.9821964: Report Priotity_1.0_Index_6842 arrived at 53590.9821964 .Current fixes: 5320
+2017-07-19 19:37:55,940 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,940 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,940 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,941 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,943 simulation_debug DEBUG    Time 53605.1571292: Report Priotity_1.0_Index_6843 arrived at 53605.1571292 .Current fixes: 5320
+2017-07-19 19:37:55,943 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,943 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,943 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,943 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    Time 53609.512543: Report Priotity_1.0_Index_6844 arrived at 53609.512543 .Current fixes: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    Time 53621.1142272: Report Priotity_1.0_Index_6845 arrived at 53621.1142272 .Current fixes: 5320
+2017-07-19 19:37:55,944 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,946 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,946 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,946 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,946 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,946 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    Time 53627.2026024: Report Priotity_3.0_Index_6846 arrived at 53627.2026024 .Current fixes: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    Time 53628.3594185: Report Priotity_1.0_Index_6847 arrived at 53628.3594185 .Current fixes: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,947 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    Time 53635.0252623: Report Priotity_1.0_Index_6848 arrived at 53635.0252623 .Current fixes: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,948 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,950 simulation_debug DEBUG    total_fixed: 5320
+2017-07-19 19:37:55,950 simulation_debug DEBUG    Time 53647.9065826: Report Priotity_1.0_Index_6584 by reporter stephenc got fixed after 1890.52961682 of reporting. Fix effort: 1875.27211294
+2017-07-19 19:37:55,950 simulation_debug DEBUG    Time 53647.9065826: Report Priotity_1.0_Index_6848 is being handled by a developer now. 
+2017-07-19 19:37:55,950 simulation_debug DEBUG    Time 53647.9065826: Report Priotity_1.0_Index_6847 is being handled by a developer now. 
+2017-07-19 19:37:55,950 simulation_debug DEBUG    Time 53647.9065826: Report Priotity_3.0_Index_6846 is being handled by a developer now. 
+2017-07-19 19:37:55,950 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,950 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,951 simulation_debug DEBUG    Time 53649.8033712: Report Priotity_1.0_Index_6849 arrived at 53649.8033712 .Current fixes: 5321
+2017-07-19 19:37:55,951 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,951 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,951 simulation_debug DEBUG    Time 53651.7875697: Report Priotity_1.0_Index_6850 arrived at 53651.7875697 .Current fixes: 5321
+2017-07-19 19:37:55,951 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,953 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,953 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,953 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,953 simulation_debug DEBUG    Time 53655.6602663: Report Priotity_3.0_Index_6851 arrived at 53655.6602663 .Current fixes: 5321
+2017-07-19 19:37:55,953 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,953 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,953 simulation_debug DEBUG    Time 53657.2930409: Report Priotity_1.0_Index_6852 arrived at 53657.2930409 .Current fixes: 5321
+2017-07-19 19:37:55,953 simulation_debug DEBUG    total_fixed: 5321
+2017-07-19 19:37:55,953 simulation_debug DEBUG    Time 53658.553056: Report Priotity_1.0_Index_6591 by reporter johanoskarsson got fixed after 1864.13623961 of reporting. Fix effort: 1858.69888991
+2017-07-19 19:37:55,953 simulation_debug DEBUG    Time 53658.553056: Report Priotity_1.0_Index_6852 is being handled by a developer now. 
+2017-07-19 19:37:55,954 simulation_debug DEBUG    Time 53658.553056: Report Priotity_3.0_Index_6851 is being handled by a developer now. 

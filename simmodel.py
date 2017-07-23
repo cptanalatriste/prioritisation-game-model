@@ -1,7 +1,7 @@
 """
 This module is a discrete event simulation model for the bug reporting process
 """
-
+import logging
 from SimPy.Simulation import *
 from SimPy.SimPlot import *
 
@@ -29,6 +29,8 @@ METRIC_BUGS_FIXED = 'completed'
 METRIC_BUGS_REPORTED = 'reported'
 METRIC_TIME_INVESTED = 'time'
 
+logger = gtconfig.get_logger("simulation_debug", "simulation_debug.txt", level=logging.INFO)
+
 
 class BugStream:
     """
@@ -52,7 +54,7 @@ class BugStream:
         reporter = self.reporter_gen.generate()
         index = self.bug_counter
 
-        bug_config = {'report_key': 'Priotity_' + str(priority) + "_Index_" + str(index),
+        bug_config = {'report_key': 'Priority_' + str(priority) + "_Index_" + str(index),
                       'real_priority': priority,
                       'fix_effort': self.get_fix_effort(priority),
                       'reporter': reporter}
@@ -86,7 +88,8 @@ class TestingContext:
                  views_to_discard,
                  catcher_generator,
                  timeout,
-                 inflation_factor=None):
+                 inflation_factor=None,
+                 replication_id=""):
         """
         Configures the context of the simulation.
 
@@ -108,6 +111,7 @@ class TestingContext:
         self.views_to_discard = views_to_discard
         self.catcher_generator = catcher_generator
         self.timeout = timeout
+        self.replication_id = replication_id
 
         self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {METRIC_BUGS_FIXED: Monitor(),
                                                                 METRIC_BUGS_REPORTED: 0,
@@ -119,6 +123,7 @@ class TestingContext:
                                                             METRIC_BUGS_REPORTED: 0,
                                                             METRIC_TIME_INVESTED: 0.0}}
 
+        self.inflation_factor = None
         if self.quota_system:
             self.inflation_factor = inflation_factor
 
@@ -157,8 +162,6 @@ class TestingContext:
         """
 
         total_fixed = self.get_total_fixes()
-
-        # print "total_fixed: ", total_fixed
 
         if total_fixed < self.target_fixes:
             return False
@@ -281,7 +284,7 @@ class BasicBugReport:
         """
         priority_monitors[self.real_priority][METRIC_TIME_INVESTED] += self.fix_effort
 
-    def update_monitors(self, resolution_monitors, time, debug=False):
+    def update_monitors(self, resolution_monitors, time, testing_context):
         """
         Updates the resolution counters
         :param time: Simulation time.
@@ -291,9 +294,10 @@ class BasicBugReport:
         """
         resol_time = time - self.arrival_time
 
-        if debug:
-            print "Time ", time, ": Report ", self.name, "by reporter ", self.reporter, " got fixed after ", resol_time, \
-                " of reporting. Fix effort: ", self.fix_effort
+        logger.debug(testing_context.replication_id +
+                     " Time " + str(
+            time) + ": Report " + self.name + " by reporter " + self.reporter + " got fixed after " + str(
+            resol_time) + " of reporting. Fix effort: " + str(self.fix_effort))
 
         for monitor in resolution_monitors:
             if isinstance(monitor, dict):
@@ -302,11 +306,13 @@ class BasicBugReport:
                 monitor.observe(resol_time)
 
     def notify_report_arrival(self, time, testing_context):
-        print "Time ", time, ": Report ", self.name, " arrived at ", now(), " .Current fixes: ", \
-            testing_context.get_total_fixes()
+        return testing_context.replication_id + " Time " + str(time) + ": Report " + self.name + " arrived at " + str(
+            now()) + " .Current fixes: " + str(
+            testing_context.get_total_fixes())
 
-    def notify_developer_start(self, time):
-        print "Time ", time, ": Report ", self.name, " is being handled by a developer now. "
+    def notify_developer_start(self, time, testing_context):
+        return testing_context.replication_id + " Time " + str(
+            time) + ": Report " + self.name + " is being handled by a developer now. "
 
 
 class BugReportSource(Process):
@@ -318,7 +324,7 @@ class BugReportSource(Process):
         Process.__init__(self, "Reporting_Process")
         self.interarrival_time_gen = interarrival_time_gen
         self.batch_size_gen = batch_size_gen
-        self.strategy_map = configure_strategy_map(reporters_config)
+        self.strategy_map = configure_strategy_map(reporters_config, testing_context)
         self.testing_context = testing_context
 
     def get_reporter_strategy(self, reporter_name):
@@ -478,24 +484,25 @@ class GatekeeperBugReport(Process):
         Process.__init__(self, basic_report.name)
         self.basic_report = basic_report
 
-    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, time_spent_monitor, testing_context,
-               debug=False):
-        if debug:
-            self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context)
+    def arrive(self, developer_resource, gatekeeper_resource, resolution_monitors, testing_context):
+        logger.debug(
+            testing_context.replication_id + " " + self.basic_report.notify_report_arrival(time=now(),
+                                                                                           testing_context=testing_context))
 
         timeout = None
 
         if testing_context.get_timeout() is not None:
-            timeout = BugReportTimeOut(report_process=self, timeout=testing_context.get_timeout())
-            activate(timeout, timeout.start_countdown(debug=debug))
+            timeout = BugReportTimeOut(report_process=self, timeout=testing_context.get_timeout(),
+                                       testing_context=testing_context)
+            activate(timeout, timeout.start_countdown())
 
         yield request, self, gatekeeper_resource
 
         if timeout is not None:
             self.cancel(timeout)
 
-        if debug:
-            print "The Gatekeeper is reviewing report ", self.basic_report.name, " . Timeout was cancelled."
+        logger.debug(
+            testing_context.replication_id + " The Gatekeeper is reviewing report " + self.basic_report.name + " . Timeout was cancelled.")
 
         # This section relates to the gatekeeper logic.
         yield hold, self, abs(self.basic_report.review_time)
@@ -503,16 +510,16 @@ class GatekeeperBugReport(Process):
         if self.basic_report.is_false_report() and testing_context.catch_inflation():
             self.basic_report.correct_priority()
         else:
-            if debug:
-                print "An inflation/deflation was ignored!"
+            logger.debug(testing_context.replication_id + " An inflation/deflation was ignored!")
 
         yield release, self, gatekeeper_resource
 
         # Development team comes into action!
         yield request, self, developer_resource, self.basic_report.get_priority_for_queue()
 
-        if debug:
-            self.basic_report.notify_developer_start(time=now())
+        logger.debug(
+            testing_context.replication_id + " " + self.basic_report.notify_developer_start(time=now(),
+                                                                                            testing_context=testing_context))
 
         if testing_context.ignore(reported_priority=self.basic_report.report_priority,
                                   reporter_name=self.basic_report.reporter):
@@ -528,7 +535,7 @@ class GatekeeperBugReport(Process):
         yield hold, self, abs(self.basic_report.fix_effort)
         yield release, self, developer_resource
 
-        self.basic_report.update_monitors(resolution_monitors, time_spent_monitor, now(), debug=debug)
+        self.basic_report.update_monitors(resolution_monitors, now(), testing_context)
         self.basic_report.track_effort(testing_context.priority_monitors)
 
 
@@ -544,20 +551,18 @@ class SimpleBugReport(Process):
         Process.__init__(self, basic_report.name)
         self.basic_report = basic_report
 
-    def arrive(self, developer_resource, resolution_monitors, testing_context, debug=True):
-        if debug:
-            self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context)
+    def arrive(self, developer_resource, resolution_monitors, testing_context):
+        logger.debug(self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context))
 
         yield request, self, developer_resource, self.basic_report.report_priority
 
-        if debug:
-            self.basic_report.notify_developer_start(time=now())
+        logger.debug(self.basic_report.notify_developer_start(time=now(), testing_context=testing_context))
 
         # Finally, here we're using our development time budget.
         yield hold, self, abs(self.basic_report.fix_effort)
         yield release, self, developer_resource
 
-        self.basic_report.update_monitors(resolution_monitors, time=now(), debug=debug)
+        self.basic_report.update_monitors(resolution_monitors, time=now(), testing_context=testing_context)
         self.basic_report.track_effort(testing_context.priority_monitors)
 
 
@@ -570,15 +575,13 @@ class VanillaBugReport(Process):
         Process.__init__(self, basic_report.name)
         self.basic_report = basic_report
 
-    def arrive(self, developer_resource, resolution_monitors, testing_context, debug=False):
+    def arrive(self, developer_resource, resolution_monitors, testing_context):
 
-        if debug:
-            self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context)
+        logger.debug(self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context))
 
         yield request, self, developer_resource, self.basic_report.get_priority_for_queue()
 
-        if debug:
-            self.basic_report.notify_developer_start(time=now())
+        logger.debug(self.basic_report.notify_developer_start(time=now(), testing_context=testing_context))
 
         # This is the ignoring procedure
         if testing_context.ignore(reported_priority=self.basic_report.report_priority,
@@ -596,7 +599,7 @@ class VanillaBugReport(Process):
         yield hold, self, abs(self.basic_report.fix_effort)
         yield release, self, developer_resource
 
-        self.basic_report.update_monitors(resolution_monitors, time=now(), debug=debug)
+        self.basic_report.update_monitors(resolution_monitors, time=now(), testing_context=testing_context)
         self.basic_report.track_effort(testing_context.priority_monitors)
 
 
@@ -609,14 +612,12 @@ class ThrottlingBugReport(Process):
         Process.__init__(self, basic_report.name)
         self.basic_report = basic_report
 
-    def arrive(self, developer_resource, resolution_monitors, testing_context, inflation_penalty, debug=False):
-        if debug:
-            self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context)
+    def arrive(self, developer_resource, resolution_monitors, testing_context, inflation_penalty):
+        logger.debug(self.basic_report.notify_report_arrival(time=now(), testing_context=testing_context))
 
         yield request, self, developer_resource, self.basic_report.get_priority_for_queue()
 
-        if debug:
-            self.basic_report.notify_developer_start(time=now())
+        logger.debug(self.basic_report.notify_developer_start(time=now(), testing_context=testing_context))
 
         # This is the ignoring procedure
         if testing_context.ignore(reported_priority=self.basic_report.report_priority,
@@ -634,12 +635,13 @@ class ThrottlingBugReport(Process):
         yield hold, self, abs(self.basic_report.fix_effort)
         yield release, self, developer_resource
 
-        self.basic_report.update_monitors(resolution_monitors, time=now(), debug=debug)
+        self.basic_report.update_monitors(resolution_monitors, time=now(), testing_context=testing_context)
         self.basic_report.track_effort(testing_context.priority_monitors)
 
         if self.basic_report.is_false_report() and inflation_penalty > 0 and testing_context.catch_inflation():
-            if debug:
-                print "Penalty to be applied to", self.reporter, " : Penalizing with ", inflation_penalty
+            logger.debug(
+                testing_context.replication_id + " Penalty to be applied to" + self.basic_report.reporter + " : Penalizing with " + str(
+                    inflation_penalty))
             testing_context.apply_penalty(inflation_penalty=inflation_penalty, reporter_name=self.basic_report.reporter)
 
 
@@ -648,17 +650,19 @@ class BugReportTimeOut(Process):
     This process manages the time a bug report can stay on the queue
     """
 
-    def __init__(self, report_process, timeout):
+    def __init__(self, report_process, timeout, testing_context):
         Process.__init__(self, "Timeout_" + report_process.name)
         self.report_process = report_process
+        self.testing_context = testing_context
         self.timeout = timeout
 
-    def start_countdown(self, debug=None):
+    def start_countdown(self):
         yield hold, self, self.timeout
         self.cancel(self.report_process)
 
-        if debug:
-            print "The report ", self.report_process.name, " was cancelled after ", self.timeout, " time units."
+        logger.debug(self.testing_context.replication_id +
+                     " The report " + self.report_process.name + " was cancelled after " + str(
+            self.timeout) + " time units.")
 
 
 class SimulationController(Process):
@@ -688,7 +692,7 @@ def start_priority_counter():
             simdata.SEVERE_PRIORITY: 0}
 
 
-def configure_strategy_map(reporters_config):
+def configure_strategy_map(reporters_config, testing_context):
     """
     Generates a map of reporters and its strategies.
     :param reporters_config:
@@ -702,6 +706,12 @@ def configure_strategy_map(reporters_config):
         strategy = None
         if strategy_key in config:
             strategy = config[strategy_key]
+            strategy.configure()
+
+            if hasattr(strategy, 'current_strategy'):
+                logger.debug(testing_context.replication_id +
+                             " Reporter: " + config[
+                                 'name'] + " will be using strategy " + strategy.current_strategy.name)
 
         strategy_map[config['name']] = strategy
 
@@ -717,7 +727,7 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
               batch_size_gen=None,
               views_to_discard=0,
               bug_stream=None,
-              quota_system=False, inflation_factor=None, catcher_generator=None, debug=False):
+              quota_system=False, inflation_factor=None, catcher_generator=None, replication_id=""):
     """
     Triggers the simulation, according to the provided parameters.
     :param debug: Enable to got debug information.
@@ -750,7 +760,7 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
         # We are ensuring a minimum capacity of one developer.
         team_capacity = max(1, dev_size_generator.generate())
 
-    # print "team_capacity: ", team_capacity
+    logger.debug(replication_id + " team_capacity: " + str(team_capacity))
     developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
                                   preemptable=preemptable)
 
@@ -778,7 +788,8 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
                                      views_to_discard=views_to_discard,
                                      catcher_generator=catcher_generator,
                                      target_fixes=target_fixes,
-                                     timeout=timeout)
+                                     timeout=timeout,
+                                     replication_id=replication_id)
 
     controller = SimulationController(testing_context=testing_context)
     activate(controller, controller.control())
@@ -802,9 +813,8 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
                                           gatekeeper_resource=gatekeeper_resource,
                                           reporter_monitors=reporter_monitors), at=start_time)
 
-    if debug:
-        print "testing_context.inflation_penalty ", testing_context.inflation_penalty, "len(reporters_config) ", len(
-            reporters_config)
+    logger.debug(replication_id + " testing_context.inflation_factor " + str(
+        testing_context.inflation_factor) + " len(reporters_config) " + str(len(reporters_config)))
 
     simulation_result = simulate(until=max_time)
     return reporter_monitors, testing_context.priority_monitors, testing_context.get_reporting_time()
