@@ -294,7 +294,11 @@ def do_throttling(simulation_configuration, simfunction, input_params, empirical
                                    desc=desc, empirical_profile=empirical_profile)
 
 
-def main():
+def gather_experiment_inputs():
+    """
+    It gathers all the data items needed for the performance measure experiments.
+    :return: Base simulation configuration, simulation function, simulation inputs and empirical strategy profile.
+    """
     logger.info("Loading information from " + simdata.ALL_ISSUES_CSV)
     all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
 
@@ -320,6 +324,11 @@ def main():
         simfunction = simutils.launch_simulation
 
     empirical_profile = extract_empirical_profile(input_params.player_configuration)
+    return simulation_configuration, simfunction, input_params, empirical_profile
+
+
+def main():
+    simulation_configuration, simfunction, input_params, empirical_profile = gather_experiment_inputs()
 
     do_unsupervised_prioritization(simulation_configuration, simfunction, input_params, empirical_profile)
     do_throttling(simulation_configuration, simfunction, input_params, empirical_profile)
