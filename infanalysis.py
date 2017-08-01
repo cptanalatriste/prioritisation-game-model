@@ -40,12 +40,16 @@ def generate_inflated_profile(inflation_rate, empirical_profile):
     return inflated_profile
 
 
-def do_unsupervised_prioritization(simulation_configuration, input_params, simfunction, empirical_profile,
-                                   replications_per_rate, step):
-    simulation_configuration['REPLICATIONS_PER_PROFILE'] = replications_per_rate
-    simulation_configuration["THROTTLING_ENABLED"] = False
-    simulation_configuration["GATEKEEPER_CONFIG"] = None
-
+def get_performance_dataframe(input_params, simfunction, simulation_configuration, empirical_profile, step):
+    """
+    Produces a dataframe containing performance measure values per several configurations of inflation probability.
+    :param input_params: Simulation inputs.
+    :param simfunction: Simulation function.
+    :param simulation_configuration: Simulation configuration.
+    :param empirical_profile: Empirical strategy profile.
+    :param step: Offset between inflation probabilities.
+    :return: Dataframe instance.
+    """
     regression_data = []
 
     logger.info("Reporters in population: " + str(len(empirical_profile.keys())))
@@ -57,27 +61,73 @@ def do_unsupervised_prioritization(simulation_configuration, input_params, simfu
         syseval.apply_strategy_profile(input_params.player_configuration, profile_after_inflation)
 
         simulation_output = syseval.run_scenario(simfunction, input_params, simulation_configuration)
+        performance_metrics = zip(simulation_output.get_time_ratio_per_priority(simdata.SEVERE_PRIORITY),
+                                  simulation_output.get_completed_per_real_priority(simdata.SEVERE_PRIORITY),
+                                  simulation_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY))
+
         regression_data += [{'inflation_rate': inflation_rate,
-                             'severe_completed': severe_completed
-                             } for severe_completed in
-                            simulation_output.get_completed_per_real_priority(simdata.SEVERE_PRIORITY)]
+                             'severe_time_ratio': severe_time_ratio,
+                             'severe_completed': severe_completed,
+                             'severe_fixed_ratio': severe_fixed_ratio
+                             } for severe_time_ratio, severe_completed, severe_fixed_ratio in
+                            performance_metrics]
 
-    dataframe = pd.DataFrame(regression_data)
+    return pd.DataFrame(regression_data)
 
-    severe_completed = dataframe['severe_completed']
-    inflation_rates = dataframe['inflation_rate']
-    rates_with_constant = sm.add_constant(inflation_rates)
 
-    regression_result = sm.OLS(severe_completed, rates_with_constant).fit()
-    logger.info("regression_result.summary(): " + str(regression_result.summary()))
+def perform_regression_analysis(desc, dataframe, dependent_variable, independent_variable):
+    """
+    Performs the regression analysis, logging the output and generating a plot.
+    :param desc: Description of the scenario.
+    :param dataframe: Dataframe with performance values.
+    :param dependent_variable: Name of the dependant variable.
+    :param independent_variable: Name of the independent variable.
+    :return: None.
+    """
+    dependent_values = dataframe[dependent_variable]
+    independent_values = sm.add_constant(dataframe[independent_variable])
+
+    regression_result = sm.OLS(dependent_values, independent_values).fit()
+    logger.info(desc + " -> regression_result.summary(): " + str(regression_result.summary()))
 
     plt.clf()
-    axis = dataframe.plot('inflation_rate', 'severe_completed', style='o')
-    plt.ylabel('Heuristic Inflation Probability')
-    plt.ylabel('Severe Bugs Fixed')
-    plt.title('Severe Bugs Fixed by Inflation Rate')
+    axis = dataframe.plot(independent_variable, dependent_variable, style='o')
+    plt.xlabel(independent_variable)
+    plt.ylabel(dependent_variable)
+    plt.title(desc)
     sm.graphics.abline_plot(model_results=regression_result, ax=axis)
-    plt.savefig("img/" + 'severe_fixes_inf_rate.png')
+    plt.savefig("img/" + desc + '_regression_analysis.png')
+
+
+def do_unsupervised_prioritization(simulation_configuration, input_params, simfunction, empirical_profile,
+                                   step):
+    simulation_configuration["THROTTLING_ENABLED"] = False
+    simulation_configuration["GATEKEEPER_CONFIG"] = None
+
+    desc = "UNSUPERVISED_PRIORITIZATION"
+    logger.info("Starting " + desc + " analysis ...")
+
+    dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
+                                          simulation_configuration=simulation_configuration,
+                                          empirical_profile=empirical_profile, step=step)
+
+    perform_regression_analysis(desc=desc, dataframe=dataframe,
+                                dependent_variable='severe_completed', independent_variable='inflation_rate')
+
+
+def do_throttling(simulation_configuration, input_params, simfunction, empirical_profile, step):
+    simulation_configuration["THROTTLING_ENABLED"] = True
+    simulation_configuration["INFLATION_FACTOR"] = 0.01
+
+    desc = "THROTTLING_INF001"
+    logger.info("Starting " + desc + " analysis ...")
+
+    dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
+                                          simulation_configuration=simulation_configuration,
+                                          empirical_profile=empirical_profile, step=step)
+
+    perform_regression_analysis(desc=desc, dataframe=dataframe,
+                                dependent_variable='severe_completed', independent_variable='inflation_rate')
 
 
 def main():
@@ -88,10 +138,13 @@ def main():
         replications_per_rate) + " Offset between rates " + str(step))
 
     simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
+    simulation_configuration['REPLICATIONS_PER_PROFILE'] = replications_per_rate
 
-    do_unsupervised_prioritization(simulation_configuration=simulation_configuration, simfunction=simfunction,
-                                   input_params=input_params, empirical_profile=empirical_profile,
-                                   replications_per_rate=replications_per_rate, step=step)
+    # do_unsupervised_prioritization(simulation_configuration=simulation_configuration, simfunction=simfunction,
+    #                                input_params=input_params, empirical_profile=empirical_profile, step=step)
+
+    do_throttling(simulation_configuration=simulation_configuration, simfunction=simfunction,
+                  input_params=input_params, empirical_profile=empirical_profile, step=step)
 
 
 if __name__ == "__main__":
