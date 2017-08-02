@@ -75,7 +75,7 @@ def get_performance_dataframe(input_params, simfunction, simulation_configuratio
     return pd.DataFrame(regression_data)
 
 
-def perform_regression_analysis(desc, dataframe, dependent_variable, independent_variable):
+def perform_regression_analysis(desc, dataframe):
     """
     Performs the regression analysis, logging the output and generating a plot.
     :param desc: Description of the scenario.
@@ -84,19 +84,26 @@ def perform_regression_analysis(desc, dataframe, dependent_variable, independent
     :param independent_variable: Name of the independent variable.
     :return: None.
     """
-    dependent_values = dataframe[dependent_variable]
-    independent_values = sm.add_constant(dataframe[independent_variable])
 
-    regression_result = sm.OLS(dependent_values, independent_values).fit()
-    logger.info(desc + " -> regression_result.summary(): " + str(regression_result.summary()))
+    independent_variable = 'inflation_rate'
+    dependent_variables = ['severe_time_ratio', 'severe_completed', 'severe_fixed_ratio']
 
-    plt.clf()
-    axis = dataframe.plot(independent_variable, dependent_variable, style='o')
-    plt.xlabel(independent_variable)
-    plt.ylabel(dependent_variable)
-    plt.title(desc)
-    sm.graphics.abline_plot(model_results=regression_result, ax=axis)
-    plt.savefig("img/" + desc + '_regression_analysis.png')
+    for dependent_variable in dependent_variables:
+        detailed_desc = desc + '_' + dependent_variable
+
+        dependent_values = dataframe[dependent_variable]
+        independent_values = sm.add_constant(dataframe[independent_variable])
+
+        regression_result = sm.OLS(dependent_values, independent_values).fit()
+        logger.info(detailed_desc + " -> regression_result.summary(): " + str(regression_result.summary()))
+
+        plt.clf()
+        axis = dataframe.plot(independent_variable, dependent_variable, style='o')
+        plt.xlabel(independent_variable)
+        plt.ylabel(dependent_variable)
+        plt.title(detailed_desc)
+        sm.graphics.abline_plot(model_results=regression_result, ax=axis)
+        plt.savefig("img/" + detailed_desc + '_' + dependent_variable + '_regression_analysis.png')
 
 
 def do_unsupervised_prioritization(simulation_configuration, input_params, simfunction, empirical_profile,
@@ -111,28 +118,37 @@ def do_unsupervised_prioritization(simulation_configuration, input_params, simfu
                                           simulation_configuration=simulation_configuration,
                                           empirical_profile=empirical_profile, step=step)
 
-    perform_regression_analysis(desc=desc, dataframe=dataframe,
-                                dependent_variable='severe_completed', independent_variable='inflation_rate')
+    perform_regression_analysis(desc=desc, dataframe=dataframe)
 
 
 def do_throttling(simulation_configuration, input_params, simfunction, empirical_profile, step):
     simulation_configuration["THROTTLING_ENABLED"] = True
-    simulation_configuration["INFLATION_FACTOR"] = 0.01
 
-    desc = "THROTTLING_INF001"
-    logger.info("Starting " + desc + " analysis ...")
+    penalty_values = [1, 3, 5]
 
-    dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
-                                          simulation_configuration=simulation_configuration,
-                                          empirical_profile=empirical_profile, step=step)
+    # TODO(cgavidia): Remove later
+    penalty_values = [5]
 
-    perform_regression_analysis(desc=desc, dataframe=dataframe,
-                                dependent_variable='severe_completed', independent_variable='inflation_rate')
+    for penalty in penalty_values:
+        simulation_configuration["INFLATION_FACTOR"] = penalty / 100.0
+
+        desc = "THROTTLING_INF00" + str(penalty)
+        logger.info("Starting " + desc + " analysis ...")
+
+        dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
+                                              simulation_configuration=simulation_configuration,
+                                              empirical_profile=empirical_profile, step=step)
+
+        perform_regression_analysis(desc=desc, dataframe=dataframe)
 
 
 def main():
     replications_per_rate = 20
-    step = 20
+    step = 10
+
+    # TODO(cgavidia): Remove later
+    # replications_per_rate = 12
+    # step = 20
 
     logger.info("Experiment configuration: Replications per Inflation Rate " + str(
         replications_per_rate) + " Offset between rates " + str(step))
@@ -140,8 +156,8 @@ def main():
     simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
     simulation_configuration['REPLICATIONS_PER_PROFILE'] = replications_per_rate
 
-    # do_unsupervised_prioritization(simulation_configuration=simulation_configuration, simfunction=simfunction,
-    #                                input_params=input_params, empirical_profile=empirical_profile, step=step)
+    do_unsupervised_prioritization(simulation_configuration=simulation_configuration, simfunction=simfunction,
+                                   input_params=input_params, empirical_profile=empirical_profile, step=step)
 
     do_throttling(simulation_configuration=simulation_configuration, simfunction=simfunction,
                   input_params=input_params, empirical_profile=empirical_profile, step=step)
