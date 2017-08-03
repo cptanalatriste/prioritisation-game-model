@@ -37,7 +37,7 @@ def generate_inflated_profile(inflation_rate, empirical_profile):
     for inflator in inflators:
         inflated_profile[inflator] = simmodel.SIMPLE_INFLATE_CONFIG
 
-    return inflated_profile
+    return inflated_profile, offender_number
 
 
 def get_performance_dataframe(input_params, simfunction, simulation_configuration, empirical_profile, step):
@@ -57,19 +57,26 @@ def get_performance_dataframe(input_params, simfunction, simulation_configuratio
         logger.info(
             "Simulating UNSUPERVISED PRIORITIZATION with an HEURISTIC INFLATOR probability of " + str(inflation_rate))
 
-        profile_after_inflation = generate_inflated_profile(inflation_rate / 100.0, empirical_profile)
+        normalized_rate = inflation_rate / 100.0
+        profile_after_inflation, offender_number = generate_inflated_profile(normalized_rate, empirical_profile)
         syseval.apply_strategy_profile(input_params.player_configuration, profile_after_inflation)
 
         simulation_output = syseval.run_scenario(simfunction, input_params, simulation_configuration)
         performance_metrics = zip(simulation_output.get_time_ratio_per_priority(simdata.SEVERE_PRIORITY),
                                   simulation_output.get_completed_per_real_priority(simdata.SEVERE_PRIORITY),
-                                  simulation_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY))
+                                  simulation_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY,
+                                                                                 exclude_open=False),
+                                  simulation_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY,
+                                                                                 exclude_open=True))
 
         regression_data += [{'inflation_rate': inflation_rate,
+                             'offender_number': offender_number,
+                             'normalized_rate': normalized_rate,
                              'severe_time_ratio': severe_time_ratio,
                              'severe_completed': severe_completed,
-                             'severe_fixed_ratio': severe_fixed_ratio
-                             } for severe_time_ratio, severe_completed, severe_fixed_ratio in
+                             'severe_fixed_ratio': severe_fixed_ratio,
+                             'severe_fixed_ratio_active': severe_fixed_ratio_active
+                             } for severe_time_ratio, severe_completed, severe_fixed_ratio, severe_fixed_ratio_active in
                             performance_metrics]
 
     return pd.DataFrame(regression_data)
@@ -85,8 +92,8 @@ def perform_regression_analysis(desc, dataframe):
     :return: None.
     """
 
-    independent_variable = 'inflation_rate'
-    dependent_variables = ['severe_time_ratio', 'severe_completed', 'severe_fixed_ratio']
+    independent_variable = 'offender_number'
+    dependent_variables = ['severe_time_ratio', 'severe_completed', 'severe_fixed_ratio', 'severe_fixed_ratio_active']
 
     for dependent_variable in dependent_variables:
         detailed_desc = desc + '_' + dependent_variable
@@ -103,7 +110,7 @@ def perform_regression_analysis(desc, dataframe):
         plt.ylabel(dependent_variable)
         plt.title(detailed_desc)
         sm.graphics.abline_plot(model_results=regression_result, ax=axis)
-        plt.savefig("img/" + detailed_desc + '_' + dependent_variable + '_regression_analysis.png')
+        plt.savefig("img/" + detailed_desc + '_regression_analysis.png')
 
 
 def do_unsupervised_prioritization(simulation_configuration, input_params, simfunction, empirical_profile,
@@ -143,7 +150,7 @@ def do_throttling(simulation_configuration, input_params, simfunction, empirical
 
 
 def main():
-    replications_per_rate = 20
+    replications_per_rate = 40
     step = 10
 
     # TODO(cgavidia): Remove later

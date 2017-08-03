@@ -28,6 +28,7 @@ DEFAULT_TIMEOUT = None
 METRIC_BUGS_FIXED = 'completed'
 METRIC_BUGS_REPORTED = 'reported'
 METRIC_TIME_INVESTED = 'time'
+METRIC_BUGS_ACTIVE = 'active'
 
 logger = gtconfig.get_logger("simulation_debug", "simulation_debug.txt", level=logging.INFO)
 
@@ -115,12 +116,15 @@ class TestingContext:
 
         self.priority_monitors = {simdata.NON_SEVERE_PRIORITY: {METRIC_BUGS_FIXED: Monitor(),
                                                                 METRIC_BUGS_REPORTED: 0,
+                                                                METRIC_BUGS_ACTIVE: 0,
                                                                 METRIC_TIME_INVESTED: 0.0},
                                   simdata.NORMAL_PRIORITY: {METRIC_BUGS_FIXED: Monitor(),
                                                             METRIC_BUGS_REPORTED: 0,
+                                                            METRIC_BUGS_ACTIVE: 0,
                                                             METRIC_TIME_INVESTED: 0.0},
                                   simdata.SEVERE_PRIORITY: {METRIC_BUGS_FIXED: Monitor(),
                                                             METRIC_BUGS_REPORTED: 0,
+                                                            METRIC_BUGS_ACTIVE: 0,
                                                             METRIC_TIME_INVESTED: 0.0}}
 
         self.inflation_factor = None
@@ -275,6 +279,19 @@ class BasicBugReport:
         :return:
         """
         self.report_priority = self.real_priority
+
+    def track_active_bugs(self, testing_context, time):
+        """
+        Keeps track of active bugs: Bugs that have been removed from the queue. It is based on the REAL PRIORITY.
+        :param priority_monitors: The monitors by priority.
+        :return: None
+        """
+
+        logger.debug(
+            testing_context.replication_id + " " + self.notify_developer_start(time=time,
+                                                                               testing_context=testing_context))
+
+        testing_context.priority_monitors[self.real_priority][METRIC_BUGS_ACTIVE] += 1
 
     def track_effort(self, priority_monitors):
         """
@@ -517,9 +534,7 @@ class GatekeeperBugReport(Process):
         # Development team comes into action!
         yield request, self, developer_resource, self.basic_report.get_priority_for_queue()
 
-        logger.debug(
-            testing_context.replication_id + " " + self.basic_report.notify_developer_start(time=now(),
-                                                                                            testing_context=testing_context))
+        self.basic_report.track_active_bugs(testing_context=testing_context, time=now())
 
         if testing_context.ignore(reported_priority=self.basic_report.report_priority,
                                   reporter_name=self.basic_report.reporter):
@@ -556,7 +571,7 @@ class SimpleBugReport(Process):
 
         yield request, self, developer_resource, self.basic_report.report_priority
 
-        logger.debug(self.basic_report.notify_developer_start(time=now(), testing_context=testing_context))
+        self.basic_report.track_active_bugs(testing_context=testing_context, time=now())
 
         # Finally, here we're using our development time budget.
         yield hold, self, abs(self.basic_report.fix_effort)
@@ -581,7 +596,7 @@ class VanillaBugReport(Process):
 
         yield request, self, developer_resource, self.basic_report.get_priority_for_queue()
 
-        logger.debug(self.basic_report.notify_developer_start(time=now(), testing_context=testing_context))
+        self.basic_report.track_active_bugs(testing_context=testing_context, time=now())
 
         # This is the ignoring procedure
         if testing_context.ignore(reported_priority=self.basic_report.report_priority,
@@ -617,7 +632,7 @@ class ThrottlingBugReport(Process):
 
         yield request, self, developer_resource, self.basic_report.get_priority_for_queue()
 
-        logger.debug(self.basic_report.notify_developer_start(time=now(), testing_context=testing_context))
+        self.basic_report.track_active_bugs(testing_context=testing_context, time=now())
 
         # This is the ignoring procedure
         if testing_context.ignore(reported_priority=self.basic_report.report_priority,

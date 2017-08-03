@@ -148,6 +148,7 @@ class SimulationMetrics:
         self.bugs_per_reporter = []
         self.resolved_per_reporter = []
         self.time_per_priority = []
+        self.active_per_priority = []
 
         self.reporting_times = []
 
@@ -165,6 +166,7 @@ class SimulationMetrics:
         self.reported_per_priotity += simulation_metrics.reported_per_priotity
         self.reporting_times += simulation_metrics.reporting_times
         self.time_per_priority += simulation_metrics.time_per_priority
+        self.active_per_priority += simulation_metrics.active_per_priority
 
     def process_simulation_output(self, reporter_monitors, priority_monitors, reporting_time):
         """
@@ -190,6 +192,10 @@ class SimulationMetrics:
         time_per_priority = {priority: monitors[simmodel.METRIC_TIME_INVESTED] for priority, monitors in
                              priority_monitors.iteritems()}
         self.time_per_priority.append(time_per_priority)
+
+        active_per_priority = {priority: monitors[simmodel.METRIC_BUGS_ACTIVE] for priority, monitors in
+                               priority_monitors.iteritems()}
+        self.active_per_priority.append(active_per_priority)
 
         self.bugs_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'priority_counters'))
         self.reports_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'report_counters'))
@@ -252,6 +258,14 @@ class SimulationMetrics:
         """
         return [report[priority] for report in self.reported_per_priotity]
 
+    def get_active_by_real_priority(self, priority):
+        """
+        Get the number of reports that were active, that means removed from the queue, during the simulation.
+        :param priority: REAL priority of the bug
+        :return: List containing replication values.
+        """
+        return [report[priority] for report in self.active_per_priority]
+
     def get_completed_per_real_priority(self, priority):
         """
         Get the number of reports that were completed according to the REAL priority
@@ -290,17 +304,21 @@ class SimulationMetrics:
         return [priority_time / float(total_time) if total_time > 0 else 0.0 for priority_time, total_time in
                 zip(priority_times, total_times)]
 
-    def get_fixed_ratio_per_priority(self, priority):
+    def get_fixed_ratio_per_priority(self, priority, exclude_open=False):
         """
         Get the fixes as a ratio on bugs according to a priority
         :param priority: Priority
         :return: List containing the replication values.
         """
         fixed = self.get_completed_per_real_priority(priority)
-        reported = self.get_reported_by_real_priority(priority)
+
+        if not exclude_open:
+            total = self.get_reported_by_real_priority(priority)
+        else:
+            total = self.get_active_by_real_priority(priority)
 
         return [fixed_bugs / float(reported_bugs) if reported_bugs > 0 else 0.0 for fixed_bugs, reported_bugs in
-                zip(fixed, reported)]
+                zip(fixed, total)]
 
     def get_completed_per_reporter(self, reporter_name):
         """
