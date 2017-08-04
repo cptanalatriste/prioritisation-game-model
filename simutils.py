@@ -203,6 +203,41 @@ class SimulationMetrics:
 
         self.reporting_times.append(reporting_time)
 
+    def get_consolidated_output(self, reporter_configuration):
+        """
+        Returns a summary view of the performance of reporters in all the simulations.
+        :param reporter_configuration: List of reporters.
+        :return: A list of dictionaries, with performance metrics.
+        """
+
+        if len(self.completed_per_reporter) != len(self.bugs_per_reporter):
+            raise Exception("The output of the simulation doesn't match!")
+
+        simulation_results = []
+
+        for run in range(len(self.completed_per_reporter)):
+
+            for reporter_config in reporter_configuration:
+                reporter_name = reporter_config['name']
+
+                reporter_team = None
+                if 'team' in reporter_config.keys():
+                    reporter_team = reporter_config['team']
+
+                reporter_strategy = reporter_config[simmodel.STRATEGY_KEY].name
+
+                consolidate_result = {"run": run,
+                                      "reporter_name": reporter_name,
+                                      "reporter_team": reporter_team,
+                                      "reporter_strategy": reporter_strategy}
+
+                reporter_performance = self.get_reporter_performance(run, reporter_name)
+
+                consolidate_result.update(reporter_performance)
+                simulation_results.append(consolidate_result)
+
+        return simulation_results
+
     def get_reporter_performance(self, run, reporter_name):
         """
         Returns how the reporter did in an specific simulation run.

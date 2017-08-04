@@ -4,12 +4,14 @@ processes considered
 """
 
 import time
+import logging
 import statsmodels.api as sm
 import random
 import pandas as pd
 import matplotlib.pyplot as plt
 
 import gtconfig
+import penaltyexp
 import simdata
 import simmodel
 import syseval
@@ -17,7 +19,7 @@ import syseval
 if gtconfig.is_windows:
     import winsound
 
-logger = gtconfig.get_logger("regression_analysis", "regression_analysis.txt")
+logger = gtconfig.get_logger("regression_analysis", "regression_analysis.txt", level=logging.INFO)
 
 
 def generate_inflated_profile(inflation_rate, empirical_profile):
@@ -33,6 +35,7 @@ def generate_inflated_profile(inflation_rate, empirical_profile):
     inflated_profile = dict(empirical_profile)
 
     inflators = random.sample(empirical_profile.keys(), offender_number)
+    logger.debug("Inflators: " + str(inflators))
 
     for inflator in inflators:
         inflated_profile[inflator] = simmodel.SIMPLE_INFLATE_CONFIG
@@ -40,7 +43,7 @@ def generate_inflated_profile(inflation_rate, empirical_profile):
     return inflated_profile, offender_number
 
 
-def get_performance_dataframe(input_params, simfunction, simulation_configuration, empirical_profile, step):
+def get_performance_dataframe(input_params, simfunction, simulation_configuration, empirical_profile, step, desc):
     """
     Produces a dataframe containing performance measure values per several configurations of inflation probability.
     :param input_params: Simulation inputs.
@@ -53,15 +56,24 @@ def get_performance_dataframe(input_params, simfunction, simulation_configuratio
     regression_data = []
 
     logger.info("Reporters in population: " + str(len(empirical_profile.keys())))
-    for inflation_rate in range(0, 110, step):
+    inflation_rates = range(0, 110, step)
+
+    for inflation_rate in inflation_rates:
         logger.info(
-            "Simulating UNSUPERVISED PRIORITIZATION with an HEURISTIC INFLATOR probability of " + str(inflation_rate))
+            "Simulating" + desc + "with an HEURISTIC INFLATOR probability of " + str(inflation_rate))
 
         normalized_rate = inflation_rate / 100.0
         profile_after_inflation, offender_number = generate_inflated_profile(normalized_rate, empirical_profile)
         syseval.apply_strategy_profile(input_params.player_configuration, profile_after_inflation)
 
         simulation_output = syseval.run_scenario(simfunction, input_params, simulation_configuration)
+
+        simulation_output_file = "csv/" + desc + "_simulaton_results.csv"
+        pd.DataFrame(simulation_output.get_consolidated_output(input_params.player_configuration)).to_csv(
+            simulation_output_file)
+
+        logger.info("The simulation output was stored at: " + simulation_output_file)
+
         performance_metrics = zip(simulation_output.get_time_ratio_per_priority(simdata.SEVERE_PRIORITY),
                                   simulation_output.get_completed_per_real_priority(simdata.SEVERE_PRIORITY),
                                   simulation_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY,
@@ -123,7 +135,7 @@ def do_unsupervised_prioritization(simulation_configuration, input_params, simfu
 
     dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
                                           simulation_configuration=simulation_configuration,
-                                          empirical_profile=empirical_profile, step=step)
+                                          empirical_profile=empirical_profile, step=step, desc=desc)
 
     perform_regression_analysis(desc=desc, dataframe=dataframe)
 
@@ -144,7 +156,31 @@ def do_throttling(simulation_configuration, input_params, simfunction, empirical
 
         dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
                                               simulation_configuration=simulation_configuration,
-                                              empirical_profile=empirical_profile, step=step)
+                                              empirical_profile=empirical_profile, step=step, desc=desc)
+
+        perform_regression_analysis(desc=desc, dataframe=dataframe)
+
+
+def do_gatekeeper(simulation_configuration, input_params, simfunction, empirical_profile, step):
+    simulation_configuration["THROTTLING_ENABLED"] = False
+    simulation_configuration['GATEKEEPER_CONFIG'] = penaltyexp.DEFAULT_GATEKEEPER_CONFIG
+
+    success_rates = [90, 100]
+
+    # TODO(cgavidia): Remove later
+    success_rates = [90]
+
+    for success_rate in success_rates:
+        normalized_success_rate = success_rate / 100.0
+        simulation_configuration["SUCCESS_RATE"] = normalized_success_rate
+        input_params.catcher_generator.configure(values=[True, False],
+                                                 probabilities=[normalized_success_rate, (1 - normalized_success_rate)])
+
+        desc = "GATEKEEPER_SUCC" + str(success_rate)
+        logger.info("Starting " + desc + " analysis ...")
+        dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
+                                              simulation_configuration=simulation_configuration,
+                                              empirical_profile=empirical_profile, step=step, desc=desc)
 
         perform_regression_analysis(desc=desc, dataframe=dataframe)
 
@@ -154,8 +190,8 @@ def main():
     step = 10
 
     # TODO(cgavidia): Remove later
-    # replications_per_rate = 12
-    # step = 20
+    # replications_per_rate = 1
+    # step = 50
 
     logger.info("Experiment configuration: Replications per Inflation Rate " + str(
         replications_per_rate) + " Offset between rates " + str(step))
@@ -163,8 +199,12 @@ def main():
     simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
     simulation_configuration['REPLICATIONS_PER_PROFILE'] = replications_per_rate
 
+    # TODO(cgavidia) Only for testing
     do_unsupervised_prioritization(simulation_configuration=simulation_configuration, simfunction=simfunction,
                                    input_params=input_params, empirical_profile=empirical_profile, step=step)
+
+    do_gatekeeper(simulation_configuration=simulation_configuration, simfunction=simfunction,
+                  input_params=input_params, empirical_profile=empirical_profile, step=step)
 
     do_throttling(simulation_configuration=simulation_configuration, simfunction=simfunction,
                   input_params=input_params, empirical_profile=empirical_profile, step=step)

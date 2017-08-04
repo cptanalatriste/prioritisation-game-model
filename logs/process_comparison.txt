@@ -1,0 +1,3 @@
+2017-08-04 17:39:40,374 process_comparison INFO     Loading information from E:\OneDrive\phd2\jira_github_ds\apache_jira_github_ds.csv
+2017-08-04 17:39:41,471 process_comparison INFO     Adding calculated fields...
+2017-08-04 17:41:30,717 process_comparison INFO     PARALLEL EXECUTION: Has been disabled.

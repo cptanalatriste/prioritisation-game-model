@@ -210,6 +210,7 @@ class TestingContext:
         :param reporter_name: The offender reporter
         :return: None
         """
+
         generators = self.ignore_generators[reporter_name]
 
         for priority, generator in generators.iteritems():
@@ -221,6 +222,10 @@ class TestingContext:
             if current_probability < maximum_probability:
                 ignore_probability = min(maximum_probability, current_probability + inflation_penalty)
                 generator.configure(values=[True, False], probabilities=[ignore_probability, 1 - ignore_probability])
+
+            logger.debug(
+                self.replication_id + " Penalty to be applied to " + reporter_name + " : Penalizing with " + str(
+                    inflation_penalty) + " for priority " + str(priority) + ". New generator values: " + str(generator))
 
     def discard(self, report):
         """
@@ -654,9 +659,6 @@ class ThrottlingBugReport(Process):
         self.basic_report.track_effort(testing_context.priority_monitors)
 
         if self.basic_report.is_false_report() and inflation_penalty > 0 and testing_context.catch_inflation():
-            logger.debug(
-                testing_context.replication_id + " Penalty to be applied to" + self.basic_report.reporter + " : Penalizing with " + str(
-                    inflation_penalty))
             testing_context.apply_penalty(inflation_penalty=inflation_penalty, reporter_name=self.basic_report.reporter)
 
 

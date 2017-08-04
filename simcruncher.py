@@ -41,35 +41,18 @@ def consolidate_payoff_results(period, reporter_configuration, simulation_output
     :param reports_per_reporter: ist containing reported (sic) reports per reporter per priority per run.
     :return: Consolidated metrics in a list.
     """
-    if len(simulation_output.completed_per_reporter) != len(simulation_output.bugs_per_reporter):
-        raise Exception("The output of the simulation doesn't match!")
 
-    simulation_results = []
+    simulation_results = simulation_output.get_consolidated_output(reporter_configuration)
 
-    for run in range(len(simulation_output.completed_per_reporter)):
+    for reporter_info in simulation_results:
+        reporter_info["period"] = period
 
-        for reporter_config in reporter_configuration:
-            reporter_name = reporter_config['name']
-            reporter_team = reporter_config['team']
-            reporter_strategy = reporter_config[simmodel.STRATEGY_KEY].name
+        payoff_score = get_payoff_score(severe_completed=reporter_info['severe_completed'],
+                                        non_severe_completed=reporter_info['non_severe_completed'],
+                                        normal_completed=reporter_info['normal_completed'],
+                                        score_map=score_map, priority_based=priority_based)
 
-            reporter_performance = simulation_output.get_reporter_performance(run, reporter_name)
-
-            payoff_score = get_payoff_score(severe_completed=reporter_performance['severe_completed'],
-                                            non_severe_completed=reporter_performance['non_severe_completed'],
-                                            normal_completed=reporter_performance['normal_completed'],
-                                            score_map=score_map, priority_based=priority_based)
-
-            consolidate_result = {"period": period,
-                                  "run": run,
-                                  "reporter_name": reporter_name,
-                                  "reporter_team": reporter_team,
-                                  "reporter_strategy": reporter_strategy,
-                                  "payoff_score": payoff_score}
-
-            consolidate_result.update(reporter_performance)
-
-            simulation_results.append(consolidate_result)
+        reporter_info["payoff_score"] = payoff_score
 
     return simulation_results
 

@@ -12,6 +12,7 @@ report_stream_batching = True
 simple_reporting_model = False
 
 parallel = True
+
 parallel_blocks = 4
 
 do_gatekeeper = True
@@ -39,7 +40,7 @@ def get_logger(name="gtbugreporting", filename="gtbugreporting.log", level=loggi
 
     file_handler = logging.FileHandler("logs/" + filename, mode='w')
     file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.DEBUG)
+    file_handler.setLevel(level)
     logger.addHandler(file_handler)
 
     console_handler = logging.StreamHandler()

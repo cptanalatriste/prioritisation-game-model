@@ -378,10 +378,7 @@ def get_simulation_results(file_prefix, strategy_map, player_configuration, game
         gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
 
     simulation_result = simcruncher.consolidate_payoff_results("ALL", player_configuration,
-                                                               simulation_output["completed_per_reporter"],
-                                                               simulation_output["bugs_per_reporter"],
-                                                               simulation_output["reports_per_reporter"],
-                                                               simulation_output["resolved_per_reporter"],
+                                                               simulation_output,
                                                                game_configuration["SCORE_MAP"],
                                                                game_configuration["PRIORITY_SCORING"])
     overall_dataframe = pd.DataFrame(simulation_result)
