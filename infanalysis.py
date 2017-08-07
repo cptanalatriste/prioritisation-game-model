@@ -21,6 +21,9 @@ if gtconfig.is_windows:
 
 logger = gtconfig.get_logger("regression_analysis", "regression_analysis.txt", level=logging.INFO)
 
+INDEPENDENT_VARIABLE = 'offender_number'
+DEPENDENT_VARIABLES = ['severe_time_ratio', 'severe_completed', 'severe_fixed_ratio', 'severe_fixed_ratio_active']
+
 
 def generate_inflated_profile(inflation_rate, empirical_profile):
     """
@@ -60,7 +63,7 @@ def get_performance_dataframe(input_params, simfunction, simulation_configuratio
 
     for inflation_rate in inflation_rates:
         logger.info(
-            "Simulating" + desc + "with an HEURISTIC INFLATOR probability of " + str(inflation_rate))
+            "Simulating " + desc + " with an HEURISTIC INFLATOR probability of " + str(inflation_rate))
 
         normalized_rate = inflation_rate / 100.0
         profile_after_inflation, offender_number = generate_inflated_profile(normalized_rate, empirical_profile)
@@ -104,25 +107,33 @@ def perform_regression_analysis(desc, dataframe):
     :return: None.
     """
 
-    independent_variable = 'offender_number'
-    dependent_variables = ['severe_time_ratio', 'severe_completed', 'severe_fixed_ratio', 'severe_fixed_ratio_active']
+    regression_results = {}
+    regression_results['dataframe'] = dataframe
 
-    for dependent_variable in dependent_variables:
+    for dependent_variable in DEPENDENT_VARIABLES:
         detailed_desc = desc + '_' + dependent_variable
 
         dependent_values = dataframe[dependent_variable]
-        independent_values = sm.add_constant(dataframe[independent_variable])
+        independent_values = sm.add_constant(dataframe[INDEPENDENT_VARIABLE])
 
-        regression_result = sm.OLS(dependent_values, independent_values).fit()
+        ols_instance = sm.OLS(dependent_values, independent_values)
+        regression_result = ols_instance.fit()
         logger.info(detailed_desc + " -> regression_result.summary(): " + str(regression_result.summary()))
 
         plt.clf()
-        axis = dataframe.plot(independent_variable, dependent_variable, style='o')
-        plt.xlabel(independent_variable)
+        axis = dataframe.plot(INDEPENDENT_VARIABLE, dependent_variable, style='o')
+        plt.xlabel(INDEPENDENT_VARIABLE)
         plt.ylabel(dependent_variable)
         plt.title(detailed_desc)
         sm.graphics.abline_plot(model_results=regression_result, ax=axis)
-        plt.savefig("img/" + detailed_desc + '_regression_analysis.png')
+
+        file_name = "img/" + detailed_desc + '_regression_analysis.png'
+        plt.savefig(file_name)
+        logger.info("Image stored at " + file_name)
+
+        regression_results[dependent_variable] = ols_instance
+
+    return regression_results
 
 
 def do_unsupervised_prioritization(simulation_configuration, input_params, simfunction, empirical_profile,
@@ -137,7 +148,7 @@ def do_unsupervised_prioritization(simulation_configuration, input_params, simfu
                                           simulation_configuration=simulation_configuration,
                                           empirical_profile=empirical_profile, step=step, desc=desc)
 
-    perform_regression_analysis(desc=desc, dataframe=dataframe)
+    return perform_regression_analysis(desc=desc, dataframe=dataframe)
 
 
 def do_throttling(simulation_configuration, input_params, simfunction, empirical_profile, step):
@@ -148,6 +159,7 @@ def do_throttling(simulation_configuration, input_params, simfunction, empirical
     # TODO(cgavidia): Remove later
     penalty_values = [5]
 
+    throttling_results = {}
     for penalty in penalty_values:
         simulation_configuration["INFLATION_FACTOR"] = penalty / 100.0
 
@@ -158,7 +170,9 @@ def do_throttling(simulation_configuration, input_params, simfunction, empirical
                                               simulation_configuration=simulation_configuration,
                                               empirical_profile=empirical_profile, step=step, desc=desc)
 
-        perform_regression_analysis(desc=desc, dataframe=dataframe)
+        throttling_results[desc] = perform_regression_analysis(desc=desc, dataframe=dataframe)
+
+    return throttling_results
 
 
 def do_gatekeeper(simulation_configuration, input_params, simfunction, empirical_profile, step):
@@ -169,6 +183,8 @@ def do_gatekeeper(simulation_configuration, input_params, simfunction, empirical
 
     # TODO(cgavidia): Remove later
     success_rates = [90]
+
+    gatekeeper_results = {}
 
     for success_rate in success_rates:
         normalized_success_rate = success_rate / 100.0
@@ -182,7 +198,25 @@ def do_gatekeeper(simulation_configuration, input_params, simfunction, empirical
                                               simulation_configuration=simulation_configuration,
                                               empirical_profile=empirical_profile, step=step, desc=desc)
 
-        perform_regression_analysis(desc=desc, dataframe=dataframe)
+        gatekeeper_results[desc] = perform_regression_analysis(desc=desc, dataframe=dataframe)
+
+    return gatekeeper_results
+
+def plot_comparison(plot_configs):
+    plt.clf()
+
+    for plot_config in plot_configs:
+        plt.plot(plot_config['x_values'], plot_config['fitted_values'], plot_config['color'],
+                 label=plot_config['legend'])
+
+    plt.legend()
+    plt.ylim(1200, 1500)
+    plt.xlim(0, 200)
+    plt.xlabel(INDEPENDENT_VARIABLE)
+    plt.ylabel('Severe Fixes')
+    plt.title('Performance Comparison')
+
+    plt.savefig("img/performance_comparison.png")
 
 
 def main():
@@ -190,8 +224,8 @@ def main():
     step = 10
 
     # TODO(cgavidia): Remove later
-    # replications_per_rate = 1
-    # step = 50
+    # replications_per_rate = 12
+    # step = 40
 
     logger.info("Experiment configuration: Replications per Inflation Rate " + str(
         replications_per_rate) + " Offset between rates " + str(step))
@@ -199,15 +233,31 @@ def main():
     simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
     simulation_configuration['REPLICATIONS_PER_PROFILE'] = replications_per_rate
 
-    # TODO(cgavidia) Only for testing
-    do_unsupervised_prioritization(simulation_configuration=simulation_configuration, simfunction=simfunction,
-                                   input_params=input_params, empirical_profile=empirical_profile, step=step)
+    uo_regression_results = do_unsupervised_prioritization(simulation_configuration=simulation_configuration,
+                                                           simfunction=simfunction,
+                                                           input_params=input_params,
+                                                           empirical_profile=empirical_profile, step=step)
 
-    do_gatekeeper(simulation_configuration=simulation_configuration, simfunction=simfunction,
-                  input_params=input_params, empirical_profile=empirical_profile, step=step)
+    throt_regression_results = do_throttling(simulation_configuration=simulation_configuration, simfunction=simfunction,
+                                             input_params=input_params, empirical_profile=empirical_profile, step=step)
 
-    do_throttling(simulation_configuration=simulation_configuration, simfunction=simfunction,
-                  input_params=input_params, empirical_profile=empirical_profile, step=step)
+    gate_regression_results = do_gatekeeper(simulation_configuration=simulation_configuration, simfunction=simfunction,
+                                            input_params=input_params, empirical_profile=empirical_profile, step=step)
+
+    plot_comparison([{"x_values": uo_regression_results['dataframe'][INDEPENDENT_VARIABLE],
+                      "fitted_values": uo_regression_results['severe_completed'].fit().fittedvalues,
+                      "color": "red",
+                      "legend": "Unsupervised Prioritization"},
+                     {"x_values": throt_regression_results['THROTTLING_INF005']['dataframe'][INDEPENDENT_VARIABLE],
+                      "fitted_values": throt_regression_results['THROTTLING_INF005'][
+                          'severe_completed'].fit().fittedvalues,
+                      "color": "blue",
+                      "legend": "Throttling with 0.05 penalty"},
+                     {"x_values": gate_regression_results['GATEKEEPER_SUCC90']['dataframe'][INDEPENDENT_VARIABLE],
+                      "fitted_values": gate_regression_results['GATEKEEPER_SUCC90'][
+                          'severe_completed'].fit().fittedvalues,
+                      "color": "green",
+                      "legend": "Gatekeeper with 10% error rate"}])
 
 
 if __name__ == "__main__":
