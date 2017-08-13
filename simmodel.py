@@ -86,6 +86,8 @@ class TestingContext:
                  quota_system,
                  review_time_gen,
                  target_fixes,
+                 dev_time_budget,
+                 fix_count_criteria,
                  views_to_discard,
                  catcher_generator,
                  timeout,
@@ -108,6 +110,8 @@ class TestingContext:
         self.first_report_time = None
         self.last_report_time = None
         self.target_fixes = target_fixes
+        self.dev_time_budget = dev_time_budget
+        self.fix_count_criteria = fix_count_criteria
         self.quota_system = quota_system
         self.views_to_discard = views_to_discard
         self.catcher_generator = catcher_generator
@@ -158,6 +162,13 @@ class TestingContext:
 
         return sum([monitors[METRIC_BUGS_FIXED].count() for priority, monitors in self.priority_monitors.iteritems()])
 
+    def get_time_invested(self):
+        """
+        Returns the time invested in fixes so far.
+        :return: Number of fixes
+        """
+        return sum([monitors[METRIC_TIME_INVESTED] for priority, monitors in self.priority_monitors.iteritems()])
+
     def stop_simulation(self):
         """
         Returns True if the simulation must be stopped.
@@ -165,12 +176,17 @@ class TestingContext:
         :return: True if we should stop. False otherwise.
         """
 
-        total_fixed = self.get_total_fixes()
+        if self.fix_count_criteria:
+            total_fixed = self.get_total_fixes()
+            if total_fixed < self.target_fixes:
+                return False
+            return True
+        else:
+            time_invested = self.get_time_invested()
+            if time_invested < self.dev_time_budget:
+                return False
 
-        if total_fixed < self.target_fixes:
-            return False
-
-        return True
+            return True
 
     def get_timeout(self):
         """
@@ -189,6 +205,7 @@ class TestingContext:
         generator = self.ignore_generators[reporter_name][int(reported_priority)]
         generator_output = generator.generate()
         return generator_output
+
 
     def catch_inflation(self):
         """
@@ -738,6 +755,7 @@ def configure_strategy_map(reporters_config, testing_context):
 def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen, reporter_gen, max_time,
               priority_generator=None,
               target_fixes=None,
+              dev_time_budget=None,
               dev_size_generator=None,
               gatekeeper_config=False,
               interarrival_time_gen=None,
@@ -796,6 +814,12 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
         bug_stream = BugStream(resolution_time_gen=resolution_time_gen, reporter_gen=reporter_gen,
                                priority_generator=priority_generator)
 
+    fix_count_criteria = True
+    if dev_time_budget is not None and not gtconfig.fix_count_criteria:
+        fix_count_criteria = False
+        logger.debug(
+            "The stop criteria is according to the development team budget of " + str(dev_time_budget) + " units")
+
     testing_context = TestingContext(bug_stream=bug_stream,
                                      ignore_generators=ignore_generators,
                                      default_review_time=default_review_time,
@@ -805,6 +829,8 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
                                      views_to_discard=views_to_discard,
                                      catcher_generator=catcher_generator,
                                      target_fixes=target_fixes,
+                                     dev_time_budget=dev_time_budget,
+                                     fix_count_criteria=fix_count_criteria,
                                      timeout=timeout,
                                      replication_id=replication_id)
 

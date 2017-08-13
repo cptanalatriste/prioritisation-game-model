@@ -6,14 +6,12 @@ processes considered
 import time
 import logging
 import statsmodels.api as sm
-import random
 import pandas as pd
 import matplotlib.pyplot as plt
 
 import gtconfig
 import penaltyexp
 import simdata
-import simmodel
 import syseval
 
 if gtconfig.is_windows:
@@ -21,32 +19,35 @@ if gtconfig.is_windows:
 
 logger = gtconfig.get_logger("regression_analysis", "regression_analysis.txt", level=logging.INFO)
 
-INDEPENDENT_VARIABLE = 'offender_number'
+INDEPENDENT_VARIABLE = 'normalized_value'
 DEPENDENT_VARIABLES = ['severe_time_ratio', 'severe_completed', 'severe_fixed_ratio', 'severe_fixed_ratio_active']
+DEV_TEAM_RATIO = 1
 
 
-def generate_inflated_profile(inflation_rate, empirical_profile):
+def configure_simulation(independent_variable_value, input_params, empirical_profile, original_team_size,
+                         inflation_based=True):
     """
-    Selects a subset of players randomly to adopt the Heuristic Inflator strategy.
-    :param inflation_rate: Proportion of players to convert.
-    :param empirical_profile: Original profile in the dataset.
-    :return: A new strategy profile.
+    Adjusts the simulation configuration to the current independent variable value.
+    :param independent_variable_value:
+    :return:
     """
-    offender_number = int(len(empirical_profile.keys()) * inflation_rate)
-    logger.info("Sampling " + str(offender_number) + " reporters for inflation ...")
 
-    inflated_profile = dict(empirical_profile)
+    if inflation_based:
+        normalized_rate = independent_variable_value / 100.0
+        profile_after_inflation, offender_number = syseval.generate_inflated_profile(normalized_rate, empirical_profile)
+        syseval.apply_strategy_profile(input_params.player_configuration, profile_after_inflation)
 
-    inflators = random.sample(empirical_profile.keys(), offender_number)
-    logger.debug("Inflators: " + str(inflators))
+        return offender_number
+    else:
+        normalized_rate = independent_variable_value / 100.0
+        new_team_size = int(original_team_size * normalized_rate)
 
-    for inflator in inflators:
-        inflated_profile[inflator] = simmodel.SIMPLE_INFLATE_CONFIG
-
-    return inflated_profile, offender_number
+        input_params.dev_team_size = new_team_size
+        return new_team_size
 
 
-def get_performance_dataframe(input_params, simfunction, simulation_configuration, empirical_profile, step, desc):
+def get_performance_dataframe(input_params, simfunction, simulation_configuration, empirical_profile,
+                              original_team_size, step, desc):
     """
     Produces a dataframe containing performance measure values per several configurations of inflation probability.
     :param input_params: Simulation inputs.
@@ -59,15 +60,15 @@ def get_performance_dataframe(input_params, simfunction, simulation_configuratio
     regression_data = []
 
     logger.info("Reporters in population: " + str(len(empirical_profile.keys())))
-    inflation_rates = range(0, 110, step)
+    independent_variable_values = range(0, 100, step)
 
-    for inflation_rate in inflation_rates:
+    for independent_variable_value in independent_variable_values:
         logger.info(
-            "Simulating " + desc + " with an HEURISTIC INFLATOR probability of " + str(inflation_rate))
+            "Simulating " + desc + " with an independent variable  of " + str(independent_variable_value))
 
-        normalized_rate = inflation_rate / 100.0
-        profile_after_inflation, offender_number = generate_inflated_profile(normalized_rate, empirical_profile)
-        syseval.apply_strategy_profile(input_params.player_configuration, profile_after_inflation)
+        normalized_value = configure_simulation(independent_variable_value, input_params, empirical_profile,
+                                                original_team_size,
+                                                inflation_based=True)
 
         simulation_output = syseval.run_scenario(simfunction, input_params, simulation_configuration)
 
@@ -84,9 +85,8 @@ def get_performance_dataframe(input_params, simfunction, simulation_configuratio
                                   simulation_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY,
                                                                                  exclude_open=True))
 
-        regression_data += [{'inflation_rate': inflation_rate,
-                             'offender_number': offender_number,
-                             'normalized_rate': normalized_rate,
+        regression_data += [{'independent_variable_value': independent_variable_value,
+                             'normalized_value': normalized_value,
                              'severe_time_ratio': severe_time_ratio,
                              'severe_completed': severe_completed,
                              'severe_fixed_ratio': severe_fixed_ratio,
@@ -137,6 +137,7 @@ def perform_regression_analysis(desc, dataframe):
 
 
 def do_unsupervised_prioritization(simulation_configuration, input_params, simfunction, empirical_profile,
+                                   original_team_size,
                                    step):
     simulation_configuration["THROTTLING_ENABLED"] = False
     simulation_configuration["GATEKEEPER_CONFIG"] = None
@@ -146,18 +147,19 @@ def do_unsupervised_prioritization(simulation_configuration, input_params, simfu
 
     dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
                                           simulation_configuration=simulation_configuration,
-                                          empirical_profile=empirical_profile, step=step, desc=desc)
+                                          empirical_profile=empirical_profile, original_team_size=original_team_size,
+                                          step=step, desc=desc)
 
     return perform_regression_analysis(desc=desc, dataframe=dataframe)
 
 
-def do_throttling(simulation_configuration, input_params, simfunction, empirical_profile, step):
+def do_throttling(simulation_configuration, input_params, simfunction, empirical_profile, original_team_size, step):
     simulation_configuration["THROTTLING_ENABLED"] = True
 
     penalty_values = [1, 3, 5]
 
     # TODO(cgavidia): Remove later
-    penalty_values = [5]
+    penalty_values = [3]
 
     throttling_results = {}
     for penalty in penalty_values:
@@ -168,14 +170,15 @@ def do_throttling(simulation_configuration, input_params, simfunction, empirical
 
         dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
                                               simulation_configuration=simulation_configuration,
-                                              empirical_profile=empirical_profile, step=step, desc=desc)
+                                              empirical_profile=empirical_profile,
+                                              original_team_size=original_team_size, step=step, desc=desc)
 
         throttling_results[desc] = perform_regression_analysis(desc=desc, dataframe=dataframe)
 
     return throttling_results
 
 
-def do_gatekeeper(simulation_configuration, input_params, simfunction, empirical_profile, step):
+def do_gatekeeper(simulation_configuration, input_params, simfunction, empirical_profile, original_team_size, step):
     simulation_configuration["THROTTLING_ENABLED"] = False
     simulation_configuration['GATEKEEPER_CONFIG'] = penaltyexp.DEFAULT_GATEKEEPER_CONFIG
 
@@ -196,13 +199,23 @@ def do_gatekeeper(simulation_configuration, input_params, simfunction, empirical
         logger.info("Starting " + desc + " analysis ...")
         dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
                                               simulation_configuration=simulation_configuration,
-                                              empirical_profile=empirical_profile, step=step, desc=desc)
+                                              empirical_profile=empirical_profile,
+                                              original_team_size=original_team_size, step=step, desc=desc)
 
         gatekeeper_results[desc] = perform_regression_analysis(desc=desc, dataframe=dataframe)
 
     return gatekeeper_results
 
-def plot_comparison(plot_configs):
+
+def plot_comparison(plot_configs, y_min, y_max, desc):
+    """
+    Plots several regression lines for the sake of comparison.
+    :param plot_configs: Each plot parameters
+    :param y_min: Y axis minimum value
+    :param y_max: Y axis maximum value
+    :param desc: Variable under analysis.
+    :return: None
+    """
     plt.clf()
 
     for plot_config in plot_configs:
@@ -210,54 +223,88 @@ def plot_comparison(plot_configs):
                  label=plot_config['legend'])
 
     plt.legend()
-    plt.ylim(1200, 1500)
-    plt.xlim(0, 200)
+    plt.ylim(y_min, y_max)
+    plt.xlim(0, 175)
     plt.xlabel(INDEPENDENT_VARIABLE)
-    plt.ylabel('Severe Fixes')
-    plt.title('Performance Comparison')
+    plt.ylabel(desc)
+    plt.title('Performance Comparison: ' + desc)
 
-    plt.savefig("img/performance_comparison.png")
+    file_name = "img/" + desc + "_performance_comparison.png"
+    plt.savefig(file_name)
+    logger.info("Performance comparison plot was stored in " + file_name)
+
+
+def compare_regression_results(uo_regression_results, throt_regression_results, gate_regression_results):
+    for performance_metric in DEPENDENT_VARIABLES:
+
+        y_min = 0.0
+        y_max = 1.0
+
+        if performance_metric == "severe_completed":
+            y_min = 800
+            y_max = 1200
+        elif performance_metric == "severe_time_ratio":
+            y_min = 0.05
+            y_max = 0.1
+
+        plot_comparison(plot_configs=[{"x_values": uo_regression_results['dataframe'][INDEPENDENT_VARIABLE],
+                                       "fitted_values": uo_regression_results[performance_metric].fit().fittedvalues,
+                                       "color": "red",
+                                       "legend": "Unsupervised Prioritization"},
+                                      {"x_values": throt_regression_results['THROTTLING_INF005']['dataframe'][
+                                          INDEPENDENT_VARIABLE],
+                                       "fitted_values": throt_regression_results['THROTTLING_INF005'][
+                                           performance_metric].fit().fittedvalues,
+                                       "color": "blue",
+                                       "legend": "Throttling with 0.05 penalty"},
+                                      {"x_values": gate_regression_results['GATEKEEPER_SUCC90']['dataframe'][
+                                          INDEPENDENT_VARIABLE],
+                                       "fitted_values": gate_regression_results['GATEKEEPER_SUCC90'][
+                                           performance_metric].fit().fittedvalues,
+                                       "color": "green",
+                                       "legend": "Gatekeeper with 10% error rate"}], desc=performance_metric,
+                        y_min=y_min, y_max=y_max)
 
 
 def main():
-    replications_per_rate = 40
-    step = 10
+    replications_per_rate = 120
+    step = 20
 
     # TODO(cgavidia): Remove later
     # replications_per_rate = 12
-    # step = 40
+    # step = 30
 
     logger.info("Experiment configuration: Replications per Inflation Rate " + str(
         replications_per_rate) + " Offset between rates " + str(step))
 
     simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
+
+    original_team_size = input_params.dev_team_size
+
+    input_params.dev_team_size = int(input_params.dev_team_size * DEV_TEAM_RATIO)
+
+    logger.info("The original dev team size is " + str(original_team_size) + " . The size under analysis is " + str(
+        input_params.dev_team_size))
+
     simulation_configuration['REPLICATIONS_PER_PROFILE'] = replications_per_rate
 
     uo_regression_results = do_unsupervised_prioritization(simulation_configuration=simulation_configuration,
                                                            simfunction=simfunction,
                                                            input_params=input_params,
-                                                           empirical_profile=empirical_profile, step=step)
+                                                           empirical_profile=empirical_profile,
+                                                           original_team_size=original_team_size, step=step)
 
     throt_regression_results = do_throttling(simulation_configuration=simulation_configuration, simfunction=simfunction,
-                                             input_params=input_params, empirical_profile=empirical_profile, step=step)
+                                             input_params=input_params, empirical_profile=empirical_profile,
+                                             original_team_size=original_team_size, step=step)
 
     gate_regression_results = do_gatekeeper(simulation_configuration=simulation_configuration, simfunction=simfunction,
-                                            input_params=input_params, empirical_profile=empirical_profile, step=step)
+                                            input_params=input_params, empirical_profile=empirical_profile,
+                                            original_team_size=original_team_size, step=step)
 
-    plot_comparison([{"x_values": uo_regression_results['dataframe'][INDEPENDENT_VARIABLE],
-                      "fitted_values": uo_regression_results['severe_completed'].fit().fittedvalues,
-                      "color": "red",
-                      "legend": "Unsupervised Prioritization"},
-                     {"x_values": throt_regression_results['THROTTLING_INF005']['dataframe'][INDEPENDENT_VARIABLE],
-                      "fitted_values": throt_regression_results['THROTTLING_INF005'][
-                          'severe_completed'].fit().fittedvalues,
-                      "color": "blue",
-                      "legend": "Throttling with 0.05 penalty"},
-                     {"x_values": gate_regression_results['GATEKEEPER_SUCC90']['dataframe'][INDEPENDENT_VARIABLE],
-                      "fitted_values": gate_regression_results['GATEKEEPER_SUCC90'][
-                          'severe_completed'].fit().fittedvalues,
-                      "color": "green",
-                      "legend": "Gatekeeper with 10% error rate"}])
+    compare_regression_results(uo_regression_results=uo_regression_results,
+                               throt_regression_results=throt_regression_results,
+                               gate_regression_results=gate_regression_results)
 
 
 if __name__ == "__main__":

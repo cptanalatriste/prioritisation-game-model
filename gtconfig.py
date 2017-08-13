@@ -11,7 +11,8 @@ replications_per_profile = 200
 report_stream_batching = True
 simple_reporting_model = False
 
-parallel = True
+fix_count_criteria = True  # True for ending simulation after a number of fixes. False to use the development time budget.
+parallel = True #Set to False for debugging purposes
 
 parallel_blocks = 4
 

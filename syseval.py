@@ -3,6 +3,7 @@ This module contains too for system comparison anc evaluation with simulation mo
 
 The approach is the one proposed by Jeremy Banks in Discrete-Event System Simulation (Chapter 12)
 """
+import random
 import numpy as np
 import statsmodels.stats.api as sms
 import pandas as pd
@@ -102,6 +103,7 @@ def run_scenario(simfunction, input_params, simulation_configuration):
         ignored_gen=input_params.ignored_gen,
         reporter_gen=input_params.reporter_gen,
         target_fixes=input_params.target_fixes,
+        dev_time_budget=input_params.dev_time_budget,
         batch_size_gen=input_params.batch_size_gen,
         interarrival_time_gen=input_params.interarrival_time_gen,
         priority_generator=input_params.priority_generator,
@@ -204,19 +206,17 @@ def get_heuristic_strategy_catalog():
 
 
 def do_unsupervised_prioritization(simulation_configuration, simfunction, input_params, empirical_profile):
-    desc = "UNSUPERVISED"
-    simulation_configuration["THROTTLING_ENABLED"] = False
-    simulation_configuration["GATEKEEPER_CONFIG"] = None
-    equilibrium_profile = generate_single_strategy_profile(input_params.player_configuration,
-                                                           simmodel.SIMPLE_INFLATE_CONFIG)
-    evaluate_actual_vs_equilibrium(simfunction, input_params, simulation_configuration, empirical_profile,
-                                   [equilibrium_profile],
-                                   desc)
+    equilibria = get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)[0]
+
+    evaluate_actual_vs_equilibrium(simfunction, input_params, equilibria["simulation_configuration"], empirical_profile,
+                                   equilibria["equilibrium_profiles"],
+                                   equilibria["desc"])
 
 
 def do_gatekeeper(simulation_configuration, simfunction, input_params, empirical_profile):
     simulation_configuration["THROTTLING_ENABLED"] = False
     simulation_configuration['GATEKEEPER_CONFIG'] = penaltyexp.DEFAULT_GATEKEEPER_CONFIG
+    simulation_configuration["INFLATION_FACTOR"] = None
 
     desc = "GATEKEEPER_SUCC090"
     success_rate = 0.90
@@ -256,10 +256,35 @@ def do_gatekeeper(simulation_configuration, simfunction, input_params, empirical
                                    desc=desc, empirical_profile=empirical_profile)
 
 
-def do_throttling(simulation_configuration, simfunction, input_params, empirical_profile):
+def get_unsupervised_prioritization_equilibria(simulation_configuration, input_params):
+    """
+    Returns the equilibrium list for unsupervised prioritization
+    :param simulation_configuration:
+    :param input_params:
+    :return:
+    """
+    desc = "UNSUPERVISED"
+
+    process_configuration = dict(simulation_configuration)
+    process_configuration["THROTTLING_ENABLED"] = False
+    process_configuration["GATEKEEPER_CONFIG"] = None
+    process_configuration["INFLATION_FACTOR"] = None
+
+    equilibrium_profile = generate_single_strategy_profile(input_params.player_configuration,
+                                                           simmodel.SIMPLE_INFLATE_CONFIG)
+
+    return [{"desc": desc,
+             "simulation_configuration": process_configuration,
+             "equilibrium_profiles": [equilibrium_profile]}]
+
+
+def get_throttling_equilibria(simulation_configuration, input_params):
     desc = "THROTTLING_INF001"
-    simulation_configuration["THROTTLING_ENABLED"] = True
-    simulation_configuration["INFLATION_FACTOR"] = 0.01
+
+    process_configuration = dict(simulation_configuration)
+    process_configuration["THROTTLING_ENABLED"] = True
+    process_configuration["GATEKEEPER_CONFIG"] = None
+    process_configuration["INFLATION_FACTOR"] = 0.01
 
     tsne1_profile = generate_single_strategy_profile(input_params.player_configuration, empirical_honest)
     tsne2_profile = generate_single_strategy_profile(input_params.player_configuration,
@@ -268,12 +293,18 @@ def do_throttling(simulation_configuration, simfunction, input_params, empirical
                                                       'probabilities': [0.62, 0.0, 0.0, 0.0, 0.0, 0.38, 0.0]})
     tsne3_profile = generate_single_strategy_profile(input_params.player_configuration, simmodel.HONEST_CONFIG)
 
+    return [{"desc": desc,
+             "simulation_configuration": process_configuration,
+             "equilibrium_profiles": [tsne1_profile, tsne2_profile, tsne3_profile]}]
+
+
+def do_throttling(simulation_configuration, simfunction, input_params, empirical_profile):
+    equilibria = get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)[0]
+
     evaluate_actual_vs_equilibrium(simfunction=simfunction, input_params=input_params,
-                                   simulation_configuration=simulation_configuration,
-                                   equilibrium_profiles=[tsne1_profile,
-                                                         tsne2_profile,
-                                                         tsne3_profile],
-                                   desc=desc, empirical_profile=empirical_profile)
+                                   simulation_configuration=equilibria["simulation_configuration"],
+                                   equilibrium_profiles=equilibria["equilibrium_profiles"],
+                                   desc=equilibria["desc"], empirical_profile=empirical_profile)
 
     desc = "THROTTLING_INF003"
     simulation_configuration["INFLATION_FACTOR"] = 0.03
@@ -327,12 +358,37 @@ def gather_experiment_inputs():
     return simulation_configuration, simfunction, input_params, empirical_profile
 
 
+def generate_inflated_profile(inflation_rate, empirical_profile):
+    """
+    Selects a subset of players randomly to adopt the Heuristic Inflator strategy.
+    :param inflation_rate: Proportion of players to convert.
+    :param empirical_profile: Original profile in the dataset.
+    :return: A new strategy profile.
+    """
+    offender_number = int(len(empirical_profile.keys()) * inflation_rate)
+    logger.info("Sampling " + str(offender_number) + " reporters for inflation ...")
+
+    inflated_profile = dict(empirical_profile)
+
+    inflators = random.sample(empirical_profile.keys(), offender_number)
+    logger.debug("Inflators: " + str(inflators))
+
+    for inflator in inflators:
+        inflated_profile[inflator] = simmodel.SIMPLE_INFLATE_CONFIG
+
+    return inflated_profile, offender_number
+
+
 def main():
     simulation_configuration, simfunction, input_params, empirical_profile = gather_experiment_inputs()
 
-    do_unsupervised_prioritization(simulation_configuration, simfunction, input_params, empirical_profile)
-    do_throttling(simulation_configuration, simfunction, input_params, empirical_profile)
-    do_gatekeeper(simulation_configuration, simfunction, input_params, empirical_profile)
+    for inflation_rate in [0.0, 0.5, 0.9]:
+        logger.info("Inflation rate for baseline profile " + str(inflation_rate))
+        baseline_profile, _ = generate_inflated_profile(inflation_rate, empirical_profile)
+
+        do_unsupervised_prioritization(simulation_configuration, simfunction, input_params, baseline_profile)
+        do_throttling(simulation_configuration, simfunction, input_params, baseline_profile)
+        do_gatekeeper(simulation_configuration, simfunction, input_params, baseline_profile)
 
 
 if __name__ == "__main__":

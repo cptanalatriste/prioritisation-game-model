@@ -689,7 +689,7 @@ def assign_strategies(reporters_config, training_issues, n_clusters=3):
     global_priority_map = DiscreteEmpiricalDistribution(
         observations=training_issues[simdata.SIMPLE_PRIORITY_COLUMN]).get_probabilities()
 
-    logger.debug("global_priority_map: " + global_priority_map)
+    logger.debug("global_priority_map: " + str(global_priority_map))
 
     reporter_dataframe = get_reporter_behavior_dataframe(reporters_config)
 
@@ -829,6 +829,7 @@ def launch_simulation_parallel(team_capacity, reporters_config,
                                ignored_gen=None,
                                reporter_gen=None,
                                target_fixes=None,
+                               dev_time_budget=None,
                                dev_size_generator=None,
                                gatekeeper_config=None,
                                inflation_factor=None,
@@ -874,6 +875,7 @@ def launch_simulation_parallel(team_capacity, reporters_config,
                         'inflation_factor': inflation_factor,
                         'priority_generator': priority_generator,
                         'target_fixes': target_fixes,
+                        'dev_time_budget': dev_time_budget,
                         'dev_size_generator': dev_size_generator,
                         'catcher_generator': catcher_generator,
                         'quota_system': quota_system,
@@ -911,6 +913,7 @@ def launch_simulation_wrapper(input_params):
         max_time=input_params['max_time'],
         priority_generator=input_params['priority_generator'],
         target_fixes=input_params['target_fixes'],
+        dev_time_budget=input_params['dev_time_budget'],
         ignored_gen=input_params['ignored_gen'],
         reporter_gen=input_params['reporter_gen'],
         dev_size_generator=input_params['dev_size_generator'],
@@ -961,6 +964,7 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
                       ignored_gen=None,
                       reporter_gen=None,
                       target_fixes=None,
+                      dev_time_budget=None,
                       dev_size_generator=None,
                       gatekeeper_config=None,
                       inflation_factor=None,
@@ -993,11 +997,14 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
         print_strategy_report(reporters_config)
 
         print "Running ", max_iterations, " replications. Target fixes: ", target_fixes, \
-            " .Throttling enabled: ", quota_system, " . Inflation penalty: ", inflation_factor, \
+            "Dev Time Budget ", dev_time_budget, " .Throttling enabled: ", quota_system, " . Inflation penalty: ", inflation_factor, \
             " Developers in team: ", team_capacity, " Success probabilities: ", str(catcher_generator), \
             " Gatekeeper Config: ", gatekeeper_params, " Max Reporter Probability: ", max(
             reporter_gen.probabilities), " Min Reporter Probability ", min(
-            reporter_gen.probabilities), " Priority distribution: ", str(priority_generator)
+            reporter_gen.probabilities), " Priority distribution: ", str(
+            priority_generator), " Severe Ignore Probabilities: ", ignored_gen[
+            simdata.SEVERE_PRIORITY].probabilities, " Non-Severe Ignore Probabilities: ", ignored_gen[
+            simdata.NON_SEVERE_PRIORITY].probabilities
 
     progress_bar = None
     if show_progress:
@@ -1021,6 +1028,7 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
                                                                                   priority_generator=priority_generator,
                                                                                   catcher_generator=catcher_generator,
                                                                                   target_fixes=target_fixes,
+                                                                                  dev_time_budget=dev_time_budget,
                                                                                   dev_size_generator=dev_size_generator,
                                                                                   gatekeeper_config=gatekeeper_config,
                                                                                   quota_system=quota_system,

@@ -317,7 +317,7 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
                                                                    probabilities=[success_rate, (1 - success_rate)])
 
     print "Project ", project_keys, " Test Period: ", "ALL", " Reporters: ", test_team_size, " Developers:", dev_team_size, \
-        " Resolved in Period: ", issues_resolved,
+        " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
 
     input_params = recordtype('SimulationParams',
                               ['strategy_maps', 'strategies_catalog',
@@ -325,11 +325,12 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
                                'resolution_time_gen', 'teams', 'ignored_gen',
                                'reporter_gen', 'target_fixes', 'batch_size_gen',
                                'interarrival_time_gen', 'priority_generator', 'review_time_gen',
-                               'catcher_generator'])
+                               'catcher_generator', 'dev_time_budget'])
 
     return input_params(strategy_maps, strategies_catalog, player_configuration, dev_team_size,
                         resolution_time_gen, teams, ignored_gen, reporter_gen, target_fixes, batch_size_gen,
-                        interarrival_time_gen, priority_generator, review_time_gen, catcher_generator)
+                        interarrival_time_gen, priority_generator, review_time_gen, catcher_generator,
+                        dev_team_bandwith)
 
 
 def assign_teams(player_configuration):
