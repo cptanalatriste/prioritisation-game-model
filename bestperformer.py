@@ -7,6 +7,7 @@ import numpy as np
 import math
 from scipy.stats import t
 import time
+from matplotlib import pyplot as plt
 
 import gtconfig
 import syseval
@@ -62,10 +63,65 @@ def get_new_sample_size(samples, initial_sample_size, confidence, difference):
     return max(initial_sample_size, potential_sample_size)
 
 
+def plot_results(means):
+    label_map = {"GATEKEEPER_SUCC100": "Gatekeeper (0% Error)",
+                 "GATEKEEPER_SUCC090": "Gatekeeper (10% Error)",
+                 "THROTTLING_INF005": "Throttling (5% Penalty)",
+                 "THROTTLING_INF001": "Throttling (1% Penalty)",
+                 "THROTTLING_INF003": "Throttling (3% Penalty)",
+                 "UNSUPERVISED": "Unsupervised Prioritization"}
+
+    color_map = {"GATEKEEPER_SUCC100": "blue",
+                 "GATEKEEPER_SUCC090": "darkblue",
+                 "THROTTLING_INF005": "red",
+                 "THROTTLING_INF001": "firebrick",
+                 "THROTTLING_INF003": "tomato",
+                 "UNSUPERVISED": "green"}
+
+    sorted_keys = sorted(means.keys())
+    data = [means[key] for key in sorted_keys]
+    colors = []
+    labels = []
+
+    for key in sorted_keys:
+        for prefix in color_map.keys():
+            if key.startswith(prefix):
+                colors.append(color_map[prefix])
+                labels.append(label_map[prefix])
+                break
+
+    plt.clf()
+    fig, ax = plt.subplots()
+    width = 0.5
+    tick_locations = np.arange(len(sorted_keys))
+    rect_locations = tick_locations - (width / 2.0)
+
+    plt.xticks(rotation=70)
+    ax.bar(rect_locations, data, width, color=colors)
+
+    ax.set_xticks(ticks=tick_locations)
+    ax.set_xticklabels(labels)
+    ax.set_xlim(min(tick_locations) - 0.6, max(tick_locations) + 0.6)
+    ax.set_ylim((0, 1.0))
+
+    ax.yaxis.grid(True)
+    ax.set_xlabel('Bug Reporting Process')
+    ax.set_ylabel('% Severe Reports Fixed')
+
+    fig.suptitle("Performance Comparison")
+    fig.tight_layout(pad=2)
+    fig.savefig('img/performance_comparison.png', dpi=125)
+
+
 def main():
-    initial_sample_size = 12
+    initial_sample_size = 200
     confidence = 0.95
-    difference = 0.1
+    difference = 0.01
+
+    #Only for testing. Remove later
+    # difference = 0.1
+    # initial_sample_size = 12
+
 
     logger.info("Initial sample size: " + str(initial_sample_size))
 
@@ -74,9 +130,10 @@ def main():
 
     uo_equilibria = syseval.get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)
     throttling_equilibria = syseval.get_throttling_equilibria(simulation_configuration, input_params)
+    gatekeeper_equilibria = syseval.get_gatekeeper_equilibria(simulation_configuration, input_params)
 
     samples = {}
-    for equilibrium_info in (uo_equilibria + throttling_equilibria):
+    for equilibrium_info in (uo_equilibria + throttling_equilibria + gatekeeper_equilibria):
 
         profiles = equilibrium_info["equilibrium_profiles"]
         configuration = equilibrium_info["desc"]
@@ -99,7 +156,7 @@ def main():
 
     if new_sample_size != initial_sample_size:
         # TODO(cgavidia) Work this later
-        pass
+        raise Exception("New sample collection is needed!")
 
     means = {}
     for scenario, samples in samples.iteritems():
@@ -126,6 +183,8 @@ def main():
             logger.info(scenario + " is inferior to the best")
         else:
             logger.info(scenario + " is statistically indistinguihable from the best")
+
+    plot_results(means)
 
 
 if __name__ == "__main__":
