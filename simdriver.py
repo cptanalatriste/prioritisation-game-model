@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 
-
 import analytics
 import defaultabuse
 import simdata
@@ -32,7 +31,6 @@ DIFFERENCE = 2
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
 # Also, it was found in Discrete Event Simulation by George Fishman (Chapter 100
 MINIMUM_P_VALUE = 0.05
-
 
 
 def get_reporter_groups(bug_dataset):
@@ -729,18 +727,20 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
 
     reporter_gen, batch_size_gen, interarrival_time_gen = get_report_stream_params(training_issues, reporters_config)
 
+    simulation_config = simutils.SimulationConfig(reporters_config=reporters_config,
+                                                  resolution_time_gen=resolution_time_gen,
+                                                  batch_size_gen=batch_size_gen,
+                                                  interarrival_time_gen=interarrival_time_gen,
+                                                  ignored_gen=ignored_gen,
+                                                  reporter_gen=reporter_gen,
+                                                  priority_generator=priority_generator,
+                                                  target_fixes=TARGET_FIXES,
+                                                  team_capacity=None,
+                                                  dev_size_generator=dev_size_generator)
+
     simulation_output = simulate_func(
-        reporters_config=reporters_config,
-        resolution_time_gen=resolution_time_gen,
-        batch_size_gen=batch_size_gen,
-        interarrival_time_gen=interarrival_time_gen,
-        ignored_gen=ignored_gen,
-        reporter_gen=reporter_gen,
-        max_iterations=max_iterations,
-        priority_generator=priority_generator,
-        target_fixes=TARGET_FIXES,
-        team_capacity=None,
-        dev_size_generator=dev_size_generator)
+        simulation_config=simulation_config,
+        max_iterations=max_iterations)
 
     simulation_result = consolidate_results("SIMULATION", None, None,
                                             reporters_config,

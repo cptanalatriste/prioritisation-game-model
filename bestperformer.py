@@ -63,7 +63,7 @@ def get_new_sample_size(samples, initial_sample_size, confidence, difference):
     return max(initial_sample_size, potential_sample_size)
 
 
-def plot_results(means):
+def plot_results(means, desc=""):
     label_map = {"GATEKEEPER_SUCC100": "Gatekeeper (0% Error)",
                  "GATEKEEPER_SUCC090": "Gatekeeper (10% Error)",
                  "THROTTLING_INF005": "Throttling (5% Penalty)",
@@ -110,7 +110,11 @@ def plot_results(means):
 
     fig.suptitle("Performance Comparison")
     fig.tight_layout(pad=2)
-    fig.savefig('img/performance_comparison.png', dpi=125)
+
+    file_name = 'img/' + desc + "_performance_comparison.png"
+    fig.savefig(file_name, dpi=125)
+
+    logger.info("Comparison plot saved at " + file_name)
 
 
 def main():
@@ -118,73 +122,90 @@ def main():
     confidence = 0.95
     difference = 0.01
 
-    #Only for testing. Remove later
-    # difference = 0.1
-    # initial_sample_size = 12
+    dev_team_factors = [0.1, 0.5, 1.0]
 
+    # TODO: Only for testing. Remove later
+    difference = 0.1
+    initial_sample_size = 12
+    dev_team_factors = [0.5]
 
-    logger.info("Initial sample size: " + str(initial_sample_size))
-
-    simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
-    simulation_configuration["REPLICATIONS_PER_PROFILE"] = initial_sample_size
-
-    uo_equilibria = syseval.get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)
-    throttling_equilibria = syseval.get_throttling_equilibria(simulation_configuration, input_params)
-    gatekeeper_equilibria = syseval.get_gatekeeper_equilibria(simulation_configuration, input_params)
-
-    samples = {}
-    for equilibrium_info in (uo_equilibria + throttling_equilibria + gatekeeper_equilibria):
-
-        profiles = equilibrium_info["equilibrium_profiles"]
-        configuration = equilibrium_info["desc"]
-
-        logger.info("Configuration " + configuration + " has " + str(len(profiles)) + " equilibrium profiles")
-
-        for index, profile in enumerate(profiles):
-            sample_key = configuration + "_TSNE" + str(index)
-
-            logger.info("Producing samples for " + sample_key)
-
-            syseval.apply_strategy_profile(input_params.player_configuration, profile)
-            simulation_output = syseval.run_scenario(simfunction, input_params,
-                                                     equilibrium_info["simulation_configuration"])
-            samples[sample_key] = simulation_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY)
-
-    new_sample_size = get_new_sample_size(samples=samples, initial_sample_size=initial_sample_size,
-                                          confidence=confidence, difference=difference)
-    logger.info("New sample size: " + str(new_sample_size))
-
-    if new_sample_size != initial_sample_size:
-        # TODO(cgavidia) Work this later
-        raise Exception("New sample collection is needed!")
-
-    means = {}
-    for scenario, samples in samples.iteritems():
-        overall_sample_mean = np.mean(samples)
-        means[scenario] = overall_sample_mean
-        logger.info("Overall Sample Mean for " + scenario + ": " + str(overall_sample_mean))
-
-    best_performer_key = max(means, key=means.get)
-    best_performer_value = means[best_performer_key]
-
-    logger.info("Best performer " + best_performer_key + ". Value: " + str(best_performer_value))
-
-    for scenario, mean in means.iteritems():
-        left_parameter = mean - best_performer_value - difference
-        right_parameter = mean - best_performer_value + difference
-
-        left_boundary = min(0, left_parameter)
-        right_boundary = max(0, right_parameter)
+    for dev_team_factor in dev_team_factors:
 
         logger.info(
-            "Confidence interval for " + scenario + ": ( " + str(left_boundary) + ", " + str(right_boundary) + ")")
+            "Using dev team factor " + str(dev_team_factor) + " Initial sample size: " + str(initial_sample_size))
 
-        if right_parameter <= 0:
-            logger.info(scenario + " is inferior to the best")
-        else:
-            logger.info(scenario + " is statistically indistinguihable from the best")
+        simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
+        simulation_configuration["REPLICATIONS_PER_PROFILE"] = initial_sample_size
+        input_params.dev_team_size = int(input_params.dev_team_size * dev_team_factor)
 
-    plot_results(means)
+        uo_equilibria = syseval.get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)
+        throttling_equilibria = syseval.get_throttling_equilibria(simulation_configuration, input_params)
+        gatekeeper_equilibria = syseval.get_gatekeeper_equilibria(simulation_configuration, input_params)
+
+        # TODO: Only for testing purposes
+        gatekeeper_equilibria = [gatekeeper_equilibria[0]]
+        throttling_equilibria = [throttling_equilibria[1]]
+
+        samples = {}
+        for equilibrium_info in (uo_equilibria + throttling_equilibria + gatekeeper_equilibria):
+
+            profiles = equilibrium_info["equilibrium_profiles"]
+            configuration = equilibrium_info["desc"]
+
+            logger.info("Configuration " + configuration + " has " + str(len(profiles)) + " equilibrium profiles")
+
+            success_rate = 1.0
+            if 'SUCCESS_RATE' in equilibrium_info["simulation_configuration"]:
+                success_rate = equilibrium_info["simulation_configuration"]["SUCCESS_RATE"]
+
+            input_params.catcher_generator.configure(values=[True, False],
+                                                     probabilities=[success_rate, (1 - success_rate)])
+
+            for index, profile in enumerate(profiles):
+                sample_key = configuration + "_TSNE" + str(index)
+
+                logger.info("Producing samples for " + sample_key)
+
+                syseval.apply_strategy_profile(input_params.player_configuration, profile)
+                simulation_output = syseval.run_scenario(simfunction, input_params,
+                                                         equilibrium_info["simulation_configuration"])
+                samples[sample_key] = simulation_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY)
+
+        new_sample_size = get_new_sample_size(samples=samples, initial_sample_size=initial_sample_size,
+                                              confidence=confidence, difference=difference)
+        logger.info("New sample size: " + str(new_sample_size))
+
+        if new_sample_size != initial_sample_size:
+            # TODO(cgavidia) Work this later
+            raise Exception("New sample collection is needed!")
+
+        means = {}
+        for scenario, samples in samples.iteritems():
+            overall_sample_mean = np.mean(samples)
+            means[scenario] = overall_sample_mean
+            logger.info("Overall Sample Mean for " + scenario + ": " + str(overall_sample_mean))
+
+        best_performer_key = max(means, key=means.get)
+        best_performer_value = means[best_performer_key]
+
+        logger.info("Best performer " + best_performer_key + ". Value: " + str(best_performer_value))
+        plot_results(means, desc="dev_team_factor" + str(dev_team_factor))
+
+        for scenario, mean in means.iteritems():
+            left_parameter = mean - best_performer_value - difference
+            right_parameter = mean - best_performer_value + difference
+
+            left_boundary = min(0, left_parameter)
+            right_boundary = max(0, right_parameter)
+
+            logger.info(
+                "Confidence interval for " + scenario + ": ( " + str(left_boundary) + ", " + str(right_boundary) + ")")
+
+            if right_parameter <= 0:
+                logger.info(scenario + " is inferior to the best")
+            else:
+                logger.info(scenario + " is statistically indistinguihable from the best")
+
 
 
 if __name__ == "__main__":

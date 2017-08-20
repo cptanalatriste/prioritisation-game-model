@@ -45,6 +45,58 @@ REPORTER_COLUMNS = [simmodel.NON_SEVERE_INFLATED_COLUMN, simmodel.SEVERE_DEFLATE
 logger = gtconfig.get_logger("simulation_utils", "simulation_utils.txt", level=logging.INFO)
 
 
+class SimulationConfig:
+    """
+    Contains the parameters necessary for the simulation execution.
+    """
+
+    def __init__(self, team_capacity, reporters_config, resolution_time_gen, batch_size_gen, interarrival_time_gen,
+                 max_time=sys.maxint, quota_system=False, inflation_factor=None, priority_generator=None,
+                 ignored_gen=None, reporter_gen=None, target_fixes=None, dev_time_budget=None,
+                 dev_size_generator=None, gatekeeper_config=None, catcher_generator=None, bug_stream=None,
+                 replication_id=None, priority_queue=False, views_to_discard=0):
+        self.team_capacity = team_capacity
+        self.reporters_config = reporters_config
+        self.resolution_time_gen = resolution_time_gen
+        self.batch_size_gen = batch_size_gen
+        self.interarrival_time_gen = interarrival_time_gen
+        self.max_time = max_time
+        self.ignored_gen = ignored_gen
+        self.reporter_gen = reporter_gen
+        self.priority_generator = priority_generator
+        self.catcher_generator = catcher_generator
+        self.target_fixes = target_fixes
+        self.dev_time_budget = dev_time_budget
+        self.dev_size_generator = dev_size_generator
+        self.gatekeeper_config = gatekeeper_config
+        self.quota_system = quota_system
+        self.inflation_factor = inflation_factor
+        self.bug_stream = bug_stream
+
+        self.replication_id = replication_id
+        self.priority_queue = priority_queue
+        self.views_to_discard = views_to_discard
+
+    def __str__(self):
+        gatekeeper_params = "NONE"
+        if self.gatekeeper_config is not None:
+            gatekeeper_params = " Capacity " + str(self.gatekeeper_config['capacity']) + " Time Generator " + str(
+                self.gatekeeper_config['review_time_gen'])
+
+        return "Target fixes: " + str(
+            self.target_fixes) + "Dev Time Budget " + str(self.dev_time_budget) + " .Throttling enabled: " + str(
+            self.quota_system) + " . Inflation penalty: " + str(self.inflation_factor) + " Developers in team: " + str(
+            self.team_capacity) + " Success probabilities: " + str(
+            self.catcher_generator) + " Gatekeeper Config: " + (
+                   gatekeeper_params) + " Max Reporter Probability: " + str(max(
+            self.reporter_gen.probabilities)) + " Min Reporter Probability " + str(min(
+            self.reporter_gen.probabilities)) + " Priority distribution: " + str(
+            self.priority_generator) + " Severe Ignore Probabilities: " + str(self.ignored_gen[
+                                                                                  simdata.SEVERE_PRIORITY].probabilities) + " Non-Severe Ignore Probabilities: " + str(
+            self.ignored_gen[
+                simdata.NON_SEVERE_PRIORITY].probabilities) + " Priority Queue: " + str(self.priority_queue)
+
+
 class MixedEmpiricalInflationStrategy:
     """
     This class represents a mixed empirical strategy: It randomly selects an instance of EmpiricalInflationStrategy
@@ -819,22 +871,8 @@ def plot_correlation(total_predicted, total_completed, title, figtext, plot):
         plt.savefig("img/" + title + ".png", bbox_inches='tight')
 
 
-def launch_simulation_parallel(team_capacity, reporters_config,
-                               resolution_time_gen,
-                               batch_size_gen,
-                               interarrival_time_gen,
+def launch_simulation_parallel(simulation_config,
                                max_iterations,
-                               max_time=sys.maxint,
-                               priority_generator=None,
-                               ignored_gen=None,
-                               reporter_gen=None,
-                               target_fixes=None,
-                               dev_time_budget=None,
-                               dev_size_generator=None,
-                               gatekeeper_config=None,
-                               inflation_factor=None,
-                               catcher_generator=None,
-                               quota_system=False,
                                parallel_blocks=gtconfig.parallel_blocks,
                                show_progress=True):
     """
@@ -862,23 +900,8 @@ def launch_simulation_parallel(team_capacity, reporters_config,
     worker_inputs = []
 
     for block_id in range(parallel_blocks):
-        worker_input = {'team_capacity': team_capacity,
-                        'reporters_config': reporters_config,
-                        'resolution_time_gen': resolution_time_gen,
-                        'batch_size_gen': batch_size_gen,
-                        'interarrival_time_gen': interarrival_time_gen,
+        worker_input = {'simulation_config': simulation_config,
                         'max_iterations': samples_per_worker,
-                        'ignored_gen': ignored_gen,
-                        'reporter_gen': reporter_gen,
-                        'max_time': max_time,
-                        'gatekeeper_config': gatekeeper_config,
-                        'inflation_factor': inflation_factor,
-                        'priority_generator': priority_generator,
-                        'target_fixes': target_fixes,
-                        'dev_time_budget': dev_time_budget,
-                        'dev_size_generator': dev_size_generator,
-                        'catcher_generator': catcher_generator,
-                        'quota_system': quota_system,
                         'block_id': block_id,
                         'show_progress': False}
 
@@ -904,25 +927,10 @@ def launch_simulation_wrapper(input_params):
     :return: A dict with the simulation output.
     """
     simulation_results = launch_simulation(
-        team_capacity=input_params['team_capacity'],
-        reporters_config=input_params['reporters_config'],
-        resolution_time_gen=input_params['resolution_time_gen'],
-        batch_size_gen=input_params['batch_size_gen'],
-        interarrival_time_gen=input_params['interarrival_time_gen'],
         max_iterations=input_params['max_iterations'],
-        max_time=input_params['max_time'],
-        priority_generator=input_params['priority_generator'],
-        target_fixes=input_params['target_fixes'],
-        dev_time_budget=input_params['dev_time_budget'],
-        ignored_gen=input_params['ignored_gen'],
-        reporter_gen=input_params['reporter_gen'],
-        dev_size_generator=input_params['dev_size_generator'],
-        gatekeeper_config=input_params['gatekeeper_config'],
-        inflation_factor=input_params['inflation_factor'],
-        quota_system=input_params['quota_system'],
-        catcher_generator=input_params['catcher_generator'],
         show_progress=input_params['show_progress'],
-        block_id=input_params['block_id'])
+        block_id=input_params['block_id'],
+        simulation_config=input_params['simulation_config'])
 
     return simulation_results
 
@@ -955,23 +963,7 @@ def print_strategy_report(reporters_config):
         print "Strategy: ", strategy_name, " Reporters: ", len(reporters_with_strategy)
 
 
-def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
-                      batch_size_gen,
-                      interarrival_time_gen,
-                      max_iterations,
-                      max_time=sys.maxint,
-                      priority_generator=None,
-                      ignored_gen=None,
-                      reporter_gen=None,
-                      target_fixes=None,
-                      dev_time_budget=None,
-                      dev_size_generator=None,
-                      gatekeeper_config=None,
-                      inflation_factor=None,
-                      catcher_generator=None,
-                      quota_system=False,
-                      show_progress=True,
-                      block_id=-1):
+def launch_simulation(simulation_config, max_iterations, show_progress=True, block_id=-1):
     """
     Triggers the simulation according a given configuration. It includes the seed reset behaviour.
 
@@ -988,23 +980,10 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
     simulation_metrics = SimulationMetrics()
 
     if show_progress:
-        gatekeeper_params = None
+        print_strategy_report(simulation_config.reporters_config)
 
-        if gatekeeper_config is not None:
-            gatekeeper_params = " Capacity " + str(gatekeeper_config['capacity']) + " Time Generator " + str(
-                gatekeeper_config['review_time_gen'])
-
-        print_strategy_report(reporters_config)
-
-        print "Running ", max_iterations, " replications. Target fixes: ", target_fixes, \
-            "Dev Time Budget ", dev_time_budget, " .Throttling enabled: ", quota_system, " . Inflation penalty: ", inflation_factor, \
-            " Developers in team: ", team_capacity, " Success probabilities: ", str(catcher_generator), \
-            " Gatekeeper Config: ", gatekeeper_params, " Max Reporter Probability: ", max(
-            reporter_gen.probabilities), " Min Reporter Probability ", min(
-            reporter_gen.probabilities), " Priority distribution: ", str(
-            priority_generator), " Severe Ignore Probabilities: ", ignored_gen[
-            simdata.SEVERE_PRIORITY].probabilities, " Non-Severe Ignore Probabilities: ", ignored_gen[
-            simdata.NON_SEVERE_PRIORITY].probabilities
+        print "Running ", max_iterations, " replications ..."
+        print str(simulation_config)
 
     progress_bar = None
     if show_progress:
@@ -1016,24 +995,9 @@ def launch_simulation(team_capacity, reporters_config, resolution_time_gen,
         current_seed = int(time.time()) + block_id
         np.random.seed(seed=current_seed)
 
-        replication_id = "BLOCK" + str(block_id) + "-REP-" + str(replication_index) + "-SEED-" + str(current_seed)
-        reporter_monitors, priority_monitors, reporting_time = simmodel.run_model(team_capacity=team_capacity,
-                                                                                  reporters_config=reporters_config,
-                                                                                  resolution_time_gen=resolution_time_gen,
-                                                                                  batch_size_gen=batch_size_gen,
-                                                                                  interarrival_time_gen=interarrival_time_gen,
-                                                                                  max_time=max_time,
-                                                                                  ignored_gen=ignored_gen,
-                                                                                  reporter_gen=reporter_gen,
-                                                                                  priority_generator=priority_generator,
-                                                                                  catcher_generator=catcher_generator,
-                                                                                  target_fixes=target_fixes,
-                                                                                  dev_time_budget=dev_time_budget,
-                                                                                  dev_size_generator=dev_size_generator,
-                                                                                  gatekeeper_config=gatekeeper_config,
-                                                                                  quota_system=quota_system,
-                                                                                  inflation_factor=inflation_factor,
-                                                                                  replication_id=replication_id)
+        simulation_config.replication_id = "BLOCK" + str(block_id) + "-REP-" + str(replication_index) + "-SEED-" + str(
+            current_seed)
+        reporter_monitors, priority_monitors, reporting_time = simmodel.run_model(simulation_config)
 
         simulation_metrics.process_simulation_output(reporter_monitors, priority_monitors, reporting_time)
 

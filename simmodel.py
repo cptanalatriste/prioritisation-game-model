@@ -206,7 +206,6 @@ class TestingContext:
         generator_output = generator.generate()
         return generator_output
 
-
     def catch_inflation(self):
         """
         Returns True if the person doing the priority assessment does it correctly.
@@ -286,7 +285,7 @@ class BasicBugReport:
         Priority for the queue for the developer.
         :return: Priority value.
         """
-        return int(self.arrival_time)
+        return self.report_priority
 
     def is_false_report(self):
         false_report = False
@@ -752,17 +751,7 @@ def configure_strategy_map(reporters_config, testing_context):
     return strategy_map
 
 
-def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen, reporter_gen, max_time,
-              priority_generator=None,
-              target_fixes=None,
-              dev_time_budget=None,
-              dev_size_generator=None,
-              gatekeeper_config=False,
-              interarrival_time_gen=None,
-              batch_size_gen=None,
-              views_to_discard=0,
-              bug_stream=None,
-              quota_system=False, inflation_factor=None, catcher_generator=None, replication_id=""):
+def run_model(simulation_config):
     """
     Triggers the simulation, according to the provided parameters.
     :param debug: Enable to got debug information.
@@ -782,63 +771,70 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
     gatekeeper_resource = None
     default_review_time = None
     review_time_gen = None
-    if gatekeeper_config:
-        review_time_gen = gatekeeper_config['review_time_gen']
-        gatekeeper_resource = Resource(capacity=gatekeeper_config['capacity'], name="gatekeeper_team",
-                                       unitName="gatekeeper", qType=PriorityQ,
+    if simulation_config.gatekeeper_config:
+        review_time_gen = simulation_config.gatekeeper_config['review_time_gen']
+        gatekeeper_resource = Resource(capacity=simulation_config.gatekeeper_config['capacity'], name="gatekeeper_team",
+                                       unitName="gatekeeper", qType=FIFO,
                                        preemptable=False)
 
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
     preemptable = False
 
-    if dev_size_generator is not None:
+    if simulation_config.dev_size_generator is not None:
         # We are ensuring a minimum capacity of one developer.
-        team_capacity = max(1, dev_size_generator.generate())
+        team_capacity = max(1, simulation_config.dev_size_generator.generate())
 
-    logger.debug(replication_id + " team_capacity: " + str(team_capacity))
-    developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=PriorityQ,
+    logger.debug(simulation_config.replication_id + " team_capacity: " + str(team_capacity))
+    dev_time_qtype = FIFO
+
+    if simulation_config.priority_queue:
+        dev_time_qtype = PriorityQ
+
+    developer_resource = Resource(capacity=team_capacity, name="dev_team", unitName="developer", qType=dev_time_qtype,
                                   preemptable=preemptable)
 
-    severe_generator = ignored_gen[simdata.SEVERE_PRIORITY]
-    nonsevere_generator = ignored_gen[simdata.NON_SEVERE_PRIORITY]
+    severe_generator = simulation_config.ignored_gen[simdata.SEVERE_PRIORITY]
+    nonsevere_generator = simulation_config.ignored_gen[simdata.NON_SEVERE_PRIORITY]
 
     ignore_generators = {config['name']: {simdata.NON_SEVERE_PRIORITY: nonsevere_generator.copy(),
                                           simdata.SEVERE_PRIORITY: severe_generator.copy()}
-                         for config in reporters_config}
+                         for config in simulation_config.reporters_config}
 
     initialize()
 
     timeout = DEFAULT_TIMEOUT
 
-    if bug_stream is None:
-        bug_stream = BugStream(resolution_time_gen=resolution_time_gen, reporter_gen=reporter_gen,
-                               priority_generator=priority_generator)
+    if simulation_config.bug_stream is None:
+        bug_stream = BugStream(resolution_time_gen=simulation_config.resolution_time_gen,
+                               reporter_gen=simulation_config.reporter_gen,
+                               priority_generator=simulation_config.priority_generator)
 
     fix_count_criteria = True
-    if dev_time_budget is not None and not gtconfig.fix_count_criteria:
+    if simulation_config.dev_time_budget is not None and not gtconfig.fix_count_criteria:
         fix_count_criteria = False
         logger.debug(
-            "The stop criteria is according to the development team budget of " + str(dev_time_budget) + " units")
+            "The stop criteria is according to the development team budget of " + str(
+                simulation_config.dev_time_budget) + " units")
 
     testing_context = TestingContext(bug_stream=bug_stream,
                                      ignore_generators=ignore_generators,
                                      default_review_time=default_review_time,
-                                     quota_system=quota_system,
-                                     inflation_factor=inflation_factor,
+                                     quota_system=simulation_config.quota_system,
+                                     inflation_factor=simulation_config.inflation_factor,
                                      review_time_gen=review_time_gen,
-                                     views_to_discard=views_to_discard,
-                                     catcher_generator=catcher_generator,
-                                     target_fixes=target_fixes,
-                                     dev_time_budget=dev_time_budget,
+                                     views_to_discard=simulation_config.views_to_discard,
+                                     catcher_generator=simulation_config.catcher_generator,
+                                     target_fixes=simulation_config.target_fixes,
+                                     dev_time_budget=simulation_config.dev_time_budget,
                                      fix_count_criteria=fix_count_criteria,
                                      timeout=timeout,
-                                     replication_id=replication_id)
+                                     replication_id=simulation_config.replication_id)
 
     controller = SimulationController(testing_context=testing_context)
     activate(controller, controller.control())
 
     reporter_monitors = {}
-    for reporter_config in reporters_config:
+    for reporter_config in simulation_config.reporters_config:
         reporter_monitor = Monitor()
 
         reporter_monitors[reporter_config['name']] = {"resolved_monitor": reporter_monitor,
@@ -846,18 +842,18 @@ def run_model(team_capacity, reporters_config, resolution_time_gen, ignored_gen,
                                                       "report_counters": start_priority_counter(),
                                                       "resolved_counters": start_priority_counter()}
 
-    bug_reporter = BugReportSource(reporters_config=reporters_config,
+    bug_reporter = BugReportSource(reporters_config=simulation_config.reporters_config,
                                    testing_context=testing_context,
-                                   interarrival_time_gen=interarrival_time_gen,
-                                   batch_size_gen=batch_size_gen)
+                                   interarrival_time_gen=simulation_config.interarrival_time_gen,
+                                   batch_size_gen=simulation_config.batch_size_gen)
 
     activate(bug_reporter,
              bug_reporter.start_reporting(developer_resource=developer_resource,
                                           gatekeeper_resource=gatekeeper_resource,
                                           reporter_monitors=reporter_monitors), at=start_time)
 
-    logger.debug(replication_id + " testing_context.inflation_factor " + str(
-        testing_context.inflation_factor) + " len(reporters_config) " + str(len(reporters_config)))
+    logger.debug(simulation_config.replication_id + " testing_context.inflation_factor " + str(
+        testing_context.inflation_factor) + " len(reporters_config) " + str(len(simulation_config.reporters_config)))
 
-    simulation_result = simulate(until=max_time)
+    simulation_result = simulate(until=simulation_config.max_time)
     return reporter_monitors, testing_context.priority_monitors, testing_context.get_reporting_time()

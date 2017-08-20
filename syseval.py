@@ -227,6 +227,9 @@ def get_throttling_equilibria(simulation_config, input_params):
     process_configuration_inf001["GATEKEEPER_CONFIG"] = None
     process_configuration_inf001["INFLATION_FACTOR"] = 0.01
 
+    # TODO(cgavidia): We need to include this in the equilibrium calculations
+    process_configuration_inf001["SUCCESS_RATE"] = 0.95
+
     tsne1_profile_inf001 = generate_single_strategy_profile(input_params.player_configuration, empirical_honest)
     tsne2_profile_inf001 = generate_single_strategy_profile(input_params.player_configuration,
                                                             {'name': desc_inf001 + "_TSNE2",
@@ -265,6 +268,7 @@ def get_gatekeeper_equilibria(simulation_config, input_params):
     :param input_params:
     :return:
     """
+
     desc_succ090 = "GATEKEEPER_SUCC090"
     process_configuration_succ090 = dict(simulation_config)
 
@@ -292,7 +296,18 @@ def get_gatekeeper_equilibria(simulation_config, input_params):
     tsne4_profile_succ100 = generate_single_strategy_profile(input_params.player_configuration, occasional_deflator)
     tsne5_profile_succ100 = generate_single_strategy_profile(input_params.player_configuration, simmodel.HONEST_CONFIG)
 
-    return [{"desc": desc_succ090,
+    # TODO This is a profile we will calculate its equilibrium later
+    desc_succ50 = "GATEKEEPER_SUCC50"
+    process_configuration_succ050 = dict(process_configuration_succ090)
+    process_configuration_succ050["SUCCESS_RATE"] = 0.5
+
+    equilibrium_profile_succ050 = generate_single_strategy_profile(input_params.player_configuration,
+                                                                   simmodel.SIMPLE_INFLATE_CONFIG)
+
+    return [{"desc": desc_succ50,
+             "simulation_configuration": process_configuration_succ050,
+             "equilibrium_profiles": [equilibrium_profile_succ050]},
+            {"desc": desc_succ090,
              "simulation_configuration": process_configuration_succ090,
              "equilibrium_profiles": [equilibrium_profile_succ090]},
             {"desc": desc_succ100,
