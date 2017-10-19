@@ -98,7 +98,8 @@ def run_scenario(simfunction, input_params, simulation_configuration):
     :param gatekeeper_config:
     :return: Samples for the variable of interest.
     """
-    simulation_output = simfunction(
+
+    simulation_config = simutils.SimulationConfig(
         team_capacity=input_params.dev_team_size,
         ignored_gen=input_params.ignored_gen,
         reporter_gen=input_params.reporter_gen,
@@ -111,10 +112,13 @@ def run_scenario(simfunction, input_params, simulation_configuration):
         resolution_time_gen=input_params.resolution_time_gen,
         max_time=sys.maxint,
         catcher_generator=input_params.catcher_generator,
-        max_iterations=simulation_configuration["REPLICATIONS_PER_PROFILE"],
         inflation_factor=simulation_configuration["INFLATION_FACTOR"],
         quota_system=simulation_configuration["THROTTLING_ENABLED"],
-        gatekeeper_config=simulation_configuration["GATEKEEPER_CONFIG"])
+        gatekeeper_config=simulation_configuration["GATEKEEPER_CONFIG"],
+        priority_queue=simulation_configuration["PRIORITY_QUEUE"])
+
+    simulation_output = simfunction(max_iterations=simulation_configuration["REPLICATIONS_PER_PROFILE"],
+                                    simulation_config=simulation_config)
 
     return simulation_output
 

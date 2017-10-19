@@ -84,7 +84,7 @@ class SimulationConfig:
                 self.gatekeeper_config['review_time_gen'])
 
         return "Target fixes: " + str(
-            self.target_fixes) + "Dev Time Budget " + str(self.dev_time_budget) + " .Throttling enabled: " + str(
+            self.target_fixes) + " Dev Time Budget " + str(self.dev_time_budget) + " .Throttling enabled: " + str(
             self.quota_system) + " . Inflation penalty: " + str(self.inflation_factor) + " Developers in team: " + str(
             self.team_capacity) + " Success probabilities: " + str(
             self.catcher_generator) + " Gatekeeper Config: " + (

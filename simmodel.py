@@ -780,6 +780,7 @@ def run_model(simulation_config):
     # The Resource is non-preemptable. It won't interrupt ongoing fixes.
     preemptable = False
 
+    team_capacity = simulation_config.team_capacity
     if simulation_config.dev_size_generator is not None:
         # We are ensuring a minimum capacity of one developer.
         team_capacity = max(1, simulation_config.dev_size_generator.generate())

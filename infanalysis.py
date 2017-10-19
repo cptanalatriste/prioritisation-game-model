@@ -24,30 +24,49 @@ DEPENDENT_VARIABLES = ['severe_time_ratio', 'severe_completed', 'severe_fixed_ra
 DEV_TEAM_RATIO = 1
 
 
+def apply_gatekeeper_error(independent_variable_value, input_params, empirical_profile, original_team_size,
+                           simulation_configuration):
+    normalized_success_rate = independent_variable_value / 100.0
+    simulation_configuration["SUCCESS_RATE"] = normalized_success_rate
+    input_params.catcher_generator.configure(values=[True, False],
+                                             probabilities=[normalized_success_rate, (1 - normalized_success_rate)])
+
+    return normalized_success_rate
+
+
+def apply_inflation_factor(independent_variable_value, input_params, empirical_profile, original_team_size,
+                           simulation_configuration):
+    normalized_rate = independent_variable_value / 100.0
+    profile_after_inflation, offender_number = syseval.generate_inflated_profile(normalized_rate, empirical_profile)
+    syseval.apply_strategy_profile(input_params.player_configuration, profile_after_inflation)
+
+    return offender_number
+
+
+def apply_team_reduction(independent_variable_value, input_params, empirical_profile, original_team_size,
+                         simulation_configuration):
+    normalized_rate = independent_variable_value / 100.0
+    new_team_size = int(original_team_size * normalized_rate)
+
+    input_params.dev_team_size = new_team_size
+    return new_team_size
+
+
 def configure_simulation(independent_variable_value, input_params, empirical_profile, original_team_size,
-                         inflation_based=True):
+                         configuration_function, simulation_configuration):
     """
     Adjusts the simulation configuration to the current independent variable value.
     :param independent_variable_value:
     :return:
     """
 
-    if inflation_based:
-        normalized_rate = independent_variable_value / 100.0
-        profile_after_inflation, offender_number = syseval.generate_inflated_profile(normalized_rate, empirical_profile)
-        syseval.apply_strategy_profile(input_params.player_configuration, profile_after_inflation)
-
-        return offender_number
-    else:
-        normalized_rate = independent_variable_value / 100.0
-        new_team_size = int(original_team_size * normalized_rate)
-
-        input_params.dev_team_size = new_team_size
-        return new_team_size
+    return configuration_function(independent_variable_value=independent_variable_value, input_params=input_params,
+                                  empirical_profile=empirical_profile, original_team_size=original_team_size,
+                                  simulation_configuration=simulation_configuration)
 
 
 def get_performance_dataframe(input_params, simfunction, simulation_configuration, empirical_profile,
-                              original_team_size, step, desc):
+                              original_team_size, step, desc, configuration_function=apply_inflation_factor):
     """
     Produces a dataframe containing performance measure values per several configurations of inflation probability.
     :param input_params: Simulation inputs.
@@ -68,7 +87,8 @@ def get_performance_dataframe(input_params, simfunction, simulation_configuratio
 
         normalized_value = configure_simulation(independent_variable_value, input_params, empirical_profile,
                                                 original_team_size,
-                                                inflation_based=True)
+                                                configuration_function=configuration_function,
+                                                simulation_configuration=simulation_configuration)
 
         simulation_output = syseval.run_scenario(simfunction, input_params, simulation_configuration)
 
@@ -153,6 +173,41 @@ def do_unsupervised_prioritization(simulation_configuration, input_params, simfu
     return perform_regression_analysis(desc=desc, dataframe=dataframe)
 
 
+def do_gatekeeper(simulation_configuration, input_params, simfunction, empirical_profile, original_team_size, step):
+    simulation_configuration["THROTTLING_ENABLED"] = False
+    simulation_configuration['GATEKEEPER_CONFIG'] = penaltyexp.DEFAULT_GATEKEEPER_CONFIG
+
+    queue_configurations = [True, False]
+    dev_team_factors = [0.5, 1.0]
+
+    gatekeeper_results = {}
+
+    original_team_size = input_params.dev_team_size
+    logger.info("Original team size: " + str(original_team_size))
+
+    for queue_configuration in queue_configurations:
+
+        for dev_team_factor in dev_team_factors:
+            logger.info("Using dev team factor " + str(dev_team_factor))
+            input_params.dev_team_size = int(original_team_size * dev_team_factor)
+
+            desc = "GATEKEEPER_PRIQUEUE_" + str(queue_configuration) + "_DEV_FACTOR_" + str(dev_team_factor)
+            logger.info("Starting " + desc + " analysis ...")
+
+            simulation_configuration["PRIORITY_QUEUE"] = queue_configuration
+            logger.info("Using Priority Queue? " + str(queue_configuration))
+
+            dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
+                                                  simulation_configuration=simulation_configuration,
+                                                  empirical_profile=empirical_profile,
+                                                  original_team_size=original_team_size, step=step, desc=desc,
+                                                  configuration_function=apply_gatekeeper_error)
+
+            gatekeeper_results[desc] = perform_regression_analysis(desc=desc, dataframe=dataframe)
+
+    return gatekeeper_results
+
+
 def do_throttling(simulation_configuration, input_params, simfunction, empirical_profile, original_team_size, step):
     simulation_configuration["THROTTLING_ENABLED"] = True
 
@@ -171,40 +226,12 @@ def do_throttling(simulation_configuration, input_params, simfunction, empirical
         dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
                                               simulation_configuration=simulation_configuration,
                                               empirical_profile=empirical_profile,
-                                              original_team_size=original_team_size, step=step, desc=desc)
+                                              original_team_size=original_team_size, step=step, desc=desc,
+                                              configuration_function=apply_gatekeeper_error)
 
         throttling_results[desc] = perform_regression_analysis(desc=desc, dataframe=dataframe)
 
     return throttling_results
-
-
-def do_gatekeeper(simulation_configuration, input_params, simfunction, empirical_profile, original_team_size, step):
-    simulation_configuration["THROTTLING_ENABLED"] = False
-    simulation_configuration['GATEKEEPER_CONFIG'] = penaltyexp.DEFAULT_GATEKEEPER_CONFIG
-
-    success_rates = [90, 100]
-
-    # TODO(cgavidia): Remove later
-    success_rates = [90]
-
-    gatekeeper_results = {}
-
-    for success_rate in success_rates:
-        normalized_success_rate = success_rate / 100.0
-        simulation_configuration["SUCCESS_RATE"] = normalized_success_rate
-        input_params.catcher_generator.configure(values=[True, False],
-                                                 probabilities=[normalized_success_rate, (1 - normalized_success_rate)])
-
-        desc = "GATEKEEPER_SUCC" + str(success_rate)
-        logger.info("Starting " + desc + " analysis ...")
-        dataframe = get_performance_dataframe(input_params=input_params, simfunction=simfunction,
-                                              simulation_configuration=simulation_configuration,
-                                              empirical_profile=empirical_profile,
-                                              original_team_size=original_team_size, step=step, desc=desc)
-
-        gatekeeper_results[desc] = perform_regression_analysis(desc=desc, dataframe=dataframe)
-
-    return gatekeeper_results
 
 
 def plot_comparison(plot_configs, y_min, y_max, desc):
@@ -270,10 +297,6 @@ def main():
     replications_per_rate = 120
     step = 20
 
-    # TODO(cgavidia): Remove later
-    # replications_per_rate = 12
-    # step = 30
-
     logger.info("Experiment configuration: Replications per Inflation Rate " + str(
         replications_per_rate) + " Offset between rates " + str(step))
 
@@ -288,23 +311,24 @@ def main():
 
     simulation_configuration['REPLICATIONS_PER_PROFILE'] = replications_per_rate
 
-    uo_regression_results = do_unsupervised_prioritization(simulation_configuration=simulation_configuration,
-                                                           simfunction=simfunction,
-                                                           input_params=input_params,
-                                                           empirical_profile=empirical_profile,
-                                                           original_team_size=original_team_size, step=step)
-
-    throt_regression_results = do_throttling(simulation_configuration=simulation_configuration, simfunction=simfunction,
-                                             input_params=input_params, empirical_profile=empirical_profile,
-                                             original_team_size=original_team_size, step=step)
-
     gate_regression_results = do_gatekeeper(simulation_configuration=simulation_configuration, simfunction=simfunction,
                                             input_params=input_params, empirical_profile=empirical_profile,
                                             original_team_size=original_team_size, step=step)
 
-    compare_regression_results(uo_regression_results=uo_regression_results,
-                               throt_regression_results=throt_regression_results,
-                               gate_regression_results=gate_regression_results)
+    # So far, we are only concerned in the regression analysis for the Gatekeeper process
+    # uo_regression_results = do_unsupervised_prioritization(simulation_configuration=simulation_configuration,
+    #                                                        simfunction=simfunction,
+    #                                                        input_params=input_params,
+    #                                                        empirical_profile=empirical_profile,
+    #                                                        original_team_size=original_team_size, step=step)
+    #
+    # throt_regression_results = do_throttling(simulation_configuration=simulation_configuration, simfunction=simfunction,
+    #                                          input_params=input_params, empirical_profile=empirical_profile,
+    #                                          original_team_size=original_team_size, step=step)
+    #
+    # compare_regression_results(uo_regression_results=uo_regression_results,
+    #                            throt_regression_results=throt_regression_results,
+    #                            gate_regression_results=gate_regression_results)
 
 
 if __name__ == "__main__":
