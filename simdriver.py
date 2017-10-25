@@ -667,11 +667,14 @@ def get_report_stream_params(training_issues, reporters_config, symmetric=False)
 
 
 def train_validate_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_valid, parallel=True,
-                              prefix=""):
+                              prefix="", priority_queue=False):
     """
 
     Train the simulation model on a dataset and test it in another dataset.
 
+    :param priority_queue: True if the queuing discipline of the developer queue is guided by Priority. False if it is FIFO.
+    :param prefix: Prefix for file generation purposes.
+    :param parallel: True if the replications should be run in parallel. False otherwise
     :param fold: Identifier of the train-test period.
     :param max_iterations: Iterations for the simulation.
     :param issues_in_range: Bug report dataframe.
@@ -736,7 +739,8 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
                                                   priority_generator=priority_generator,
                                                   target_fixes=TARGET_FIXES,
                                                   team_capacity=None,
-                                                  dev_size_generator=dev_size_generator)
+                                                  dev_size_generator=dev_size_generator,
+                                                  priority_queue=priority_queue)
 
     simulation_output = simulate_func(
         simulation_config=simulation_config,
@@ -793,19 +797,23 @@ def split_dataset(dataframe, set_size):
     return None, None
 
 
-def get_experiment_prefix(project_key, test_size):
+def get_experiment_prefix(project_key, test_size, priority_queue=False):
     """
     A convenient prefix to identify an experiment instance.
     :param project_key: Projects under analysis.
     :param test_size: Size of the test dataset.
     :return: The prefix.
     """
-    return "_".join(project_key) + "_Test_" + str(test_size)
+    return "_".join(project_key) + "_Test_" + str(test_size) + "_PRIQUEUE_" + str(priority_queue)
 
 
-def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=None, max_iterations=1000):
+def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=None, max_iterations=1000,
+                     priority_queue=False):
     """
     Launches simulation analysis for an specific project.
+    :param priority_queue: True if the developers use a priority queue, false otherwise.
+    :param max_iterations: Number of replications to run.
+    :param parallel: True if the replications should run in parallel, false otherwise.
     :param project_key: Project identifier.
     :param enhanced_dataframe: Dataframe with additional fields
     :return: None
@@ -827,7 +835,7 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
 
     simulation_results = []
 
-    experiment_prefix = get_experiment_prefix(project_key, test_size)
+    experiment_prefix = get_experiment_prefix(project_key, test_size, priority_queue)
 
     if test_size is not None:
         keys_train, keys_test = split_dataset(keys_in_range, test_size)
@@ -842,7 +850,8 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
                                                     keys_train,
                                                     keys_valid,
                                                     parallel=parallel,
-                                                    prefix=experiment_prefix)
+                                                    prefix=experiment_prefix,
+                                                    priority_queue=priority_queue)
         if training_output is None:
             print "TRAINING FAILED for Project ", project_key
             return None
@@ -878,9 +887,10 @@ def get_valid_projects(enhanced_dataframe, threshold=0.3):
     return project_keys
 
 
-def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iterations, parallel):
+def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iterations, parallel, priority_queue):
     """
     Applies the simulation and validation procedures to a project list.
+    :param priority_queue: True if the development team uses a Priority Queue, false otherwise.
     :param project_list: List of projects.
     :param enhanced_dataframe: Bug report dataframe.
     :param test_size: Percentage of bug reports for testing.
@@ -891,7 +901,7 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
     simulation_output = simulate_project(project_list, enhanced_dataframe,
                                          test_size=test_size,
                                          max_iterations=max_iterations,
-                                         parallel=parallel)
+                                         parallel=parallel, priority_queue=priority_queue)
 
     if simulation_output is None:
         return [{'test_size': test_size,
@@ -910,13 +920,14 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
 
     results = []
     for meassure in performance_meassures:
-        column_value = get_experiment_prefix(project_list, test_size) + "_TRAINING_" + meassure
+        column_value = get_experiment_prefix(project_list, test_size, priority_queue) + "_TRAINING_" + meassure
+
         training_series = training_results.loc[training_results['desc'] == column_value].iloc[0]
         simulation_value = training_series['sample_mean']
         training_value = training_series['population_mean']
         accept_simulation_training = training_series['ci_accept_simulation']
 
-        column_value = get_experiment_prefix(project_list, test_size) + "_VALIDATION_" + meassure
+        column_value = get_experiment_prefix(project_list, test_size, priority_queue) + "_VALIDATION_" + meassure
         validation_series = validation_results.loc[validation_results['desc'] == column_value].iloc[0]
         validation_value = validation_series['population_mean']
         accept_simulation_validation = validation_series['ci_accept_simulation']
@@ -947,49 +958,55 @@ def main():
     per_project = False
     consolidated = True
 
-    consolidated_results = []
+    for priority_queue in [True, False]:
 
-    try:
-        project_name = None
+        consolidated_results = []
 
-        if consolidated:
-            print "Starting consolidated analysis ..."
-            project_name = "ALL"
-            for test_size in test_sizes:
-                consolidated_results += get_simulation_results(project_list=valid_projects,
-                                                               max_iterations=max_iterations,
-                                                               parallel=parallel,
-                                                               test_size=test_size,
-                                                               enhanced_dataframe=enhanced_dataframe)
+        try:
+            project_name = None
 
-        if per_project:
-            print "Starting per-project analysis ..."
-            for test_size in test_sizes:
-                for project in valid_projects:
-                    project_name = project
-                    results = get_simulation_results(project_list=[project], max_iterations=max_iterations,
-                                                     parallel=parallel,
-                                                     test_size=test_size, enhanced_dataframe=enhanced_dataframe)
+            print "USING PRIORITY QUEUE? " + str(priority_queue)
 
-                    consolidated_results += results
+            if consolidated:
+                print "Starting consolidated analysis ..."
+                project_name = "ALL"
+                for test_size in test_sizes:
+                    consolidated_results += get_simulation_results(project_list=valid_projects,
+                                                                   max_iterations=max_iterations,
+                                                                   parallel=parallel,
+                                                                   test_size=test_size,
+                                                                   enhanced_dataframe=enhanced_dataframe,
+                                                                   priority_queue=priority_queue)
 
-    except:
-        print "ERROR!!!!: Could not simulate ", project_name
-        traceback.print_exc()
+            if per_project:
+                print "Starting per-project analysis ..."
+                for test_size in test_sizes:
+                    for project in valid_projects:
+                        project_name = project
+                        results = get_simulation_results(project_list=[project], max_iterations=max_iterations,
+                                                         parallel=parallel,
+                                                         test_size=test_size, enhanced_dataframe=enhanced_dataframe,
+                                                         priority_queue=priority_queue)
 
-    consolidated_results = [result for result in consolidated_results if result is not None]
+                        consolidated_results += results
 
-    if len(consolidated_results) > 0:
-        prefix = ""
-        if consolidated:
-            prefix += "ALL_"
-        if per_project:
-            prefix += "PROJECTS_"
-        results_dataframe = pd.DataFrame(consolidated_results)
-        file_name = "csv/" + prefix + str(TARGET_FIXES) + "_fixes_" + str(
-            DIFFERENCE) + "_ci_difference_validation.csv"
-        results_dataframe.to_csv(file_name)
-        print "Consolidated validation results written to ", file_name
+        except:
+            print "ERROR!!!!: Could not simulate ", project_name
+            traceback.print_exc()
+
+        consolidated_results = [result for result in consolidated_results if result is not None]
+
+        if len(consolidated_results) > 0:
+            prefix = ""
+            if consolidated:
+                prefix += "ALL_"
+            if per_project:
+                prefix += "PROJECTS_"
+            results_dataframe = pd.DataFrame(consolidated_results)
+            file_name = "csv/" + prefix + str(TARGET_FIXES) + "_fixes_" + str(
+                DIFFERENCE) + "_PRIQUEUE_" + str(priority_queue) + "_ci_difference_validation.csv"
+            results_dataframe.to_csv(file_name)
+            print "Consolidated validation results written to ", file_name
 
 
 if __name__ == "__main__":

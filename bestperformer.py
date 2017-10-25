@@ -127,14 +127,14 @@ def main():
     confidence = 0.95
     difference = 0.05
 
-    dev_team_factors = [0.5, 1.0]
+    # dev_team_factors = [0.5, 1.0]
     priority_disciplines = [False, True]
 
     # TODO: Only for testing. Remove later
     # difference = 0.1
     # initial_sample_size = 12
-    # dev_team_factors = [0.5]
-    # priority_disciplines = [True]
+    dev_team_factors = [1.0]
+    priority_disciplines = [False]
 
 
     simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()

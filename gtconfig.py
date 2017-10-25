@@ -7,7 +7,7 @@ gambit_folder = "C:\Program Files (x86)\Gambit\\"
 enumerate_equilibria_solver = "gambit-enummixed.exe"
 quantal_response_solver = "gambit-logit.exe"
 
-replications_per_profile = 200
+replications_per_profile = 1000
 report_stream_batching = True
 simple_reporting_model = False
 
