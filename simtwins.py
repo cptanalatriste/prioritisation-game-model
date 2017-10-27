@@ -8,6 +8,7 @@ import pandas as pd
 
 import simcruncher
 import simmodel
+import simutils
 
 
 def aggregate_players(agent_team, reporter_configuration, aggregate_agent_team):
@@ -50,7 +51,7 @@ def get_twins_strategy_map(agent_team, strategy_map, aggregate_agent_team):
 
 
 def get_simulation_results(file_prefix, strategy_map, player_configuration, game_configuration,
-                           simfunction, simparams, simulation_history):
+                           simfunction, simulation_config, simulation_history):
     """
     Given an strategy profile, it returns the results of all the simulation runs, given the "rules" for twins aggregation
     :return: List of dataframes containing simulation execution information.
@@ -76,21 +77,8 @@ def get_simulation_results(file_prefix, strategy_map, player_configuration, game
             print "Preparing simulation for getting the payoff for team ", team, " in profile: ", twins_strategy_map
 
             simulation_output = simfunction(
-                team_capacity=simparams['dev_team_size'],
-                ignored_gen=simparams['ignored_gen'],
-                reporter_gen=simparams['reporter_gen'],
-                target_fixes=simparams['target_fixes'],
-                batch_size_gen=simparams['batch_size_gen'],
-                interarrival_time_gen=simparams['interarrival_time_gen'],
-                priority_generator=simparams['priority_generator'],
-                reporters_config=player_configuration,
-                resolution_time_gen=simparams['resolution_time_gen'],
-                max_time=simparams['simulation_time'],
-                catcher_generator=simparams['catcher_generator'],
-                max_iterations=game_configuration["REPLICATIONS_PER_PROFILE"],
-                inflation_factor=game_configuration["INFLATION_FACTOR"],
-                quota_system=game_configuration["THROTTLING_ENABLED"],
-                gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
+                simulation_config=simulation_config,
+                max_iterations=game_configuration["REPLICATIONS_PER_PROFILE"])
 
             simulation_result = simcruncher.consolidate_payoff_results("ALL", player_configuration,
                                                                        simulation_output,

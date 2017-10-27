@@ -8,6 +8,7 @@ enumerate_equilibria_solver = "gambit-enummixed.exe"
 quantal_response_solver = "gambit-logit.exe"
 
 replications_per_profile = 1000
+# replications_per_profile = 40
 report_stream_batching = True
 simple_reporting_model = False
 

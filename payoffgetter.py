@@ -202,7 +202,8 @@ def get_strategy_map(strategy_list, teams):
     return strategy_maps
 
 
-def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuration):
+def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuration, priority_queue=False,
+                             dev_team_factor=1.0):
     """
     Given a strategy profile list, calculates payoffs per player thorugh simulation.
     :param enhanced_dataframe: Report data to gather simulation input.
@@ -221,7 +222,9 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
                           interarrival_time_gen=input_params.interarrival_time_gen,
                           priority_generator=input_params.priority_generator,
                           teams=input_params.teams,
-                          game_configuration=game_configuration)
+                          game_configuration=game_configuration,
+                          priority_queue=priority_queue,
+                          dev_team_factor=dev_team_factor)
 
 
 def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configuration):
@@ -394,7 +397,7 @@ def get_simulation_results(file_prefix, strategy_map, player_configuration, game
 def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_team_size, resolution_time_gen, teams,
                    game_configuration, ignored_gen=None, reporter_gen=None, target_fixes=None, batch_size_gen=None,
                    interarrival_time_gen=None, catcher_generator=None, priority_generator=None,
-                   simfunction=simutils.launch_simulation_parallel):
+                   simfunction=simutils.launch_simulation_parallel, priority_queue=False, dev_team_factor=1.0):
     """
 
     :param strategy_maps: Strategy profiles of the game.
@@ -436,18 +439,25 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
 
         overall_dataframes = []
 
-        simparams = {
-            'dev_team_size': dev_team_size,
-            'ignored_gen': ignored_gen,
-            'reporter_gen': reporter_gen,
-            'target_fixes': target_fixes,
-            'batch_size_gen': batch_size_gen,
-            'interarrival_time_gen': interarrival_time_gen,
-            'priority_generator': priority_generator,
-            'resolution_time_gen': resolution_time_gen,
-            'simulation_time': simulation_time,
-            'catcher_generator': catcher_generator
-        }
+        team_capacity = int(dev_team_size * dev_team_factor)
+
+        print "Team capacity: ", team_capacity, ". After applying the factor of ", dev_team_factor, " to a team of ", dev_team_size
+
+        simulation_config = simutils.SimulationConfig(team_capacity=team_capacity,
+                                                      ignored_gen=ignored_gen,
+                                                      reporter_gen=reporter_gen,
+                                                      target_fixes=target_fixes,
+                                                      batch_size_gen=batch_size_gen,
+                                                      interarrival_time_gen=interarrival_time_gen,
+                                                      priority_generator=priority_generator,
+                                                      reporters_config=player_configuration,
+                                                      resolution_time_gen=resolution_time_gen,
+                                                      max_time=simulation_time,
+                                                      catcher_generator=catcher_generator,
+                                                      priority_queue=priority_queue,
+                                                      inflation_factor=game_configuration["INFLATION_FACTOR"],
+                                                      quota_system=game_configuration["THROTTLING_ENABLED"],
+                                                      gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
 
         if not gtconfig.parallel:
             print "PARALLEL EXECUTION: Has been disabled."
@@ -456,11 +466,11 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
         if game_configuration['TWINS_REDUCTION']:
             overall_dataframes += simtwins.get_simulation_results(file_prefix, strategy_map, player_configuration,
                                                                   game_configuration, simfunction,
-                                                                  simparams, simulation_history)
+                                                                  simulation_config, simulation_history)
         else:
             overall_dataframes.append(get_simulation_results(file_prefix, strategy_map, player_configuration,
                                                              game_configuration, simfunction,
-                                                             simparams, simulation_history))
+                                                             simulation_config, simulation_history))
 
         payoffs = simcruncher.get_team_metrics(str(index) + "-" + file_prefix, "ALL", teams, overall_dataframes,
                                                game_configuration["NUMBER_OF_TEAMS"])
@@ -481,7 +491,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
     return equilibrium_list
 
 
-def get_game_description(game_configuration):
+def get_game_description(game_configuration, priority_queue=False, dev_team_factor=1.0):
     """
     Returns a descriptive name for the game in place
     :param game_configuration: Game parameters
@@ -498,6 +508,8 @@ def get_game_description(game_configuration):
 
     if game_configuration["PROJECT_FILTER"] is not None and len(game_configuration["PROJECT_FILTER"]) > 0:
         game_desc = "_".join(game_configuration["PROJECT_FILTER"]) + "_" + game_desc
+
+    game_desc = "PRIQUEUE_" + str(priority_queue) + "_TEAMFACTOR_" + str(dev_team_factor)
 
     return game_desc
 
@@ -520,36 +532,49 @@ def main():
     simulation_configuration['N_CLUSTERS'] = 5
 
     valid_projects = all_valid_projects
-    equilibrium_catalog = []
-    if per_project:
-        for project in valid_projects:
-            print "Calculating equilibria for project ", project
 
-            configuration = dict(simulation_configuration)
-            configuration['PROJECT_FILTER'] = [project]
-            equilibrium_list = start_payoff_calculation(enhanced_dataframe, all_valid_projects,
-                                                        configuration)
+    for priority_queue in [True, False]:
+        for dev_team_factor in [0.5, 1.0]:
 
-            equilibrium_catalog += [gtutils.get_equilibrium_as_dict(identifier=project, profile=profile) for profile in
-                                    equilibrium_list]
+            print "GAME CONFIGURATION: Priority Queue ", priority_queue, " Dev Team Factor: ", dev_team_factor
 
-    if consolidated:
-        configuration = dict(simulation_configuration)
-        configuration['PROJECT_FILTER'] = None
-        equilibrium_list = start_payoff_calculation(enhanced_dataframe, all_valid_projects, configuration)
-        equilibrium_catalog += [gtutils.get_equilibrium_as_dict(identifier="CONSOLIDATED", profile=profile) for profile
-                                in
-                                equilibrium_list]
+            equilibrium_catalog = []
+            if per_project:
+                for project in valid_projects:
+                    print "Calculating equilibria for project ", project
 
-    prefix = ""
-    if consolidated:
-        prefix += "ALL_"
-    if per_project:
-        prefix += "PROJECTS_"
-    results_dataframe = pd.DataFrame(equilibrium_catalog)
-    file_name = "csv/" + prefix + "vanilla_equilibrium_results.csv"
-    results_dataframe.to_csv(file_name)
-    print "Consolidated equilibrium results written to ", file_name
+                    configuration = dict(simulation_configuration)
+                    configuration['PROJECT_FILTER'] = [project]
+                    equilibrium_list = start_payoff_calculation(enhanced_dataframe, all_valid_projects,
+                                                                configuration, priority_queue=priority_queue,
+                                                                dev_team_factor=dev_team_factor)
+
+                    equilibrium_catalog += [gtutils.get_equilibrium_as_dict(identifier=project, profile=profile) for
+                                            profile in
+                                            equilibrium_list]
+
+            if consolidated:
+                configuration = dict(simulation_configuration)
+                configuration['PROJECT_FILTER'] = None
+                equilibrium_list = start_payoff_calculation(enhanced_dataframe, all_valid_projects, configuration,
+                                                            priority_queue=priority_queue,
+                                                            dev_team_factor=dev_team_factor)
+                equilibrium_catalog += [gtutils.get_equilibrium_as_dict(identifier="CONSOLIDATED", profile=profile) for
+                                        profile
+                                        in
+                                        equilibrium_list]
+
+            prefix = ""
+            if consolidated:
+                prefix += "ALL_"
+            if per_project:
+                prefix += "PROJECTS_"
+
+            prefix += "_PRIQUEUE_" + str(priority_queue) + "_DEVFACTOR_" + str(dev_team_factor)
+            results_dataframe = pd.DataFrame(equilibrium_catalog)
+            file_name = "csv/" + prefix + "vanilla_equilibrium_results.csv"
+            results_dataframe.to_csv(file_name)
+            print "Consolidated equilibrium results written to ", file_name
 
 
 if __name__ == "__main__":
