@@ -476,7 +476,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                game_configuration["NUMBER_OF_TEAMS"])
         profile_payoffs.append((file_prefix, payoffs))
 
-    game_desc = get_game_description(game_configuration)
+    game_desc = get_game_description(game_configuration, priority_queue=priority_queue, dev_team_factor=dev_team_factor)
 
     print "Generating Gambit NFG file ..."
     gambit_file = gtutils.get_strategic_game_format(game_desc, player_configuration, strategies_catalog,
@@ -506,12 +506,13 @@ def get_game_description(game_configuration, priority_queue=False, dev_team_fact
     if game_configuration["GATEKEEPER_CONFIG"] and game_configuration["SUCCESS_RATE"]:
         game_desc += "_RATE" + str(game_configuration['SUCCESS_RATE'] * 100)
 
+    project_prefix = ""
     if game_configuration["PROJECT_FILTER"] is not None and len(game_configuration["PROJECT_FILTER"]) > 0:
-        game_desc = "_".join(game_configuration["PROJECT_FILTER"]) + "_" + game_desc
+        project_prefix = "_".join(game_configuration["PROJECT_FILTER"])
 
-    game_desc = "PRIQUEUE_" + str(priority_queue) + "_TEAMFACTOR_" + str(dev_team_factor)
-
-    return game_desc
+    final_description = project_prefix + "_" + game_desc + "_PRIQUEUE_" + str(priority_queue) + "_TEAMFACTOR_" + str(
+        dev_team_factor)
+    return final_description
 
 
 def main():
@@ -533,8 +534,8 @@ def main():
 
     valid_projects = all_valid_projects
 
-    for priority_queue in [True, False]:
-        for dev_team_factor in [0.5, 1.0]:
+    for priority_queue in gtconfig.priority_queues:
+        for dev_team_factor in gtconfig.dev_team_factors:
 
             print "GAME CONFIGURATION: Priority Queue ", priority_queue, " Dev Team Factor: ", dev_team_factor
 

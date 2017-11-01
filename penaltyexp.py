@@ -53,7 +53,8 @@ def get_profile_for_plotting(equilibrium_list):
     return profile
 
 
-def simulate_and_obtain_equilibria(input_params, game_configuration, prefix="", file_name=None):
+def simulate_and_obtain_equilibria(input_params, game_configuration, prefix="", file_name=None, priority_queue=False,
+                                   dev_team_factor=1.0):
     """
     Given a game configuration, it computes the heuristic payoff matrix and calculates the symmetric Nash Equilibrium
     :param input_params: Simulation parameters.
@@ -74,6 +75,8 @@ def simulate_and_obtain_equilibria(input_params, game_configuration, prefix="", 
                                                    interarrival_time_gen=input_params.interarrival_time_gen,
                                                    priority_generator=input_params.priority_generator,
                                                    catcher_generator=input_params.catcher_generator,
+                                                   priority_queue=priority_queue,
+                                                   dev_team_factor=dev_team_factor,
                                                    game_configuration=game_configuration)
 
     symmetric_equilibrium = [profile for profile in equilibrium_list if gtutils.is_symmetric_equilibrium(profile)]
@@ -89,7 +92,7 @@ def simulate_and_obtain_equilibria(input_params, game_configuration, prefix="", 
     return equilibrium_list, symmetric_equilibrium
 
 
-def do_penalty_experiments(input_params, game_configuration):
+def do_penalty_experiments(input_params, game_configuration, priority_queue=False, dev_team_factor=1.0):
     """
     Executes the simulation model using different settings for the penalty factor, and calculates the equilibrium under
     each of this conditions.
@@ -99,6 +102,9 @@ def do_penalty_experiments(input_params, game_configuration):
     :return: None.
     """
     game_configuration['THROTTLING_ENABLED'] = True
+    game_configuration["SUCCESS_RATE"] = 0.95
+    input_params.catcher_generator.configure(values=[True, False], probabilities=[game_configuration["SUCCESS_RATE"], (
+        1 - game_configuration["SUCCESS_RATE"])])
 
     experiment_results = []
 
@@ -107,9 +113,13 @@ def do_penalty_experiments(input_params, game_configuration):
         game_configuration['INFLATION_FACTOR'] = raw_inflation
 
         print "Current inflation factor: ", game_configuration['INFLATION_FACTOR']
+
+        prefix = "INF" + str(game_configuration['INFLATION_FACTOR'] * 100) + "_PRIQUEUE_" + str(
+            priority_queue) + "_DEVFACTOR_" + str(dev_team_factor)
         equilibrium_list, symmetric_equilibrium = simulate_and_obtain_equilibria(input_params, game_configuration,
-                                                                                 prefix="INF" + str(game_configuration[
-                                                                                                        'INFLATION_FACTOR'] * 100))
+                                                                                 prefix=prefix,
+                                                                                 priority_queue=priority_queue,
+                                                                                 dev_team_factor=dev_team_factor)
 
         profile_for_plotting = get_profile_for_plotting(symmetric_equilibrium)
         sample_team = 0
@@ -118,24 +128,26 @@ def do_penalty_experiments(input_params, game_configuration):
         results = {"total_equilibrium": len(equilibrium_list),
                    "symmetric equilibrium": len(symmetric_equilibrium),
                    "inflation_factor": game_configuration['INFLATION_FACTOR'],
-                   "inflation_at_equilibrium": inflation_at_equilibrium}
+                   "inflation_at_equilibrium": inflation_at_equilibrium,
+                   "priority_queue": priority_queue,
+                   "dev_team_factor": dev_team_factor}
 
         print "results ", results
 
         experiment_results.append(results)
 
     dataframe = pd.DataFrame(experiment_results)
-    prefix = "ALL"
+    project_prefix = "ALL"
 
     if game_configuration['PROJECT_FILTER'] is not None and len(game_configuration['PROJECT_FILTER']) > 0:
-        prefix = "_".join(game_configuration['PROJECT_FILTER'])
+        project_prefix = "_".join(game_configuration['PROJECT_FILTER'])
 
-    filename = "csv/" + prefix + "_penalty_experiment_results.csv"
+    filename = "csv/" + project_prefix + "_" + prefix + "_penalty_experiment_results.csv"
     dataframe.to_csv(filename, index=False)
     print "Penalty experiment results stored in ", filename
 
 
-def do_gatekeeper_experiments(input_params, game_configuration):
+def do_gatekeeper_experiments(input_params, game_configuration, priority_queue=False, dev_team_factor=1.0):
     """
     Performs the Gatekeeper game with several levels of success rate for inflation detection.
     :param input_params: Simulation inputs.
@@ -148,12 +160,15 @@ def do_gatekeeper_experiments(input_params, game_configuration):
         game_configuration['SUCCESS_RATE'] = success_rate
 
         input_params.catcher_generator.configure(values=[True, False], probabilities=[success_rate, (1 - success_rate)])
-        simulate_and_obtain_equilibria(input_params, game_configuration,
-                                       prefix="GATEKEEPER_SUCCESS" + str(game_configuration['SUCCESS_RATE']))
+
+        prefix = "GATEKEEPER_SUCCESS" + str(game_configuration['SUCCESS_RATE']) + "_PRIQUEUE_" + str(
+            priority_queue) + "_DEVFACTOR_" + str(dev_team_factor)
+        simulate_and_obtain_equilibria(input_params, game_configuration, prefix=prefix, priority_queue=priority_queue,
+                                       dev_team_factor=dev_team_factor)
 
 
 def analyse_project(project_list, enhanced_dataframe, valid_projects, replications_per_profile=1000,
-                    use_empirical=False, use_heuristic=True):
+                    use_empirical=False, use_heuristic=True, priority_queue=False, dev_team_factor=1.0):
     """
 
     :param project_list:
@@ -163,7 +178,8 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
     :param use_empirical:
     :return:
     """
-    print "Analyzing ", valid_projects, " with ", replications_per_profile, " replications and use_empirical=", use_empirical
+    print "Analyzing ", valid_projects, " with ", replications_per_profile, " replications and use_empirical=", \
+        use_empirical, " priority_queue=", priority_queue, " dev_team_factor=", dev_team_factor
 
     game_configuration = dict(payoffgetter.DEFAULT_CONFIGURATION)
     game_configuration['PROJECT_FILTER'] = project_list
@@ -181,9 +197,10 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
                                                           game_configuration)
 
     if do_throttling:
-        print "Starting Throtling penalty experiments..."
+        print "Starting Throttling penalty experiments..."
         game_configuration['THROTTLING_ENABLED'] = True
-        do_penalty_experiments(input_params, game_configuration)
+        do_penalty_experiments(input_params, game_configuration, priority_queue=priority_queue,
+                               dev_team_factor=dev_team_factor)
 
     if do_gatekeeper:
         print "Starting gatekeeper analysis ..."
@@ -191,7 +208,8 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
         game_configuration['THROTTLING_ENABLED'] = False
         game_configuration['GATEKEEPER_CONFIG'] = DEFAULT_GATEKEEPER_CONFIG
 
-        do_gatekeeper_experiments(input_params, game_configuration)
+        do_gatekeeper_experiments(input_params, game_configuration, priority_queue=priority_queue,
+                                  dev_team_factor=dev_team_factor)
 
 
 def main():
@@ -212,18 +230,28 @@ def main():
 
     replications_per_profile = gtconfig.replications_per_profile
 
-    if per_project:
-        print "Running per-project analysis ..."
-        for project in valid_projects:
-            analyse_project([project], enhanced_dataframe, valid_projects,
-                            replications_per_profile=replications_per_profile,
-                            use_empirical=gtconfig.use_empirical_strategies,
-                            use_heuristic=gtconfig.use_heuristic_strategies)
+    for priority_queue in gtconfig.priority_queues:
+        for dev_team_factor in gtconfig.dev_team_factors:
 
-    if consolidated:
-        analyse_project(None, enhanced_dataframe, valid_projects, replications_per_profile=replications_per_profile,
-                        use_empirical=gtconfig.use_empirical_strategies,
-                        use_heuristic=gtconfig.use_heuristic_strategies)
+            print "GAME CONFIGURATION: Priority Queue ", priority_queue, " Dev Team Factor: ", dev_team_factor
+
+            if per_project:
+                print "Running per-project analysis ..."
+                for project in valid_projects:
+                    analyse_project([project], enhanced_dataframe, valid_projects,
+                                    replications_per_profile=replications_per_profile,
+                                    use_empirical=gtconfig.use_empirical_strategies,
+                                    use_heuristic=gtconfig.use_heuristic_strategies,
+                                    priority_queue=priority_queue,
+                                    dev_team_factor=dev_team_factor)
+
+            if consolidated:
+                analyse_project(None, enhanced_dataframe, valid_projects,
+                                replications_per_profile=replications_per_profile,
+                                use_empirical=gtconfig.use_empirical_strategies,
+                                use_heuristic=gtconfig.use_heuristic_strategies,
+                                priority_queue=priority_queue,
+                                dev_team_factor=dev_team_factor)
 
 
 if __name__ == "__main__":
@@ -231,7 +259,7 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        if gtconfig.is_windows:
+        if gtconfig.is_windows and gtconfig.beep:
             winsound.Beep(2500, 1000)
 
     print "Execution time in seconds: ", (time.time() - start_time)

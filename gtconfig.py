@@ -7,8 +7,9 @@ gambit_folder = "C:\Program Files (x86)\Gambit\\"
 enumerate_equilibria_solver = "gambit-enummixed.exe"
 quantal_response_solver = "gambit-logit.exe"
 
-replications_per_profile = 1000
-# replications_per_profile = 40
+# replications_per_profile = 1000
+replications_per_profile = 40
+
 report_stream_batching = True
 simple_reporting_model = False
 
@@ -17,10 +18,14 @@ parallel = True #Set to False for debugging purposes
 
 parallel_blocks = 4
 
-do_gatekeeper = True
-success_rates = [1.0, 0.9]
+#Equilibrium experiment configurations
+priority_queues = [True, False]
+dev_team_factors = [0.5, 1.0]
 
-do_throttling = False
+do_gatekeeper = True
+success_rates = [0.5, 0.9, 1.0]
+
+do_throttling = True
 inflation_factors = [0.01, 0.03, 0.05]
 
 is_windows = True
@@ -28,6 +33,9 @@ is_windows = True
 # This parameters are only used in the experiments module (penaltyexp)
 use_empirical_strategies = True
 use_heuristic_strategies = True
+
+beep = True
+# beep = False
 
 
 def get_logger(name="gtbugreporting", filename="gtbugreporting.log", level=logging.INFO):

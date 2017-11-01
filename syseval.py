@@ -232,7 +232,7 @@ def get_throttling_equilibria(simulation_config, input_params):
     process_configuration_inf001["INFLATION_FACTOR"] = 0.01
 
     # TODO(cgavidia): We need to include this in the equilibrium calculations
-    # process_configuration_inf001["SUCCESS_RATE"] = 0.95
+    process_configuration_inf001["SUCCESS_RATE"] = 0.95
 
     tsne1_profile_inf001 = generate_single_strategy_profile(input_params.player_configuration, empirical_honest)
     tsne2_profile_inf001 = generate_single_strategy_profile(input_params.player_configuration,
