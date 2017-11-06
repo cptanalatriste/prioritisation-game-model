@@ -13,7 +13,7 @@ import time
 
 import gtconfig
 import payoffgetter
-import penaltyexp
+import eqcatalog
 import simdata
 import simdriver
 import simmodel
@@ -23,27 +23,6 @@ if gtconfig.is_windows:
     import winsound
 
 logger = gtconfig.get_logger("process_comparison", "process_comparison.txt")
-
-# Empirical strategy catalog
-empirical_honest = {"name": "empirical_honest",
-                    simmodel.NON_SEVERE_INFLATED_COLUMN: 0.05,
-                    simmodel.SEVERE_DEFLATED_COLUMN: 0.08}
-
-persistent_deflator = {"name": "persistent_deflator",
-                       simmodel.NON_SEVERE_INFLATED_COLUMN: 0.08,
-                       simmodel.SEVERE_DEFLATED_COLUMN: 1.00}
-
-regular_deflator = {"name": "regular_deflator",
-                    simmodel.NON_SEVERE_INFLATED_COLUMN: 0.04,
-                    simmodel.SEVERE_DEFLATED_COLUMN: 0.58}
-
-empirical_inflator = {"name": "empirical_inflator",
-                      simmodel.NON_SEVERE_INFLATED_COLUMN: 0.19,
-                      simmodel.SEVERE_DEFLATED_COLUMN: 0.02}
-
-occasional_deflator = {"name": "occasional_deflator",
-                       simmodel.NON_SEVERE_INFLATED_COLUMN: 0.06,
-                       simmodel.SEVERE_DEFLATED_COLUMN: 0.26}
 
 
 def compare_with_independent_sampling(first_system_replications, second_system_replications,
@@ -168,15 +147,6 @@ def extract_empirical_profile(player_configuration):
             "Cannot extract empirical profile if the flag gtconfig.use_empirical_strategies is not active!!")
 
 
-def generate_single_strategy_profile(player_configuration, strategy_config):
-    """
-    Returns a strategy profile with a single strategy
-    :return: None
-    """
-
-    return {reporter['name']: strategy_config for reporter in player_configuration}
-
-
 def apply_strategy_profile(player_configuration, strategy_profile):
     """
     Applies a strategy profile to a list of players
@@ -198,131 +168,16 @@ def apply_strategy_profile(player_configuration, strategy_profile):
                 mixed_strategy_config=strategy_config)
 
 
-def get_heuristic_strategy_catalog():
-    """
-    The collection of strategies for our game-theoretic model of bug reporting: It includes two heuristic ones and 5
-    found in our dataset
-    :return: List of strategy configurations.
-    """
-
-    return [empirical_honest, persistent_deflator, regular_deflator, empirical_inflator, occasional_deflator,
-            simmodel.HONEST_CONFIG, simmodel.SIMPLE_INFLATE_CONFIG]
-
-
 def do_unsupervised_prioritization(simulation_configuration, simfunction, input_params, empirical_profile):
-    equilibria = get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)[0]
+    equilibria = eqcatalog.get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)[0]
 
     evaluate_actual_vs_equilibrium(simfunction, input_params, equilibria["simulation_configuration"], empirical_profile,
                                    equilibria["equilibrium_profiles"],
                                    equilibria["desc"])
 
 
-def get_throttling_equilibria(simulation_config, input_params):
-    """
-    Returns the equilibrium profiles for throttling configuration under analysis.
-    :param simulation_config:
-    :param input_params:
-    :return:
-    """
-    desc_inf001 = "THROTTLING_INF001"
-
-    process_configuration_inf001 = dict(simulation_config)
-    process_configuration_inf001["THROTTLING_ENABLED"] = True
-    process_configuration_inf001["GATEKEEPER_CONFIG"] = None
-    process_configuration_inf001["INFLATION_FACTOR"] = 0.01
-
-    # TODO(cgavidia): We need to include this in the equilibrium calculations
-    process_configuration_inf001["SUCCESS_RATE"] = 0.95
-
-    tsne1_profile_inf001 = generate_single_strategy_profile(input_params.player_configuration, empirical_honest)
-    tsne2_profile_inf001 = generate_single_strategy_profile(input_params.player_configuration,
-                                                            {'name': desc_inf001 + "_TSNE2",
-                                                             'strategy_configs': get_heuristic_strategy_catalog(),
-                                                             'probabilities': [0.62, 0.0, 0.0, 0.0, 0.0, 0.38, 0.0]})
-    tsne3_profile_inf001 = generate_single_strategy_profile(input_params.player_configuration, simmodel.HONEST_CONFIG)
-
-    desc_inf003 = "THROTTLING_INF003"
-    process_configuration_inf003 = dict(process_configuration_inf001)
-    process_configuration_inf003["INFLATION_FACTOR"] = 0.03
-    equilibrium_profile_inf003 = generate_single_strategy_profile(input_params.player_configuration,
-                                                                  simmodel.HONEST_CONFIG)
-
-    desc_inf005 = "THROTTLING_INF005"
-    process_configuration_inf005 = dict(process_configuration_inf001)
-    process_configuration_inf005["INFLATION_FACTOR"] = 0.05
-    equilibrium_profile_inf005 = generate_single_strategy_profile(input_params.player_configuration,
-                                                                  simmodel.HONEST_CONFIG)
-
-    return [{"desc": desc_inf001,
-             "simulation_configuration": process_configuration_inf001,
-             "equilibrium_profiles": [tsne1_profile_inf001, tsne2_profile_inf001, tsne3_profile_inf001]},
-            {"desc": desc_inf003,
-             "simulation_configuration": process_configuration_inf003,
-             "equilibrium_profiles": [equilibrium_profile_inf003]},
-            {"desc": desc_inf005,
-             "simulation_configuration": process_configuration_inf005,
-             "equilibrium_profiles": [equilibrium_profile_inf005]}
-            ]
-
-
-def get_gatekeeper_equilibria(simulation_config, input_params):
-    """
-    Return the equilibrium results for each gatekeeper configuration explored.
-    :param simulation_config:
-    :param input_params:
-    :return:
-    """
-
-    desc_succ090 = "GATEKEEPER_SUCC090"
-    process_configuration_succ090 = dict(simulation_config)
-
-    process_configuration_succ090["THROTTLING_ENABLED"] = False
-    process_configuration_succ090['GATEKEEPER_CONFIG'] = penaltyexp.DEFAULT_GATEKEEPER_CONFIG
-    process_configuration_succ090["INFLATION_FACTOR"] = None
-    process_configuration_succ090["SUCCESS_RATE"] = 0.9
-
-    equilibrium_profile_succ090 = generate_single_strategy_profile(input_params.player_configuration,
-                                                                   simmodel.SIMPLE_INFLATE_CONFIG)
-
-    desc_succ100 = "GATEKEEPER_SUCC100"
-    process_configuration_succ100 = dict(process_configuration_succ090)
-    process_configuration_succ100["SUCCESS_RATE"] = 1.0
-
-    tsne1_profile_succ100 = generate_single_strategy_profile(input_params.player_configuration, persistent_deflator)
-    tsne2_profile_succ100 = generate_single_strategy_profile(input_params.player_configuration,
-                                                             {'name': desc_succ100 + "_TSNE2",
-                                                              'strategy_configs': get_heuristic_strategy_catalog(),
-                                                              'probabilities': [0.22, 0.22, 0.0, 0.0, 0.56, 0.00, 0.0]})
-    tsne3_profile_succ100 = generate_single_strategy_profile(input_params.player_configuration,
-                                                             {'name': desc_succ100 + "_TSNE3",
-                                                              'strategy_configs': get_heuristic_strategy_catalog(),
-                                                              'probabilities': [0.00, 0.67, 0.0, 0.0, 0.0, 0.33, 0.0]})
-    tsne4_profile_succ100 = generate_single_strategy_profile(input_params.player_configuration, occasional_deflator)
-    tsne5_profile_succ100 = generate_single_strategy_profile(input_params.player_configuration, simmodel.HONEST_CONFIG)
-
-    # TODO This is a profile we will calculate its equilibrium later
-    desc_succ50 = "GATEKEEPER_SUCC50"
-    process_configuration_succ050 = dict(process_configuration_succ090)
-    process_configuration_succ050["SUCCESS_RATE"] = 0.5
-
-    equilibrium_profile_succ050 = generate_single_strategy_profile(input_params.player_configuration,
-                                                                   simmodel.SIMPLE_INFLATE_CONFIG)
-
-    return [{"desc": desc_succ50,
-             "simulation_configuration": process_configuration_succ050,
-             "equilibrium_profiles": [equilibrium_profile_succ050]},
-            {"desc": desc_succ090,
-             "simulation_configuration": process_configuration_succ090,
-             "equilibrium_profiles": [equilibrium_profile_succ090]},
-            {"desc": desc_succ100,
-             "simulation_configuration": process_configuration_succ100,
-             "equilibrium_profiles": [tsne1_profile_succ100, tsne2_profile_succ100, tsne3_profile_succ100,
-                                      tsne4_profile_succ100, tsne5_profile_succ100]}
-            ]
-
-
 def do_gatekeeper(simulation_configuration, simfunction, input_params, empirical_profile):
-    equilibria = get_gatekeeper_equilibria(simulation_configuration, input_params)
+    equilibria = eqcatalog.get_gatekeeper_equilibria(simulation_configuration, input_params)
 
     for equilibrium_result in equilibria:
         success_rate = equilibrium_result["simulation_configuration"]["SUCCESS_RATE"]
@@ -332,30 +187,8 @@ def do_gatekeeper(simulation_configuration, simfunction, input_params, empirical
                                        equilibrium_result["desc"])
 
 
-def get_unsupervised_prioritization_equilibria(simulation_configuration, input_params):
-    """
-    Returns the equilibrium list for unsupervised prioritization
-    :param simulation_configuration:
-    :param input_params:
-    :return:
-    """
-    desc = "UNSUPERVISED"
-
-    process_configuration = dict(simulation_configuration)
-    process_configuration["THROTTLING_ENABLED"] = False
-    process_configuration["GATEKEEPER_CONFIG"] = None
-    process_configuration["INFLATION_FACTOR"] = None
-
-    equilibrium_profile = generate_single_strategy_profile(input_params.player_configuration,
-                                                           simmodel.SIMPLE_INFLATE_CONFIG)
-
-    return [{"desc": desc,
-             "simulation_configuration": process_configuration,
-             "equilibrium_profiles": [equilibrium_profile]}]
-
-
 def do_throttling(simulation_configuration, simfunction, input_params, empirical_profile):
-    equilibria = get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)
+    equilibria = eqcatalog.get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)
 
     for equilibrium_result in equilibria:
         evaluate_actual_vs_equilibrium(simfunction=simfunction, input_params=input_params,

@@ -10,6 +10,7 @@ from scipy.stats import t
 import time
 from matplotlib import pyplot as plt
 
+import eqcatalog
 import gtconfig
 import syseval
 import simdata
@@ -124,18 +125,12 @@ def plot_results(means, desc=""):
 
 def main():
     initial_sample_size = 120
+
     confidence = 0.95
     difference = 0.05
 
-    # dev_team_factors = [0.5, 1.0]
+    dev_team_factors = [0.5, 1.0]
     priority_disciplines = [False, True]
-
-    # TODO: Only for testing. Remove later
-    # difference = 0.1
-    # initial_sample_size = 12
-    dev_team_factors = [1.0]
-    priority_disciplines = [False]
-
 
     simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
     simulation_configuration["REPLICATIONS_PER_PROFILE"] = initial_sample_size
@@ -155,13 +150,13 @@ def main():
 
             input_params.dev_team_size = int(original_team_size * dev_team_factor)
 
-            uo_equilibria = syseval.get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)
-            throttling_equilibria = syseval.get_throttling_equilibria(simulation_configuration, input_params)
-            gatekeeper_equilibria = syseval.get_gatekeeper_equilibria(simulation_configuration, input_params)
-
-            # TODO: Only for testing purposes
-            # gatekeeper_equilibria = [gatekeeper_equilibria[0]]
-            # throttling_equilibria = [throttling_equilibria[1]]
+            uo_equilibria = eqcatalog.get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)
+            gatekeeper_equilibria = eqcatalog.get_gatekeeper_equilibria(simulation_configuration, input_params,
+                                                                        priority_queue=priority_discipline,
+                                                                        dev_team_factor=dev_team_factor)
+            throttling_equilibria = eqcatalog.get_throttling_equilibria(simulation_configuration, input_params,
+                                                                        priority_queue=priority_discipline,
+                                                                        dev_team_factor=dev_team_factor)
 
             samples = {}
             for equilibrium_info in (uo_equilibria + throttling_equilibria + gatekeeper_equilibria):

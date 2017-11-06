@@ -105,7 +105,14 @@ class MixedEmpiricalInflationStrategy:
 
     def __init__(self, mixed_strategy_config):
         if len(mixed_strategy_config['strategy_configs']) != len(mixed_strategy_config['probabilities']):
-            raise Exception("The number of strategies and probabilities does not match")
+            raise Exception(
+                "The number of configurations and probabilities does not match for strategy " + mixed_strategy_config[
+                    'name'])
+
+        if abs(sum(mixed_strategy_config['probabilities']) - 1.0) >= 0.00001:
+            raise Exception("The probabilities in mixed strategy " + mixed_strategy_config[
+                'name'] + " should sum 1. Probabilities: " + str(
+                mixed_strategy_config['probabilities']))
 
         self.name = mixed_strategy_config['name']
         self.strategy_config = mixed_strategy_config
