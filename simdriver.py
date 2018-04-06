@@ -2,6 +2,7 @@
 This modules triggers the bug report simulation. Launch this module to trigger the simulation validation per
 project dataset.
 """
+import logging
 import time
 import traceback
 
@@ -28,9 +29,81 @@ DEBUG = False
 TARGET_FIXES = 10
 DIFFERENCE = 2
 
+TEST_SIZE = .2
+VALID_THRESHOLD = .3
+
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
 # Also, it was found in Discrete Event Simulation by George Fishman (Chapter 100
 MINIMUM_P_VALUE = 0.05
+
+logger = gtconfig.get_logger("simulation_driver", "simulation_driver.txt", level=logging.INFO)
+
+
+def split_bug_dataset(enhanced_dataframe, test_size, valid_projects):
+    """
+    From the whole dataset, it splits it in training, validation and testing.
+    This process includes data filtering.
+
+    :param enhanced_dataframe:
+    :return:
+    """
+    logger.info("Number of issues before valid filtering: " + str(len(enhanced_dataframe.index)))
+    logger.info(
+        "Number of reporters before valid filtering: " + str(enhanced_dataframe[simdata.REPORTER_COLUMN].nunique()))
+    logger.info("Report Start before valid filtering: " + str(enhanced_dataframe[simdata.CREATED_DATE_COLUMN].min()))
+    logger.info("Report End before valid filtering: " + str(enhanced_dataframe[simdata.CREATED_DATE_COLUMN].max()))
+    logger.info(
+        "Number of projects before valid filtering: " + str(enhanced_dataframe[simdata.PROJECT_KEY_COUMN].nunique()))
+
+    issues_in_range = get_valid_reports(valid_projects, enhanced_dataframe, exclude_priority=None)
+    issues_in_range = issues_in_range.sort_values(by=simdata.CREATED_DATE_COLUMN, ascending=True)
+
+    analytics.run_project_analysis(valid_projects, issues_in_range)
+
+    keys_in_range = issues_in_range[simdata.ISSUE_KEY_COLUMN].unique()
+    logger.info("Number of issue keys after valid filtering: " + str(len(keys_in_range)))
+
+    if test_size is not None:
+        keys_train, keys_test = split_dataset(keys_in_range, test_size)
+        keys_train, keys_valid = split_dataset(keys_train, test_size)
+
+        logger.info("Dataset split: Keys in Train: " + str(len(
+            keys_train)) + " Keys in Validation " + str(len(keys_valid)) + " Keys in Test: " + str(len(
+            keys_test)) + " Test Size: " + str(test_size))
+
+        training_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_train)]
+        logger.info("Issues in training: " + str(len(training_issues.index)))
+
+        reporters_config = get_reporter_configuration(training_issues, drive_by_filter=True)
+        if len(reporters_config) == 0:
+            logger.info(
+                "Project " + valid_projects + ": No reporters left on training dataset after drive-by filtering.")
+            return None, None, None
+
+        try:
+            simutils.assign_strategies(reporters_config, training_issues)
+        except ValueError as e:
+            logger.info("Cannot perform strategy assignment for this project...")
+
+        engaged_testers = [reporter_config['name'] for reporter_config in reporters_config]
+        training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
+        logger.info("Issues in training after reporter filtering: " + str(len(training_issues.index)))
+
+        valid_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_valid)]
+        logger.info("Issues in Validation: " + str(len(valid_issues.index)))
+
+        valid_issues = simdata.filter_by_reporter(valid_issues, engaged_testers)
+        logger.info("Issues in validation after reporter filtering: " + str(len(valid_issues.index)))
+
+        test_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_test)]
+        logger.info("Issues in Testing: " + str(len(test_issues.index)))
+
+        test_issues = simdata.filter_by_reporter(test_issues, engaged_testers)
+        logger.info("Issues in testing after reporter filtering: " + str(len(test_issues.index)))
+
+        return reporters_config, training_issues, valid_issues, test_issues
+
+    return None, None, None, None
 
 
 def get_reporter_groups(bug_dataset):
@@ -487,11 +560,15 @@ def get_simulation_input(training_issues=None):
                 most_relevant_priority = priority
                 most_relevant_probability = ignored_probability
 
+            if gtconfig.disable_ignore:
+                print "ALERT!!! Ignore reports is disabled. No report will be discarded."
+                ignored_probability = 0.0
+
             ignored_per_priority[priority] = simutils.DiscreteEmpiricalDistribution(name="Ignored_" + str(priority),
                                                                                     values=[True, False],
                                                                                     probabilities=[ignored_probability,
                                                                                                    (
-                                                                                                       1 - ignored_probability)])
+                                                                                                           1 - ignored_probability)])
 
     print "MOST RELEVANT PRIORITY: ", most_relevant_priority
     priorities_in_training = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
@@ -666,7 +743,8 @@ def get_report_stream_params(training_issues, reporters_config, symmetric=False)
     return reporter_gen, batch_size_gen, interarrival_time_gen
 
 
-def train_validate_simulation(project_key, issues_in_range, max_iterations, keys_train, keys_valid, parallel=True,
+def train_validate_simulation(project_key, max_iterations, reporters_config, training_issues, valid_issues,
+                              parallel=True,
                               prefix="", priority_queue=False):
     """
 
@@ -689,34 +767,12 @@ def train_validate_simulation(project_key, issues_in_range, max_iterations, keys
         print "Project ", project_key, ": Disabling parallel execution ..."
         simulate_func = simutils.launch_simulation
 
-    training_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_train)]
-    print "Issues in training: ", len(training_issues.index)
-
-    reporters_config = get_reporter_configuration(training_issues, drive_by_filter=True)
-    if len(reporters_config) == 0:
-        print "Project ", project_key, ": No reporters left on training dataset after drive-by filtering."
-        return None
-
-    try:
-        simutils.assign_strategies(reporters_config, training_issues)
-    except ValueError as e:
-        print "Cannot perform strategy assignment for this project..."
-
-    engaged_testers = [reporter_config['name'] for reporter_config in reporters_config]
-    training_issues = simdata.filter_by_reporter(training_issues, engaged_testers)
-    print "Issues in training after reporter filtering: ", len(training_issues.index)
-
     resolution_time_gen, ignored_gen, priority_generator = get_simulation_input(training_issues)
     if resolution_time_gen is None:
         print "Not enough resolution time info! ", project_key
         return
 
-    valid_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_valid)]
-    print "Issues in Validation: ", len(valid_issues.index)
-    valid_issues = simdata.filter_by_reporter(valid_issues, engaged_testers)
-    print "Issues in validation after reporter filtering: ", len(valid_issues.index)
     print "Assigning Batch information to validation dataset ..."
-
     valid_issues = simdata.include_batch_information(valid_issues, target_fixes=TARGET_FIXES)
 
     unique_batches = valid_issues[simdata.BATCH_COLUMN].unique()
@@ -819,36 +875,21 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
     :return: None
     """
 
-    print "Number of issues before valid filtering: ", len(enhanced_dataframe.index)
-    print "Number of reporters before valid filtering: ", enhanced_dataframe[simdata.REPORTER_COLUMN].nunique()
-    print "Report Start before valid filtering: ", enhanced_dataframe[simdata.CREATED_DATE_COLUMN].min()
-    print "Report End before valid filtering: ", enhanced_dataframe[simdata.CREATED_DATE_COLUMN].max()
-    print "Number of projects before valid filtering: ", enhanced_dataframe[simdata.PROJECT_KEY_COUMN].nunique()
-
-    issues_in_range = get_valid_reports(project_key, enhanced_dataframe, exclude_priority=None)
-    issues_in_range = issues_in_range.sort_values(by=simdata.CREATED_DATE_COLUMN, ascending=True)
-
-    analytics.run_project_analysis(project_key, issues_in_range)
-
-    keys_in_range = issues_in_range[simdata.ISSUE_KEY_COLUMN].unique()
-    print "Number of issue keys after valid filtering: ", len(keys_in_range)
-
+    reporters_config, training_issues, valid_issues, test_issues = split_bug_dataset(
+        enhanced_dataframe=enhanced_dataframe,
+        test_size=test_size,
+        valid_projects=project_key)
     simulation_results = []
 
     experiment_prefix = get_experiment_prefix(project_key, test_size, priority_queue)
 
     if test_size is not None:
-        keys_train, keys_test = split_dataset(keys_in_range, test_size)
-        keys_train, keys_valid = split_dataset(keys_train, test_size)
 
-        print "Training simulation and validating: Keys in Train: ", len(
-            keys_train), "Keys in Validation ", len(keys_valid), " Keys in Test: ", len(
-            keys_test), " Test Size: ", test_size, " Simulation iterations: ", max_iterations
-
-        training_output = train_validate_simulation(project_key, issues_in_range,
+        training_output = train_validate_simulation(project_key,
                                                     max_iterations,
-                                                    keys_train,
-                                                    keys_valid,
+                                                    reporters_config=reporters_config,
+                                                    training_issues=training_issues,
+                                                    valid_issues=valid_issues,
                                                     parallel=parallel,
                                                     prefix=experiment_prefix,
                                                     priority_queue=priority_queue)
@@ -952,9 +993,9 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     max_iterations = gtconfig.replications_per_profile
-    valid_projects = get_valid_projects(enhanced_dataframe, threshold=0.3)
+    valid_projects = get_valid_projects(enhanced_dataframe, threshold=VALID_THRESHOLD)
     parallel = gtconfig.parallel
-    test_sizes = [.2]
+    test_sizes = [TEST_SIZE]
     per_project = False
     consolidated = True
 

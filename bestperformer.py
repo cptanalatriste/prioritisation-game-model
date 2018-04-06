@@ -218,7 +218,7 @@ def main():
                 if right_parameter <= 0:
                     logger.info(scenario + " is inferior to the best")
                 else:
-                    logger.info(scenario + " is statistically indistinguihable from the best")
+                    logger.info(scenario + " is statistically indistinguishable from the best")
 
 
 if __name__ == "__main__":

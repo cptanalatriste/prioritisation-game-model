@@ -15,6 +15,7 @@ simple_reporting_model = False
 
 fix_count_criteria = True  # True for ending simulation after a number of fixes. False to use the development time budget.
 parallel = True #Set to False for debugging purposes
+disable_ignore = False # Set true for the developer team to do not ignore based on priorities
 
 parallel_blocks = 4
 
@@ -35,7 +36,6 @@ use_empirical_strategies = True
 use_heuristic_strategies = True
 
 beep = True
-# beep = False
 
 
 def get_logger(name="gtbugreporting", filename="gtbugreporting.log", level=logging.INFO):
