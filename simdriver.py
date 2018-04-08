@@ -514,7 +514,7 @@ def get_priority_change_gen(training_issues):
     return change_time_gen
 
 
-def get_simulation_input(training_issues=None):
+def get_simulation_input(training_issues=None, disable_ignore=False):
     """
     Extract the simulation paramaters from the training dataset.
     :param training_issues: Training data set.
@@ -523,7 +523,7 @@ def get_simulation_input(training_issues=None):
 
     priority_sample = training_issues[simdata.SIMPLE_PRIORITY_COLUMN]
     counts_per_priority = priority_sample.value_counts()
-    print "Simplified Priorities in Training Range: \n ", counts_per_priority
+    logger.info("Simplified Priorities in Training Range: \n " + str(counts_per_priority))
 
     resolution_per_priority = defaultdict(lambda: None)
     all_resolved_issues = simdata.filter_resolved(training_issues, only_with_commits=True,
@@ -533,7 +533,7 @@ def get_simulation_input(training_issues=None):
     ignored_per_priority = defaultdict(lambda: None)
 
     total_ignored = float(len(all_ignored_issues.index))
-    print "Total number of ignored reports: ", total_ignored
+    logger.info("Total number of ignored reports: " + str(total_ignored))
 
     most_relevant_priority = None
     most_relevant_probability = None
@@ -545,24 +545,24 @@ def get_simulation_input(training_issues=None):
             resolution_per_priority[priority] = resolution_time_gen
 
             priority_ignored = all_ignored_issues[all_ignored_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
+            logger.info(" Ignored reports for Priority: " + str(priority) + ": " + str(len(priority_ignored.index)))
+
             priority_reported = training_issues[training_issues[simdata.SIMPLE_PRIORITY_COLUMN] == priority]
 
             ignored_probability = 0.0
 
             total_reported = float(len(priority_reported.index))
-            if total_reported > 0:
+            if total_reported > 0 and not disable_ignore:
                 ignored_probability = len(priority_ignored.index) / total_reported
+            else:
+                logger.info("ALERT!!! Ignore reports is disabled for Priority " + str(
+                    priority) + ". No report will be discarded.")
 
-            print "Ignored probability for Priority ", priority, " is ", ignored_probability, ". Ignored reports: ", len(
-                priority_ignored.index)
+            logger.info("Ignored probability for Priority " + str(priority) + " is " + str(ignored_probability))
 
             if most_relevant_priority is None or ignored_probability < most_relevant_probability:
                 most_relevant_priority = priority
                 most_relevant_probability = ignored_probability
-
-            if gtconfig.disable_ignore:
-                print "ALERT!!! Ignore reports is disabled. No report will be discarded."
-                ignored_probability = 0.0
 
             ignored_per_priority[priority] = simutils.DiscreteEmpiricalDistribution(name="Ignored_" + str(priority),
                                                                                     values=[True, False],

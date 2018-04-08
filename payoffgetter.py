@@ -2,7 +2,7 @@
 This modules is used to gather payoff values needed for equilibrium calculation. Now it is also capable of triggering
 gambit and calculating the equilibrium.
 """
-
+import logging
 import time
 import sys
 
@@ -60,6 +60,8 @@ DEFAULT_CONFIGURATION = {
     'SYMMETRIC': True,  # If all the players have the same strategic vision, i.e  there are no advantages per player.
     'ALL_EQUILIBRIA': True  # Instructs gambit to find all equilibria. Only supported for 2 player games.
 }
+
+logger = gtconfig.get_logger("exp_equilibrium_results", "exp_equilibrium_results.txt", level=logging.INFO)
 
 
 def select_reporters_for_simulation(reporter_configuration, game_configuration):
@@ -211,7 +213,7 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
     :return: Payoffs per player per profile.
     """
 
-    input_params = prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configuration)
+    input_params = prepare_simulation_inputs(enhanced_dataframe, project_keys, game_configuration, priority_queue)
 
     return run_simulation(strategy_maps=input_params.strategy_maps, strategies_catalog=input_params.strategies_catalog,
                           player_configuration=input_params.player_configuration,
@@ -227,7 +229,7 @@ def start_payoff_calculation(enhanced_dataframe, project_keys, game_configuratio
                           dev_team_factor=dev_team_factor)
 
 
-def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configuration):
+def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configuration, priority_queue=False):
     """
     Based on the provided dataframe, this functions produces the simulation inputs.
 
@@ -238,14 +240,15 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     """
 
     project_keys = all_project_keys
-    print "Project catalog: ", project_keys
+    logger.info("Project catalog: " + str(project_keys))
     total_projects = len(project_keys)
 
     if game_configuration["PROJECT_FILTER"] is not None and len(game_configuration["PROJECT_FILTER"]) >= 1:
         project_keys = game_configuration["PROJECT_FILTER"]
 
-    print "Original projects ", total_projects, "Project Filter: ", game_configuration["PROJECT_FILTER"], \
-        " Projects remaining after reduction: ", len(project_keys)
+    logger.info(
+        "Original projects " + str(total_projects) + "Project Filter: " + str(game_configuration["PROJECT_FILTER"]) + \
+        " Projects remaining after reduction: " + str(len(project_keys)))
 
     valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
     valid_reporters = simdriver.get_reporter_configuration(valid_reports)
@@ -256,11 +259,11 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     empirical_strategies = None
     reporter_behaviour = None
     if game_configuration["EMPIRICAL_STRATEGIES"]:
-        print "Empirical Strategy extraction over ", len(all_project_keys), " project datasets ..."
+        logger.info("Empirical Strategy extraction over " + str(len(all_project_keys)) + " project datasets ...")
         all_reports = simdriver.get_valid_reports(all_project_keys, enhanced_dataframe)
         all_reporters = simdriver.get_reporter_configuration(all_reports)
 
-        print "Generating elbow-method plot..."
+        logger.info("Generating elbow-method plot...")
         simutils.elbow_method_for_reporters(all_reporters, file_prefix="_".join(all_project_keys))
 
         strategy_params, reporter_behaviour = get_empirical_strategies(all_reporters,
@@ -280,7 +283,7 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     # This is the configuration of the actual game players.
     player_configuration = reporter_configuration
 
-    print "Reporters selected for playing the game ", len(player_configuration)
+    logger.info("Reporters selected for playing the game " + str(len(player_configuration)))
 
     if game_configuration["EMPIRICAL_STRATEGIES"]:
         assign_empirical_strategy(player_configuration, reporter_behaviour, empirical_strategies)
@@ -290,15 +293,19 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
 
     engaged_testers = [reporter_config['name'] for reporter_config in reporter_configuration]
     valid_reports = simdata.filter_by_reporter(valid_reports, engaged_testers)
-    print "Issues in training after reporter filtering: ", len(valid_reports.index)
+    logger.info("Issues in training after reporter filtering: " + str(len(valid_reports.index)))
 
-    print "Starting simulation for project ", project_keys
+    logger.info("Starting simulation for project " + str(project_keys))
 
-    resolution_time_gen, ignored_gen, priority_generator = simdriver.get_simulation_input(training_issues=valid_reports)
+    # When dealing with a priority queue, the ignore behaviour is disabled
+    disable_ignore = priority_queue
+
+    resolution_time_gen, ignored_gen, priority_generator = simdriver.get_simulation_input(training_issues=valid_reports,
+                                                                                          disable_ignore=disable_ignore)
     dev_team_size, issues_resolved, resolved_in_period, dev_team_bandwith = simdriver.get_dev_team_production(
         valid_reports)
 
-    print "Obtaining priority change distribution ..."
+    logger.info("Obtaining priority change distribution ...")
     review_time_gen = simdriver.get_priority_change_gen(training_issues=valid_reports)
 
     target_fixes = issues_resolved
@@ -314,13 +321,14 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     catcher_generator = None
     if game_configuration['SUCCESS_RATE'] is not None:
         success_rate = game_configuration['SUCCESS_RATE']
-        print "The inflation detection succes rate is: ", success_rate
+        logger.info("The inflation detection succes rate is: " + str(success_rate))
         catcher_generator = simutils.DiscreteEmpiricalDistribution(name="InflationCatcher",
                                                                    values=[True, False],
                                                                    probabilities=[success_rate, (1 - success_rate)])
 
-    print "Project ", project_keys, " Test Period: ", "ALL", " Reporters: ", test_team_size, " Developers:", dev_team_size, \
-        " Resolved in Period: ", issues_resolved, " Dev Team Bandwith: ", dev_team_bandwith
+    logger.info("Project " + str(project_keys) + " Test Period: " + "ALL" + " Reporters: " + str(
+        test_team_size) + " Developers:" + str(dev_team_size) + \
+                " Resolved in Period: " + str(issues_resolved) + " Dev Team Bandwith: " + str(dev_team_bandwith))
 
     input_params = recordtype('SimulationParams',
                               ['strategy_maps', 'strategies_catalog',
@@ -516,10 +524,10 @@ def get_game_description(game_configuration, priority_queue=False, dev_team_fact
 
 
 def main():
-    print "Loading information from ", simdata.ALL_ISSUES_CSV
+    logger.info("Loading information from " + str(simdata.ALL_ISSUES_CSV))
     all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
 
-    print "Adding calculated fields..."
+    logger.info("Adding calculated fields...")
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     all_valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
@@ -537,12 +545,13 @@ def main():
     for priority_queue in gtconfig.priority_queues:
         for dev_team_factor in gtconfig.dev_team_factors:
 
-            print "GAME CONFIGURATION: Priority Queue ", priority_queue, " Dev Team Factor: ", dev_team_factor
+            logger.info("GAME CONFIGURATION: Priority Queue " + str(priority_queue) + " Dev Team Factor: " + str(
+                dev_team_factor))
 
             equilibrium_catalog = []
             if per_project:
                 for project in valid_projects:
-                    print "Calculating equilibria for project ", project
+                    logger.info("Calculating equilibria for project " + str(project))
 
                     configuration = dict(simulation_configuration)
                     configuration['PROJECT_FILTER'] = [project]
@@ -575,7 +584,7 @@ def main():
             results_dataframe = pd.DataFrame(equilibrium_catalog)
             file_name = "csv/" + prefix + "vanilla_equilibrium_results.csv"
             results_dataframe.to_csv(file_name)
-            print "Consolidated equilibrium results written to ", file_name
+            logger.info("Consolidated equilibrium results written to " + str(file_name))
 
 
 if __name__ == "__main__":
