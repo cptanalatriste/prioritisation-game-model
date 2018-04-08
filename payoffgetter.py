@@ -297,8 +297,8 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
 
     logger.info("Starting simulation for project " + str(project_keys))
 
-    # When dealing with a priority queue, the ignore behaviour is disabled
-    disable_ignore = priority_queue
+    # When NOT dealing with a priority queue, the ignore behaviour is disabled
+    disable_ignore = not priority_queue
 
     resolution_time_gen, ignored_gen, priority_generator = simdriver.get_simulation_input(training_issues=valid_reports,
                                                                                           disable_ignore=disable_ignore)
