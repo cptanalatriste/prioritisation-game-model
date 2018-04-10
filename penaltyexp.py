@@ -2,6 +2,7 @@
 This modules performs the experiments for finding the optimal value of the inflation
 penalty
 """
+import logging
 
 import pandas as pd
 
@@ -22,6 +23,8 @@ if gtconfig.is_windows:
 
 DEFAULT_GATEKEEPER_CONFIG = {'review_time_gen': simutils.ConstantGenerator(name="review_time_gen", value=20.0 / 60.0),
                              'capacity': 2}
+
+logger = gtconfig.get_logger("config_experiments", "config_experiments.txt", level=logging.INFO)
 
 
 def get_profile_for_plotting(equilibrium_list):
@@ -104,7 +107,7 @@ def do_penalty_experiments(input_params, game_configuration, priority_queue=Fals
     game_configuration['THROTTLING_ENABLED'] = True
     game_configuration["SUCCESS_RATE"] = 0.95
     input_params.catcher_generator.configure(values=[True, False], probabilities=[game_configuration["SUCCESS_RATE"], (
-        1 - game_configuration["SUCCESS_RATE"])])
+            1 - game_configuration["SUCCESS_RATE"])])
 
     experiment_results = []
 
@@ -178,8 +181,10 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
     :param use_empirical:
     :return:
     """
-    print "Analyzing ", valid_projects, " with ", replications_per_profile, " replications and use_empirical=", \
-        use_empirical, " priority_queue=", priority_queue, " dev_team_factor=", dev_team_factor
+    logger.info("Analyzing " + str(valid_projects) + " with " + str(
+        replications_per_profile) + " replications and use_empirical=" +
+                str(use_empirical) + " priority_queue=" + str(priority_queue) + " dev_team_factor=" + str(
+        dev_team_factor))
 
     game_configuration = dict(payoffgetter.DEFAULT_CONFIGURATION)
     game_configuration['PROJECT_FILTER'] = project_list
@@ -189,15 +194,14 @@ def analyse_project(project_list, enhanced_dataframe, valid_projects, replicatio
     game_configuration['HEURISTIC_STRATEGIES'] = use_heuristic
     game_configuration['EMPIRICAL_STRATEGIES'] = use_empirical
 
-    # TODO(cgavidia): Only for testing
     do_gatekeeper = gtconfig.do_gatekeeper
     do_throttling = gtconfig.do_throttling
 
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, valid_projects,
-                                                          game_configuration)
+                                                          game_configuration, priority_queue=priority_queue)
 
     if do_throttling:
-        print "Starting Throttling penalty experiments..."
+        logger.info("Starting Throttling penalty experiments...")
         game_configuration['THROTTLING_ENABLED'] = True
         do_penalty_experiments(input_params, game_configuration, priority_queue=priority_queue,
                                dev_team_factor=dev_team_factor)
@@ -217,10 +221,10 @@ def main():
     Initial execution point
     :return:
     """
-    print "Loading information from ", simdata.ALL_ISSUES_CSV
+    logger.info("Loading information from " + simdata.ALL_ISSUES_CSV)
     all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
 
-    print "Adding calculated fields..."
+    logger.info("Adding calculated fields...")
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
@@ -233,10 +237,11 @@ def main():
     for priority_queue in gtconfig.priority_queues:
         for dev_team_factor in gtconfig.dev_team_factors:
 
-            print "GAME CONFIGURATION: Priority Queue ", priority_queue, " Dev Team Factor: ", dev_team_factor
+            logger.info("GAME CONFIGURATION: Priority Queue " + str(priority_queue) + " Dev Team Factor: " + str(
+                dev_team_factor))
 
             if per_project:
-                print "Running per-project analysis ..."
+                logger.info("Running per-project analysis ...")
                 for project in valid_projects:
                     analyse_project([project], enhanced_dataframe, valid_projects,
                                     replications_per_profile=replications_per_profile,

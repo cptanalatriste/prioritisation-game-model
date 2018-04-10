@@ -34,6 +34,31 @@ def get_effect_size(one_sample, other_sample):
     return effect_size
 
 
+def perform_parametric_test(first_sample, second_sample, threshold):
+    t_statistic, p_value = stats.ttest_ind(first_sample,
+                                           second_sample,
+                                           equal_var=False)
+
+    logger.info("Welch t-test result: t_statistic " + str(t_statistic) + " p_value " + str(p_value))
+    logger.info("Effect size (Cohen's d): " + str(get_effect_size(first_sample,
+                                                                  second_sample)))
+
+    if p_value > threshold:
+        logger.info("We CANNOT REJECT the null hypothesis of identical average scores")
+    else:
+        logger.info("We REJECT the null hypothesis of equal averages")
+
+
+def perform_nonparametric_test(first_sample, second_sample, threshold):
+    u_statistic, p_value = stats.mannwhitneyu(first_sample, second_sample, alternative="two-sided")
+    logger.info("Mann-Whitney rank test result: u_statistic " + str(u_statistic) + " p_value " + str(p_value))
+
+    if p_value < threshold:
+        logger.info("The two samples are significantly DIFFERENT")
+    else:
+        logger.info("NO DIFFERENCE between the two samples.")
+
+
 def main():
     logger.info("Starting priority analysis ...")
 
@@ -69,20 +94,12 @@ def main():
 
             samples_per_priority[priority] = resolution_time_sample
 
-    t_statistic, p_value = stats.ttest_ind(samples_per_priority[simdata.NON_SEVERE_PRIORITY],
-                                           samples_per_priority[simdata.SEVERE_PRIORITY],
-                                           equal_var=False)
-
-    logger.info("Welch t-test result: t_statistic " + str(t_statistic) + " p_value " + str(p_value))
-    logger.info("Effect size (Cohen's d): " + str(get_effect_size(samples_per_priority[simdata.NON_SEVERE_PRIORITY],
-                                                                  samples_per_priority[simdata.SEVERE_PRIORITY])))
-
     threshold = 0.05
+    perform_parametric_test(samples_per_priority[simdata.NON_SEVERE_PRIORITY],
+                            samples_per_priority[simdata.SEVERE_PRIORITY], threshold)
 
-    if p_value > threshold:
-        logger.info("We CANNOT REJECT the null hypothesis of identical average scores")
-    else:
-        logger.info("We REJECT the null hypothesis of equal averages")
+    perform_nonparametric_test(samples_per_priority[simdata.NON_SEVERE_PRIORITY],
+                               samples_per_priority[simdata.SEVERE_PRIORITY], threshold)
 
 
 if __name__ == "__main__":

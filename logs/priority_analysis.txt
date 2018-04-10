@@ -1,0 +1,32 @@
+2018-04-09 17:35:21,453 priority_analysis INFO     Starting priority analysis ...
+2018-04-09 17:35:21,457 priority_analysis INFO     Loading information from E:\OneDrive\phd2\jira_github_ds\apache_jira_github_ds.csv
+2018-04-09 17:35:22,989 priority_analysis INFO     Adding calculated fields...
+2018-04-09 17:37:22,457 priority_analysis INFO     Simplified Priorities in Training Range: 
+ 1.0    8947
+3.0    1997
+Name: Simplified Priority, dtype: int64
+2018-04-09 17:37:22,921 priority_analysis INFO     Resolution times in Training Range for Priority_1.0: 
+count     4603.000000
+mean      2030.421118
+std       6016.211428
+min          0.053333
+25%         17.590278
+50%        140.035833
+75%        969.495000
+max      79296.476944
+Name: Resolution Time, dtype: float64
+2018-04-09 17:37:22,927 priority_analysis INFO     Resolution times in Training Range for Priority_3.0: 
+count     1078.000000
+mean       559.626015
+std       1869.739200
+min          0.025278
+25%         22.622014
+50%        106.856944
+75%        398.155833
+max      28835.556111
+Name: Resolution Time, dtype: float64
+2018-04-09 17:37:22,928 priority_analysis INFO     Welch t-test result: t_statistic 13.9562223261 p_value 1.67492095236e-43
+2018-04-09 17:37:22,928 priority_analysis INFO     Effect size (Cohen's d): 0.268510630806
+2018-04-09 17:37:22,930 priority_analysis INFO     We REJECT the null hypothesis of equal averages
+2018-04-09 17:37:22,930 priority_analysis INFO     Mann-Whitney rank test result: u_statistic 2673590.0 p_value 7.10116597385e-05
+2018-04-09 17:37:22,930 priority_analysis INFO     The two samples are significantly DIFFERENT

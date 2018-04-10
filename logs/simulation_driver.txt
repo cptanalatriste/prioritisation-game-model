@@ -1,0 +1,19 @@
+2018-04-09 17:36:45,730 simulation_driver INFO     Number of issues before valid filtering: 42620
+2018-04-09 17:36:45,734 simulation_driver INFO     Number of reporters before valid filtering: 5136
+2018-04-09 17:36:45,786 simulation_driver INFO     Report Start before valid filtering: 2006-02-18 11:53:10+00:00
+2018-04-09 17:36:45,841 simulation_driver INFO     Report End before valid filtering: 2015-11-27 08:06:44+00:00
+2018-04-09 17:36:45,842 simulation_driver INFO     Number of projects before valid filtering: 15
+2018-04-09 17:37:07,941 simulation_driver INFO     Number of issue keys after valid filtering: 26167
+2018-04-09 17:37:07,941 simulation_driver INFO     Dataset split: Keys in Train: 16746 Keys in Validation 4187 Keys in Test: 5234 Test Size: 0.2
+2018-04-09 17:37:07,957 simulation_driver INFO     Issues in training: 16746
+2018-04-09 17:37:22,426 simulation_driver INFO    2018-04-10 01:29:11,878 simulation_driver INFO     Simplified Priorities in Training Range: 
+ 1.0    11693
+3.0     2638
+Name: Simplified Priority, dtype: int64
+2018-04-10 01:29:12,236 simulation_driver INFO     Total number of ignored reports: 2406.0
+2018-04-10 01:29:12,796 simulation_driver INFO      Ignored reports for Priority: 1.0: 2275
+2018-04-10 01:29:12,796 simulation_driver INFO     ALERT!!! Ignore reports is disabled for Priority 1.0. No report will be discarded.
+2018-04-10 01:29:12,796 simulation_driver INFO     Ignored probability for Priority 1.0 is 0.0
+2018-04-10 01:29:13,098 simulation_driver INFO      Ignored reports for Priority: 3.0: 90
+2018-04-10 01:29:13,112 simulation_driver INFO     ALERT!!! Ignore reports is disabled for Priority 3.0. No report will be discarded.
+2018-04-10 01:29:13,112 simulation_driver INFO     Ignored probability for Priority 3.0 is 0.0
