@@ -745,7 +745,7 @@ def get_report_stream_params(training_issues, reporters_config, symmetric=False)
 
 def train_validate_simulation(project_key, max_iterations, reporters_config, training_issues, valid_issues,
                               parallel=True,
-                              prefix="", priority_queue=False):
+                              prefix="", priority_queue=False, disable_ignore=False):
     """
 
     Train the simulation model on a dataset and test it in another dataset.
@@ -764,20 +764,21 @@ def train_validate_simulation(project_key, max_iterations, reporters_config, tra
 
     simulate_func = simutils.launch_simulation_parallel
     if not parallel:
-        print "Project ", project_key, ": Disabling parallel execution ..."
+        logger.info("Project " + str(project_key) + ": Disabling parallel execution ...")
         simulate_func = simutils.launch_simulation
 
-    resolution_time_gen, ignored_gen, priority_generator = get_simulation_input(training_issues)
+    resolution_time_gen, ignored_gen, priority_generator = get_simulation_input(training_issues,
+                                                                                disable_ignore=disable_ignore)
     if resolution_time_gen is None:
         print "Not enough resolution time info! ", project_key
         return
 
-    print "Assigning Batch information to validation dataset ..."
+    logger.info("Assigning Batch information to validation dataset ...")
     valid_issues = simdata.include_batch_information(valid_issues, target_fixes=TARGET_FIXES)
 
     unique_batches = valid_issues[simdata.BATCH_COLUMN].unique()
-    print len(valid_issues.index), " reports where grouped in ", len(
-        unique_batches), " batches with ", TARGET_FIXES, " fixed reports ..."
+    logger.info(str(len(valid_issues.index)) + " reports where grouped in " + str(len(
+        unique_batches)) + " batches with " + str(TARGET_FIXES) + " fixed reports ...")
 
     dev_team_series, dev_bandwith_series, training_metrics = get_team_training_data(training_issues,
                                                                                     reporters_config)
@@ -807,7 +808,7 @@ def train_validate_simulation(project_key, max_iterations, reporters_config, tra
                                             simulation_output,
                                             project_key)
 
-    print "Project ", project_key, " - Assessing simulation on TRAINING DATASET: "
+    logger.info("Project " + str(project_key) + " - Assessing simulation on TRAINING DATASET: ")
     training_results = pd.DataFrame(
         simvalid.analyse_input_output(training_metrics, simulation_result, prefix=prefix + "_TRAINING",
                                       difference=DIFFERENCE))
@@ -828,7 +829,7 @@ def train_validate_simulation(project_key, max_iterations, reporters_config, tra
         else:
             excluded_counter += 1
 
-    print  excluded_counter, " batches where excluded from a total of ", len(unique_batches)
+    logger.info(str(excluded_counter) + " batches where excluded from a total of " + str(len(unique_batches)))
 
     return metrics_on_validation, simulation_result, training_results
 
@@ -864,7 +865,7 @@ def get_experiment_prefix(project_key, test_size, priority_queue=False):
 
 
 def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=None, max_iterations=1000,
-                     priority_queue=False):
+                     priority_queue=False, disable_ignore=False):
     """
     Launches simulation analysis for an specific project.
     :param priority_queue: True if the developers use a priority queue, false otherwise.
@@ -892,9 +893,10 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
                                                     valid_issues=valid_issues,
                                                     parallel=parallel,
                                                     prefix=experiment_prefix,
-                                                    priority_queue=priority_queue)
+                                                    priority_queue=priority_queue,
+                                                    disable_ignore=disable_ignore)
         if training_output is None:
-            print "TRAINING FAILED for Project ", project_key
+            logger.info("TRAINING FAILED for Project " + str(project_key))
             return None
 
         metrics_on_valid, simulation_result, training_results = training_output
@@ -908,7 +910,9 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
         file_name = "csv/" + experiment_prefix + "_validation_val_results.csv"
         valid_results.to_csv(file_name)
 
-        print "Project ", project_key, " - Assessing simulation on VALIDATION DATASET. Results written in ", file_name
+        logger.info(
+            "Project " + str(project_key) + " - Assessing simulation on VALIDATION DATASET. Results written in " + str(
+                file_name))
 
     return training_results, valid_results
 
@@ -928,7 +932,8 @@ def get_valid_projects(enhanced_dataframe, threshold=0.3):
     return project_keys
 
 
-def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iterations, parallel, priority_queue):
+def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iterations, parallel, priority_queue,
+                           disable_ignore):
     """
     Applies the simulation and validation procedures to a project list.
     :param priority_queue: True if the development team uses a Priority Queue, false otherwise.
@@ -942,7 +947,9 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
     simulation_output = simulate_project(project_list, enhanced_dataframe,
                                          test_size=test_size,
                                          max_iterations=max_iterations,
-                                         parallel=parallel, priority_queue=priority_queue)
+                                         parallel=parallel,
+                                         priority_queue=priority_queue,
+                                         disable_ignore=disable_ignore)
 
     if simulation_output is None:
         return [{'test_size': test_size,
@@ -986,10 +993,10 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
 
 
 def main():
-    print "Loading information from ", simdata.ALL_ISSUES_CSV
+    logger.info("Loading information from " + simdata.ALL_ISSUES_CSV)
     all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
 
-    print "Adding calculated fields..."
+    logger.info("Adding calculated fields...")
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     max_iterations = gtconfig.replications_per_profile
@@ -1003,51 +1010,55 @@ def main():
 
         consolidated_results = []
 
-        try:
-            project_name = None
+        for disable_ignore in [True, False]:
 
-            print "USING PRIORITY QUEUE? " + str(priority_queue)
+            try:
+                project_name = None
 
-            if consolidated:
-                print "Starting consolidated analysis ..."
-                project_name = "ALL"
-                for test_size in test_sizes:
-                    consolidated_results += get_simulation_results(project_list=valid_projects,
-                                                                   max_iterations=max_iterations,
-                                                                   parallel=parallel,
-                                                                   test_size=test_size,
-                                                                   enhanced_dataframe=enhanced_dataframe,
-                                                                   priority_queue=priority_queue)
+                logger.info("USING PRIORITY QUEUE? " + str(priority_queue))
 
-            if per_project:
-                print "Starting per-project analysis ..."
-                for test_size in test_sizes:
-                    for project in valid_projects:
-                        project_name = project
-                        results = get_simulation_results(project_list=[project], max_iterations=max_iterations,
-                                                         parallel=parallel,
-                                                         test_size=test_size, enhanced_dataframe=enhanced_dataframe,
-                                                         priority_queue=priority_queue)
+                if consolidated:
+                    logger.info("Starting consolidated analysis ...")
+                    project_name = "ALL"
+                    for test_size in test_sizes:
+                        consolidated_results += get_simulation_results(project_list=valid_projects,
+                                                                       max_iterations=max_iterations,
+                                                                       parallel=parallel,
+                                                                       test_size=test_size,
+                                                                       enhanced_dataframe=enhanced_dataframe,
+                                                                       priority_queue=priority_queue,
+                                                                       disable_ignore=disable_ignore)
 
-                        consolidated_results += results
+                if per_project:
+                    logger.info("Starting per-project analysis ...")
+                    for test_size in test_sizes:
+                        for project in valid_projects:
+                            project_name = project
+                            results = get_simulation_results(project_list=[project], max_iterations=max_iterations,
+                                                             parallel=parallel,
+                                                             test_size=test_size, enhanced_dataframe=enhanced_dataframe,
+                                                             priority_queue=priority_queue)
 
-        except:
-            print "ERROR!!!!: Could not simulate ", project_name
-            traceback.print_exc()
+                            consolidated_results += results
 
-        consolidated_results = [result for result in consolidated_results if result is not None]
+            except:
+                print "ERROR!!!!: Could not simulate ", project_name
+                traceback.print_exc()
 
-        if len(consolidated_results) > 0:
-            prefix = ""
-            if consolidated:
-                prefix += "ALL_"
-            if per_project:
-                prefix += "PROJECTS_"
-            results_dataframe = pd.DataFrame(consolidated_results)
-            file_name = "csv/" + prefix + str(TARGET_FIXES) + "_fixes_" + str(
-                DIFFERENCE) + "_PRIQUEUE_" + str(priority_queue) + "_ci_difference_validation.csv"
-            results_dataframe.to_csv(file_name)
-            print "Consolidated validation results written to ", file_name
+            consolidated_results = [result for result in consolidated_results if result is not None]
+
+            if len(consolidated_results) > 0:
+                prefix = ""
+                if consolidated:
+                    prefix += "ALL_"
+                if per_project:
+                    prefix += "PROJECTS_"
+                results_dataframe = pd.DataFrame(consolidated_results)
+                file_name = "csv/" + prefix + str(TARGET_FIXES) + "_fixes_" + str(
+                    DIFFERENCE) + "_PRIQUEUE_" + str(priority_queue) + "_IGNORE_" + str(
+                    disable_ignore) + "_ci_difference_validation.csv"
+                results_dataframe.to_csv(file_name)
+                logger.info("Consolidated validation results written to " + str(file_name))
 
 
 if __name__ == "__main__":
