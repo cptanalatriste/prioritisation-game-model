@@ -39,6 +39,7 @@ if not gtconfig.is_windows:
 from matplotlib import pyplot as plt
 
 MINIMUM_OBSERVATIONS = 3
+EPSILON = 0.001
 
 REPORTER_COLUMNS = [simmodel.NON_SEVERE_INFLATED_COLUMN, simmodel.SEVERE_DEFLATED_COLUMN]
 
@@ -109,10 +110,11 @@ class MixedEmpiricalInflationStrategy:
                 "The number of configurations and probabilities does not match for strategy " + mixed_strategy_config[
                     'name'])
 
-        if abs(sum(mixed_strategy_config['probabilities']) - 1.0) >= 0.00001:
+        delta = abs(sum(mixed_strategy_config['probabilities']) - 1.0)
+        if delta > EPSILON:
             raise Exception("The probabilities in mixed strategy " + mixed_strategy_config[
                 'name'] + " should sum 1. Probabilities: " + str(
-                mixed_strategy_config['probabilities']))
+                mixed_strategy_config['probabilities']) + ". Delta: " + str(delta))
 
         self.name = mixed_strategy_config['name']
         self.strategy_config = mixed_strategy_config

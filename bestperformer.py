@@ -150,7 +150,9 @@ def main():
 
             input_params.dev_team_size = int(original_team_size * dev_team_factor)
 
-            uo_equilibria = eqcatalog.get_unsupervised_prioritization_equilibria(simulation_configuration, input_params)
+            uo_equilibria = eqcatalog.get_unsupervised_prioritization_equilibria(simulation_configuration, input_params,
+                                                                                 priority_queue=priority_discipline,
+                                                                                 dev_team_factor=dev_team_factor)
             gatekeeper_equilibria = eqcatalog.get_gatekeeper_equilibria(simulation_configuration, input_params,
                                                                         priority_queue=priority_discipline,
                                                                         dev_team_factor=dev_team_factor)

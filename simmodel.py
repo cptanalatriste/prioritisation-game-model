@@ -14,11 +14,13 @@ NON_SEVERE_INFLATED_COLUMN = "Non-Severe-Inflated"
 SEVERE_DEFLATED_COLUMN = "Severe-Deflated"
 
 SIMPLE_INFLATE_CONFIG = {'name': SIMPLE_INFLATE_STRATEGY,
+                         "as_string": SIMPLE_INFLATE_STRATEGY,
                          NON_SEVERE_INFLATED_COLUMN: 1.0,
                          SEVERE_DEFLATED_COLUMN: 0.0}
 
 HONEST_STRATEGY = 'HONEST'
 HONEST_CONFIG = {'name': HONEST_STRATEGY,
+                 "as_string": HONEST_STRATEGY,
                  NON_SEVERE_INFLATED_COLUMN: 0.0,
                  SEVERE_DEFLATED_COLUMN: 0.0}
 
