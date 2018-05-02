@@ -9,6 +9,7 @@ import math
 from scipy.stats import t
 import time
 from matplotlib import pyplot as plt
+import pandas as pd
 
 import eqcatalog
 import gtconfig
@@ -194,6 +195,7 @@ def main():
                 raise Exception("New sample collection is needed!")
 
             means = {}
+
             for scenario, samples in samples.iteritems():
                 overall_sample_mean = np.mean(samples)
                 means[scenario] = overall_sample_mean
@@ -203,8 +205,11 @@ def main():
             best_performer_value = means[best_performer_key]
 
             logger.info("Best performer " + best_performer_key + ". Value: " + str(best_performer_value))
-            plot_results(means,
-                         desc="priority_queue_" + str(priority_discipline) + "_dev_team_factor_" + str(dev_team_factor))
+
+            experiment_desc = "priority_queue_" + str(priority_discipline) + "_dev_team_factor_" + str(dev_team_factor)
+            plot_results(means, desc=experiment_desc)
+
+            report_rows = []
 
             for scenario, mean in means.iteritems():
                 left_parameter = mean - best_performer_value - difference
@@ -219,8 +224,20 @@ def main():
 
                 if right_parameter <= 0:
                     logger.info(scenario + " is inferior to the best")
+                    inferior_to_best = True
                 else:
                     logger.info(scenario + " is statistically indistinguishable from the best")
+                    inferior_to_best = False
+
+                report_rows.append({'scenario': scenario,
+                                    'mean': mean,
+                                    'inferior_to_best': inferior_to_best})
+
+            experiment_results = pd.DataFrame(report_rows)
+            file_name = "csv/performance_exp_" + experiment_desc + ".csv"
+            experiment_results.to_csv(file_name, index=False)
+            
+            logger.info("Experiment results written to: " + file_name)
 
 
 if __name__ == "__main__":
