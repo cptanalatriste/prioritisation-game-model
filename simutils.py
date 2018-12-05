@@ -655,8 +655,8 @@ def get_inverse_cdf(observations, n_bins=40):
 
 def remove_drive_in_testers(reporters_config, min_reports):
     """
-    Removes drive-in testers, defined as the testers who's mean interrival time is larger than range_in_std standard deviations of the
-    overall average interarrival times.
+    Removes drive-in testers, defined as the testers has a number of active days bigger than a threshold.
+
     :param reporters_config: Reporter configuration.
     :param min_reports: Minimum number of reports to be considered non drive-by.
     :return: Filtered list of reporters config.
@@ -674,7 +674,10 @@ def remove_drive_in_testers(reporters_config, min_reports):
     engaged_testers = [config for config in reporters_config if
                        len(config['inter_arrival_sample']) >= min_reports]
 
-    return engaged_testers
+    drive_by_testers = [config for config in reporters_config if
+                        len(config['inter_arrival_sample']) < min_reports]
+
+    return engaged_testers, drive_by_testers
 
 
 def get_reporter_behavior_dataframe(reporters_config):

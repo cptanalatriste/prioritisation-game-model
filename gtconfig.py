@@ -14,19 +14,20 @@ report_stream_batching = True
 simple_reporting_model = False
 
 fix_count_criteria = True  # True for ending simulation after a number of fixes. False to use the development time budget.
-parallel = True #Set to False for debugging purposes
+parallel = True  # Set to False for debugging purposes
 
 parallel_blocks = 4
 
-#Equilibrium experiment configurations
+# Equilibrium experiment configurations
 priority_queues = [True, False]
 dev_team_factors = [0.5, 1.0]
 
 do_gatekeeper = True
+
 success_rates = [0.5, 0.9, 1.0]
 
 do_throttling = True
-inflation_factors = [0.01, 0.03, 0.05]
+inflation_factors = [0.01, 0.03, 0.05, 0.07]
 
 is_windows = True
 

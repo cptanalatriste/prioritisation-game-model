@@ -74,7 +74,7 @@ def split_bug_dataset(enhanced_dataframe, test_size, valid_projects):
         training_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_train)]
         logger.info("Issues in training: " + str(len(training_issues.index)))
 
-        reporters_config = get_reporter_configuration(training_issues, drive_by_filter=True)
+        reporters_config, _ = get_reporter_configuration(training_issues, drive_by_filter=True)
         if len(reporters_config) == 0:
             logger.info(
                 "Project " + valid_projects + ": No reporters left on training dataset after drive-by filtering.")
@@ -222,9 +222,10 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
 
     if drive_by_filter:
         original_reporters = len(reporters_config)
-        reporters_config = simutils.remove_drive_in_testers(reporters_config, min_reports=10)
+        reporters_config, drive_by_reporters = simutils.remove_drive_in_testers(reporters_config, min_reports=10)
         print "Original reporters: ", original_reporters, "Number of reporters after drive-by filtering: ", len(
             reporters_config)
+        return reporters_config, drive_by_reporters
     else:
         print "No drive-by filtering was performed."
 
@@ -925,9 +926,15 @@ def get_valid_projects(enhanced_dataframe, threshold=0.3):
     """
 
     project_dataframe = defaultabuse.get_default_usage_data(enhanced_dataframe)
+    file_name = "csv/project_filtering_data.csv"
+    project_dataframe.to_csv(file_name, index=False)
+    logger.info("Project validation information stored in " + file_name)
 
     using_priorities = project_dataframe[project_dataframe['non_default_ratio'] >= threshold]
     project_keys = using_priorities['project_key'].unique()
+
+    logger.info("Filtering priorities using threshold " + str(threshold) + " Before filtering: " + str(
+        len(project_dataframe)) + " After filtering " + str(len(project_keys)))
 
     return project_keys
 

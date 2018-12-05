@@ -32,7 +32,8 @@ def get_default_usage_data(enhanced_dataframe):
     for project_key in project_lists:
         valid_reports = simdriver.get_valid_reports([project_key], enhanced_dataframe)
 
-        reporters_config = simdriver.get_reporter_configuration(valid_reports)
+        reporters_config, drive_by_reporters = simdriver.get_reporter_configuration(valid_reports)
+
         engaged_testers = [reporter_config['name'] for reporter_config in reporters_config]
         valid_reports = simdata.filter_by_reporter(valid_reports, engaged_testers)
 
@@ -47,7 +48,9 @@ def get_default_usage_data(enhanced_dataframe):
         project_dist.append({'project_key': project_key,
                              'total_reports': total_reports,
                              'total_non_default': total_non_default,
-                             'non_default_ratio': non_default_ratio})
+                             'non_default_ratio': non_default_ratio,
+                             'engaged_reporters': len(reporters_config),
+                             'drive_by_reporters': len(drive_by_reporters)})
 
     project_dataframe = pd.DataFrame(project_dist)
     return project_dataframe

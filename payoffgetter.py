@@ -251,7 +251,7 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
         " Projects remaining after reduction: " + str(len(project_keys)))
 
     valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
-    valid_reporters = simdriver.get_reporter_configuration(valid_reports)
+    valid_reporters, _ = simdriver.get_reporter_configuration(valid_reports)
     print "Reporters after drive-in tester removal ...", len(valid_reporters)
 
     strategies_catalog = []
@@ -261,7 +261,7 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     if game_configuration["EMPIRICAL_STRATEGIES"]:
         logger.info("Empirical Strategy extraction over " + str(len(all_project_keys)) + " project datasets ...")
         all_reports = simdriver.get_valid_reports(all_project_keys, enhanced_dataframe)
-        all_reporters = simdriver.get_reporter_configuration(all_reports)
+        all_reporters, _ = simdriver.get_reporter_configuration(all_reports)
 
         logger.info("Generating elbow-method plot...")
         simutils.elbow_method_for_reporters(all_reporters, file_prefix="_".join(all_project_keys))
