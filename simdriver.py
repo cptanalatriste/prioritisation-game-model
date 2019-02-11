@@ -621,8 +621,9 @@ def is_valid_period(issues_for_period, batch=-1):
     result = abs(len(resolved_issues.index) - TARGET_FIXES) <= tolerance
 
     if not result:
-        print "The invalid period only has ", len(resolved_issues.index), " fixes in a batch of ", len(
-            issues_for_period.index), " Identifier: ", batch
+        logger.info(
+            "The invalid period only has " + str(len(resolved_issues.index)) + " fixes in a batch of " + str(len(
+                issues_for_period.index)) + " Identifier " + str(batch))
 
     return result
 
@@ -746,7 +747,7 @@ def get_report_stream_params(training_issues, reporters_config, symmetric=False)
 
 def train_validate_simulation(project_key, max_iterations, reporters_config, training_issues, valid_issues,
                               parallel=True,
-                              prefix="", priority_queue=False, disable_ignore=False):
+                              prefix="", priority_queue=False, disable_ignore=False, test_issues=None):
     """
 
     Train the simulation model on a dataset and test it in another dataset.
@@ -780,6 +781,14 @@ def train_validate_simulation(project_key, max_iterations, reporters_config, tra
     unique_batches = valid_issues[simdata.BATCH_COLUMN].unique()
     logger.info(str(len(valid_issues.index)) + " reports where grouped in " + str(len(
         unique_batches)) + " batches with " + str(TARGET_FIXES) + " fixed reports ...")
+
+    if test_issues is not None:
+        logger.info("Assigning Batch information to TESTING dataset ...")
+        test_issues = simdata.include_batch_information(test_issues, target_fixes=TARGET_FIXES)
+
+        test_unique_batches = test_issues[simdata.BATCH_COLUMN].unique()
+        logger.info(str(len(test_issues.index)) + " reports where grouped in " + str(len(
+            test_unique_batches)) + " batches with " + str(TARGET_FIXES) + " fixed reports ...")
 
     dev_team_series, dev_bandwith_series, training_metrics = get_team_training_data(training_issues,
                                                                                     reporters_config)
@@ -815,6 +824,23 @@ def train_validate_simulation(project_key, max_iterations, reporters_config, tra
                                       difference=DIFFERENCE))
     training_results.to_csv("csv/" + prefix + "_training_val_results.csv")
 
+    metrics_on_validation = collect_reporting_metrics(valid_issues=valid_issues, reporters_config=reporters_config,
+                                                  unique_batches=unique_batches)
+
+    metrics_on_testing = collect_reporting_metrics(valid_issues=test_issues, reporters_config=reporters_config,
+                                               unique_batches=test_unique_batches)
+
+    return metrics_on_validation, simulation_result, training_results, metrics_on_testing
+
+
+def collect_reporting_metrics(valid_issues, reporters_config, unique_batches):
+    """
+    Obtains reporting metrics for a subset of the dataset, grouped by batches.
+    :param valid_issues:
+    :param reporters_config:
+    :param unique_batches:
+    :return:
+    """
     metrics_on_validation = []
 
     excluded_counter = 0
@@ -832,7 +858,7 @@ def train_validate_simulation(project_key, max_iterations, reporters_config, tra
 
     logger.info(str(excluded_counter) + " batches where excluded from a total of " + str(len(unique_batches)))
 
-    return metrics_on_validation, simulation_result, training_results
+    return metrics_on_validation
 
 
 def split_dataset(dataframe, set_size):
@@ -881,7 +907,6 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
         enhanced_dataframe=enhanced_dataframe,
         test_size=test_size,
         valid_projects=project_key)
-    simulation_results = []
 
     experiment_prefix = get_experiment_prefix(project_key, test_size, priority_queue)
 
@@ -895,17 +920,17 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
                                                     parallel=parallel,
                                                     prefix=experiment_prefix,
                                                     priority_queue=priority_queue,
-                                                    disable_ignore=disable_ignore)
+                                                    disable_ignore=disable_ignore,
+                                                    test_issues=test_issues)
         if training_output is None:
             logger.info("TRAINING FAILED for Project " + str(project_key))
             return None
 
-        metrics_on_valid, simulation_result, training_results = training_output
-        simulation_results.extend((metrics_on_valid, simulation_result))
+        metrics_on_valid, simulation_result, training_results, metrics_on_test = training_output
 
-    if len(simulation_results) > 0:
+    if metrics_on_valid:
         valid_results = pd.DataFrame(
-            simvalid.analyse_input_output(simulation_results[0], simulation_results[1],
+            simvalid.analyse_input_output(metrics_on_valid, simulation_result,
                                           prefix=experiment_prefix + "_VALIDATION",
                                           difference=DIFFERENCE))
         file_name = "csv/" + experiment_prefix + "_validation_val_results.csv"
@@ -915,7 +940,19 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
             "Project " + str(project_key) + " - Assessing simulation on VALIDATION DATASET. Results written in " + str(
                 file_name))
 
-    return training_results, valid_results
+    if metrics_on_test:
+        test_results = pd.DataFrame(
+            simvalid.analyse_input_output(metrics_on_test, simulation_result,
+                                          prefix=experiment_prefix + "_TEST",
+                                          difference=DIFFERENCE))
+        file_name = "csv/" + experiment_prefix + "_validation_test_results.csv"
+        test_results.to_csv(file_name)
+
+        logger.info(
+            "Project " + str(project_key) + " - Assessing simulation on TEST DATASET. Results written in " + str(
+                file_name))
+
+    return training_results, valid_results, test_results
 
 
 def get_valid_projects(enhanced_dataframe, threshold=0.3):
@@ -968,7 +1005,7 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
                  'accept_simulation_training': False,
                  'accept_simulation_validation': False}]
 
-    training_results, validation_results = simulation_output
+    training_results, validation_results, test_results = simulation_output
     performance_meassures = ['RESOLVED_BUGS_FROM_PRIORITY_1', 'RESOLVED_BUGS_FROM_PRIORITY_3',
                              'TIME_RATIO_FROM_PRIORITY_1', 'TIME_RATIO_FROM_PRIORITY_3', 'FIX_RATIO_FROM_PRIORITY_1',
                              'FIX_RATIO_FROM_PRIORITY_3']
@@ -987,14 +1024,21 @@ def get_simulation_results(project_list, enhanced_dataframe, test_size, max_iter
         validation_value = validation_series['population_mean']
         accept_simulation_validation = validation_series['ci_accept_simulation']
 
+        testing_column_value = get_experiment_prefix(project_list, test_size, priority_queue) + "_TEST_" + meassure
+        testing_series = test_results.loc[test_results['desc'] == testing_column_value].iloc[0]
+        testing_value = testing_series['population_mean']
+        accept_simulation_test = testing_series['ci_accept_simulation']
+
         results.append({'test_size': test_size,
                         'project_list': "_".join(project_list),
                         'meassure': meassure,
                         'simulation_value': simulation_value,
                         'training_value': training_value,
                         'validation_value': validation_value,
+                        'testing_value': testing_value,
                         'accept_simulation_training': accept_simulation_training,
-                        'accept_simulation_validation': accept_simulation_validation})
+                        'accept_simulation_validation': accept_simulation_validation,
+                        'accept_simulation_test': accept_simulation_test})
 
     return results
 
