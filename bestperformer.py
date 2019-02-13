@@ -67,31 +67,8 @@ def get_new_sample_size(samples, initial_sample_size, confidence, difference):
 
 
 def plot_results(means, desc=""):
-    # label_map = {"GATEKEEPER_SUCC100": "Gatekeeper (0% Error)",
-    #              "GATEKEEPER_SUCC090": "Gatekeeper (10% Error)",
-    #              "THROTTLING_INF005": "Throttling (5% Penalty)",
-    #              "THROTTLING_INF001": "Throttling (1% Penalty)",
-    #              "THROTTLING_INF003": "Throttling (3% Penalty)",
-    #              "UNSUPERVISED": "Unsupervised Prioritization"}
-    #
-    # color_map = {"GATEKEEPER_SUCC100": "blue",
-    #              "GATEKEEPER_SUCC090": "darkblue",
-    #              "THROTTLING_INF005": "red",
-    #              "THROTTLING_INF001": "firebrick",
-    #              "THROTTLING_INF003": "tomato",
-    #              "UNSUPERVISED": "green"}
-
     sorted_keys = sorted(means.keys())
     data = [means[key] for key in sorted_keys]
-    # colors = []
-    # labels = []
-
-    # for key in sorted_keys:
-    #     for prefix in color_map.keys():
-    #         if key.startswith(prefix):
-    #             colors.append(color_map[prefix])
-    #             labels.append(label_map[prefix])
-    #             break
 
     plt.clf()
     fig, ax = plt.subplots()
@@ -100,12 +77,10 @@ def plot_results(means, desc=""):
     rect_locations = tick_locations - (width / 2.0)
 
     plt.xticks(rotation="vertical")
-    # ax.bar(rect_locations, data, width, color=colors)
 
     ax.bar(rect_locations, data, width)
 
     ax.set_xticks(ticks=tick_locations)
-    # ax.set_xticklabels(labels)
     ax.set_xticklabels(sorted_keys)
 
     ax.set_xlim(min(tick_locations) - 0.6, max(tick_locations) + 0.6)
@@ -124,14 +99,82 @@ def plot_results(means, desc=""):
     logger.info("Comparison plot saved at " + file_name)
 
 
+def compare_with_best_performer(samples, experiment_desc, initial_sample_size, difference, confidence):
+    """
+    Performs the Bonferroni procedure: Given a number of samples it compares them with respect to the best performer
+    :param samples:
+    :param experiment_desc:
+    :param difference:
+    :return:
+    """
+
+    logger.info("Analizing: " + str(experiment_desc))
+
+    new_sample_size = get_new_sample_size(samples=samples, initial_sample_size=initial_sample_size,
+                                          confidence=confidence, difference=difference)
+    logger.info("New sample size: " + str(new_sample_size))
+
+    if new_sample_size != initial_sample_size:
+        # TODO(cgavidia) Work this later
+        raise Exception("New sample collection is needed!")
+
+    means = {}
+
+    for scenario, samples in samples.iteritems():
+        overall_sample_mean = np.mean(samples)
+        means[scenario] = overall_sample_mean
+        logger.info("Overall Sample Mean for " + scenario + ": " + str(overall_sample_mean))
+
+    best_performer_key = max(means, key=means.get)
+    best_performer_value = means[best_performer_key]
+
+    logger.info("Best performer " + best_performer_key + ". Value: " + str(best_performer_value))
+
+    plot_results(means, desc=experiment_desc)
+
+    report_rows = []
+
+    for scenario, mean in means.iteritems():
+        left_parameter = mean - best_performer_value - difference
+        right_parameter = mean - best_performer_value + difference
+
+        left_boundary = min(0, left_parameter)
+        right_boundary = max(0, right_parameter)
+
+        logger.info(
+            "Confidence interval for " + scenario + ": ( " + str(left_boundary) + ", " + str(
+                right_boundary) + ")")
+
+        if right_parameter <= 0:
+            logger.info(scenario + " is inferior to the best")
+            inferior_to_best = True
+        else:
+            logger.info(scenario + " is statistically indistinguishable from the best")
+            inferior_to_best = False
+
+        report_rows.append({'scenario': scenario,
+                            'mean': mean,
+                            'inferior_to_best': inferior_to_best})
+
+    experiment_results = pd.DataFrame(report_rows)
+    file_name = "csv/performance_exp_" + experiment_desc + ".csv"
+    experiment_results.to_csv(file_name, index=False)
+
+    logger.info("Experiment results written to: " + file_name)
+
+
 def main():
     initial_sample_size = 120
 
     confidence = 0.95
-    difference = 0.05
+    severe_fixed_difference = 0.05
+
+    # This is in hours
+    severe_restime_difference = 24
 
     dev_team_factors = [0.5, 1.0]
-    priority_disciplines = [False, True]
+    # priority_disciplines = [False, True]
+    priority_disciplines = [True]
 
     simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
     simulation_configuration["REPLICATIONS_PER_PROFILE"] = initial_sample_size
@@ -161,7 +204,9 @@ def main():
                                                                         priority_queue=priority_discipline,
                                                                         dev_team_factor=dev_team_factor)
 
-            samples = {}
+            severe_fixed_samples = {}
+            severe_restime_samples = {}
+
             for equilibrium_info in (uo_equilibria + throttling_equilibria + gatekeeper_equilibria):
 
                 profiles = equilibrium_info["equilibrium_profiles"]
@@ -184,60 +229,22 @@ def main():
                     syseval.apply_strategy_profile(input_params.player_configuration, profile)
                     simulation_output = syseval.run_scenario(simfunction, input_params,
                                                              equilibrium_info["simulation_configuration"])
-                    samples[sample_key] = simulation_output.get_fixed_ratio_per_priority(simdata.SEVERE_PRIORITY)
+                    severe_fixed_samples[sample_key] = simulation_output.get_fixed_ratio_per_priority(
+                        simdata.SEVERE_PRIORITY)
+                    severe_restime_samples[sample_key] = simulation_output.get_time_ratio_per_priority(
+                        simdata.SEVERE_PRIORITY)
 
-            new_sample_size = get_new_sample_size(samples=samples, initial_sample_size=initial_sample_size,
-                                                  confidence=confidence, difference=difference)
-            logger.info("New sample size: " + str(new_sample_size))
+            experiment_desc_suffix = "priority_queue_" + str(priority_discipline) + "_dev_team_factor_" + str(
+                dev_team_factor)
+            severe_fixed_desc = "SEVERE_FIXED_" + experiment_desc_suffix
+            compare_with_best_performer(samples=severe_fixed_samples, experiment_desc=severe_fixed_desc,
+                                        initial_sample_size=initial_sample_size, difference=severe_fixed_difference,
+                                        confidence=confidence)
 
-            if new_sample_size != initial_sample_size:
-                # TODO(cgavidia) Work this later
-                raise Exception("New sample collection is needed!")
-
-            means = {}
-
-            for scenario, samples in samples.iteritems():
-                overall_sample_mean = np.mean(samples)
-                means[scenario] = overall_sample_mean
-                logger.info("Overall Sample Mean for " + scenario + ": " + str(overall_sample_mean))
-
-            best_performer_key = max(means, key=means.get)
-            best_performer_value = means[best_performer_key]
-
-            logger.info("Best performer " + best_performer_key + ". Value: " + str(best_performer_value))
-
-            experiment_desc = "priority_queue_" + str(priority_discipline) + "_dev_team_factor_" + str(dev_team_factor)
-            plot_results(means, desc=experiment_desc)
-
-            report_rows = []
-
-            for scenario, mean in means.iteritems():
-                left_parameter = mean - best_performer_value - difference
-                right_parameter = mean - best_performer_value + difference
-
-                left_boundary = min(0, left_parameter)
-                right_boundary = max(0, right_parameter)
-
-                logger.info(
-                    "Confidence interval for " + scenario + ": ( " + str(left_boundary) + ", " + str(
-                        right_boundary) + ")")
-
-                if right_parameter <= 0:
-                    logger.info(scenario + " is inferior to the best")
-                    inferior_to_best = True
-                else:
-                    logger.info(scenario + " is statistically indistinguishable from the best")
-                    inferior_to_best = False
-
-                report_rows.append({'scenario': scenario,
-                                    'mean': mean,
-                                    'inferior_to_best': inferior_to_best})
-
-            experiment_results = pd.DataFrame(report_rows)
-            file_name = "csv/performance_exp_" + experiment_desc + ".csv"
-            experiment_results.to_csv(file_name, index=False)
-
-            logger.info("Experiment results written to: " + file_name)
+            severe_restime_desc = "SEVERE_RESTIME_" + experiment_desc_suffix
+            compare_with_best_performer(samples=severe_restime_samples, experiment_desc=severe_restime_desc,
+                                        initial_sample_size=initial_sample_size, difference=severe_restime_difference,
+                                        confidence=confidence)
 
 
 if __name__ == "__main__":
