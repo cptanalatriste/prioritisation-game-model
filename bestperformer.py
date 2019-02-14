@@ -170,7 +170,7 @@ def main():
     severe_fixed_difference = 0.05
 
     # This is in hours
-    severe_restime_difference = 24
+    severe_restime_difference = 5
 
     dev_team_factors = [0.5, 1.0]
     # priority_disciplines = [False, True]
@@ -231,8 +231,13 @@ def main():
                                                              equilibrium_info["simulation_configuration"])
                     severe_fixed_samples[sample_key] = simulation_output.get_fixed_ratio_per_priority(
                         simdata.SEVERE_PRIORITY)
-                    severe_restime_samples[sample_key] = simulation_output.get_time_ratio_per_priority(
+                    logger.info(
+                        str(len(severe_fixed_samples[sample_key])) + " fixed ratio samples obtained for " + sample_key)
+
+                    severe_restime_samples[sample_key] = simulation_output.get_avg_fix_delivery_time(
                         simdata.SEVERE_PRIORITY)
+                    logger.info(str(
+                        len(severe_restime_samples[sample_key])) + " delivery time samples obtained for " + sample_key)
 
             experiment_desc_suffix = "priority_queue_" + str(priority_discipline) + "_dev_team_factor_" + str(
                 dev_team_factor)

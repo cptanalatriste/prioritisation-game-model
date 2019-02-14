@@ -390,7 +390,7 @@ class SimulationMetrics:
 
     def get_time_ratio_per_priority(self, priority):
         """
-        Get the time spent as a ratio on bugs according to a priority
+        Get the time spent as a ratio on bugs according to a priority. This is ELLAPSED time
         :param priority: Priority
         :return: List containing the replication values.
         """
@@ -399,6 +399,15 @@ class SimulationMetrics:
 
         return [priority_time / float(total_time) if total_time > 0 else 0.0 for priority_time, total_time in
                 zip(priority_times, total_times)]
+
+    def get_avg_fix_delivery_time(self, priority):
+        """
+        Gets the average fix delivery time per priority, in DAYS
+        :param priority: Ground-truth priority
+        :return: List of averages
+        """
+        priority_times = self.get_time_per_priority(priority)
+        return [np.mean(report)/float(24) for report in priority_times]
 
     def get_fixed_ratio_per_priority(self, priority, exclude_open=False):
         """
