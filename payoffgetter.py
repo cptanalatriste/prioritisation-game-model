@@ -1,6 +1,10 @@
 """
 This modules is used to gather payoff values needed for equilibrium calculation. Now it is also capable of triggering
 gambit and calculating the equilibrium.
+
+The execution of this module triggers the equilibrium experiments for unsupervised prioritizaton.
+Experiment parameters can be tuned in gtconfig.py.
+
 """
 import logging
 import time

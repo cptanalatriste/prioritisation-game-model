@@ -1,7 +1,7 @@
 import logging
 
-git_home = "E:\OneDrive\phd2\jira_github_ds"
-all_issues_csv = git_home + "\\apache_jira_github_ds.csv"
+git_home = "/Users/carlosgavidiacalderon/Google Drive/phd2/jira_github_ds"
+all_issues_csv = git_home + "/apache_jira_github_ds.csv"
 
 gambit_folder = "C:\Program Files (x86)\Gambit\\"
 enumerate_equilibria_solver = "gambit-enummixed.exe"
@@ -18,18 +18,20 @@ parallel = True  # Set to False for debugging purposes
 
 parallel_blocks = 4
 
-# Equilibrium experiment configurations
-priority_queues = [True, False]
+# Equilibrium experiment configurations. Used by payoffgetter.py and penaltyexp.py
+priority_queues = [True]
 dev_team_factors = [0.5, 1.0]
 
+# Experiment configuration for Gatekeeper. Used by penaltyexp.py
 do_gatekeeper = True
-
 success_rates = [0.5, 0.9, 1.0]
 
+# Experiment configuration for Throttling. Used by penaltyexp.py
 do_throttling = True
 inflation_factors = [0.01, 0.03, 0.05, 0.07]
 
-is_windows = True
+# is_windows = True
+is_windows = False
 
 # This parameters are only used in the experiments module (penaltyexp)
 use_empirical_strategies = True

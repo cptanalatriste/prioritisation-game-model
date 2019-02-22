@@ -204,6 +204,7 @@ class SimulationMetrics:
         self.reports_per_reporter = []
         self.completed_per_priority = []
         self.reported_per_priotity = []  # TODO(cgavidia): Correct this awful typo
+        self.reported_resolved_per_reporter = []
 
         # This is according to the real priority of the bug.
         self.bugs_per_reporter = []
@@ -224,6 +225,7 @@ class SimulationMetrics:
         self.bugs_per_reporter += simulation_metrics.bugs_per_reporter
         self.reports_per_reporter += simulation_metrics.reports_per_reporter
         self.resolved_per_reporter += simulation_metrics.resolved_per_reporter
+        self.reported_resolved_per_reporter += simulation_metrics.reported_resolved_per_reporter
         self.reported_per_priotity += simulation_metrics.reported_per_priotity
         self.reporting_times += simulation_metrics.reporting_times
         self.time_per_priority += simulation_metrics.time_per_priority
@@ -261,6 +263,8 @@ class SimulationMetrics:
         self.bugs_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'priority_counters'))
         self.reports_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'report_counters'))
         self.resolved_per_reporter.append(gather_reporter_statistics(reporter_monitors, 'resolved_counters'))
+        self.reported_resolved_per_reporter.append(
+            gather_reporter_statistics(reporter_monitors, 'reported_resolved_counters'))
 
         self.reporting_times.append(reporting_time)
 
@@ -311,12 +315,15 @@ class SimulationMetrics:
         run_found = self.bugs_per_reporter[run]
         run_reported = self.reports_per_reporter[run]
         run_resolved_priority = self.resolved_per_reporter[run]
+        run_reported_resolved_priority = self.reported_resolved_per_reporter[run]
 
         reported_completed = run_resolved[reporter_name]
 
         severe_completed = run_resolved_priority[reporter_name][simdata.SEVERE_PRIORITY]
         non_severe_completed = run_resolved_priority[reporter_name][simdata.NON_SEVERE_PRIORITY]
         normal_completed = run_resolved_priority[reporter_name][simdata.NORMAL_PRIORITY]
+        reported_severe_fixed = run_reported_resolved_priority[reporter_name][simdata.SEVERE_PRIORITY]
+        reported_nonsevere_fixed = run_reported_resolved_priority[reporter_name][simdata.NON_SEVERE_PRIORITY]
 
         severe_found = run_found[reporter_name][simdata.SEVERE_PRIORITY]
         non_severe_found = run_found[reporter_name][simdata.NON_SEVERE_PRIORITY]
@@ -330,6 +337,8 @@ class SimulationMetrics:
                 'severe_completed': severe_completed,
                 'non_severe_completed': non_severe_completed,
                 'normal_completed': normal_completed,
+                'reported_severe_fixed': reported_severe_fixed,
+                'reported_nonsevere_fixed': reported_nonsevere_fixed,
                 'severe_found': severe_found,
                 'non_severe_found': non_severe_found,
                 'normal_found': normal_found,
@@ -407,7 +416,7 @@ class SimulationMetrics:
         :return: List of averages
         """
         priority_times = self.get_time_per_priority(priority)
-        return [np.mean(report)/float(24) for report in priority_times]
+        return [np.mean(report) / float(24) for report in priority_times]
 
     def get_fixed_ratio_per_priority(self, priority, exclude_open=False):
         """

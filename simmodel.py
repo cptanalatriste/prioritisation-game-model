@@ -342,6 +342,8 @@ class BasicBugReport:
         for monitor in resolution_monitors:
             if isinstance(monitor, dict):
                 monitor[self.real_priority] += 1
+            elif isinstance(monitor, dict) and 'use_reported' in monitor:
+                monitor[self.report_priority] += 1
             else:
                 monitor.observe(resol_time)
 
@@ -414,6 +416,7 @@ class BugReportSource(Process):
                 reporter_metrics = reporter_monitors[reporter]
                 reporter_monitor = reporter_metrics['resolved_monitor']
                 resolved_counters = reporter_metrics['resolved_counters']
+                reported_resolved_counters = reporter_metrics['reported_resolved_counters']
 
                 inflation_penalty = self.get_inflation_penalty()
 
@@ -421,7 +424,7 @@ class BugReportSource(Process):
                     self.testing_context.first_report_time = arrival_time
 
                 resolution_monitors = [reporter_monitor, reported_priority_monitor,
-                                       resolved_counters]
+                                       resolved_counters, reported_resolved_counters]
 
                 if gatekeeper_resource is None and inflation_penalty is None:
                     # The Vanilla Bug Reporting Process
@@ -717,14 +720,20 @@ class SimulationController(Process):
                 stopSimulation()
 
 
-def start_priority_counter():
+def start_priority_counter(use_reported=False):
     """
     Returns a priority-based counter.
     :return: A map, with an entry per priority.
     """
-    return {simdata.NON_SEVERE_PRIORITY: 0,
-            simdata.NORMAL_PRIORITY: 0,
-            simdata.SEVERE_PRIORITY: 0}
+
+    result = {simdata.NON_SEVERE_PRIORITY: 0,
+              simdata.NORMAL_PRIORITY: 0,
+              simdata.SEVERE_PRIORITY: 0}
+
+    if use_reported:
+        result['use_reported'] = use_reported
+
+    return result
 
 
 def configure_strategy_map(reporters_config, testing_context):
@@ -843,7 +852,9 @@ def run_model(simulation_config):
         reporter_monitors[reporter_config['name']] = {"resolved_monitor": reporter_monitor,
                                                       "priority_counters": start_priority_counter(),
                                                       "report_counters": start_priority_counter(),
-                                                      "resolved_counters": start_priority_counter()}
+                                                      "resolved_counters": start_priority_counter(),
+                                                      "reported_resolved_counters": start_priority_counter(
+                                                          use_reported=True)}
 
     bug_reporter = BugReportSource(reporters_config=simulation_config.reporters_config,
                                    testing_context=testing_context,

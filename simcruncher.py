@@ -10,7 +10,7 @@ import scipy.stats as st
 import simmodel
 
 
-def get_payoff_score(severe_completed, non_severe_completed, normal_completed, score_map, priority_based=True):
+def get_payoff_score(reporter_info, score_map, priority_based=True):
     """
     Calculates the payoff per user after an specific run.
 
@@ -20,12 +20,18 @@ def get_payoff_score(severe_completed, non_severe_completed, normal_completed, s
     :param normal_completed: Normal bugs resolved.
     :return: Payoff score.
     """
+    reported_severe_fixed = reporter_info['reported_severe_fixed']
+    reported_nonsevere_fixed = reporter_info['reported_nonsevere_fixed']
 
     if priority_based:
-        score = severe_completed * score_map[simdata.SEVERE_PRIORITY] + non_severe_completed * score_map[
-            simdata.NON_SEVERE_PRIORITY] + normal_completed * score_map[simdata.NORMAL_PRIORITY]
+
+        reported_severe_fixed = reporter_info['reported_severe_fixed']
+        reported_nonsevere_fixed = reporter_info['reported_nonsevere_fixed']
+
+        score = reported_severe_fixed * score_map[simdata.SEVERE_PRIORITY] + reported_nonsevere_fixed * score_map[
+            simdata.NON_SEVERE_PRIORITY]
     else:
-        score = severe_completed + non_severe_completed + normal_completed
+        score = reported_severe_fixed + reported_nonsevere_fixed
 
     return score
 
@@ -46,12 +52,7 @@ def consolidate_payoff_results(period, reporter_configuration, simulation_output
 
     for reporter_info in simulation_results:
         reporter_info["period"] = period
-
-        payoff_score = get_payoff_score(severe_completed=reporter_info['severe_completed'],
-                                        non_severe_completed=reporter_info['non_severe_completed'],
-                                        normal_completed=reporter_info['normal_completed'],
-                                        score_map=score_map, priority_based=priority_based)
-
+        payoff_score = get_payoff_score(reporter_info=reporter_info, score_map=score_map, priority_based=priority_based)
         reporter_info["payoff_score"] = payoff_score
 
     return simulation_results
