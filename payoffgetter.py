@@ -254,9 +254,10 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
         "Original projects " + str(total_projects) + "Project Filter: " + str(game_configuration["PROJECT_FILTER"]) + \
         " Projects remaining after reduction: " + str(len(project_keys)))
 
-    valid_reports = simdriver.get_valid_reports(project_keys, enhanced_dataframe)
+    valid_reports = simdriver.get_valid_reports(project_keys=project_keys, enhanced_dataframe=enhanced_dataframe,
+                                                exclude_self_fix=gtconfig.exclude_self_fix)
     valid_reporters, _ = simdriver.get_reporter_configuration(valid_reports)
-    print "Reporters after drive-in tester removal ...", len(valid_reporters)
+    logger.info("Reporters after drive-in tester removal ..." + str(len(valid_reporters)))
 
     strategies_catalog = []
 
@@ -264,7 +265,9 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     reporter_behaviour = None
     if game_configuration["EMPIRICAL_STRATEGIES"]:
         logger.info("Empirical Strategy extraction over " + str(len(all_project_keys)) + " project datasets ...")
-        all_reports = simdriver.get_valid_reports(all_project_keys, enhanced_dataframe)
+        all_reports = simdriver.get_valid_reports(all_project_keys=all_project_keys,
+                                                  enhanced_dataframe=enhanced_dataframe,
+                                                  exclude_self_fix=gtconfig.exclude_self_fix)
         all_reporters, _ = simdriver.get_reporter_configuration(all_reports)
 
         logger.info("Generating elbow-method plot...")
@@ -400,8 +403,9 @@ def get_simulation_results(file_prefix, strategy_map, player_configuration, game
     overall_dataframe = pd.DataFrame(simulation_result)
     simulation_history.append(overall_dataframe)
 
-    overall_dataframe.to_csv("csv/all_teams_" + file_prefix + '_simulation_results.csv',
-                             index=False)
+    file_name = "csv/all_teams_" + file_prefix + '_simulation_results.csv'
+    overall_dataframe.to_csv(file_name, index=False)
+    logger.info("The simulation results for the strategy profile were stored at " + file)
 
     return overall_dataframe
 
@@ -436,24 +440,29 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
         " GATEKEEPER_CONFIG ", game_configuration["GATEKEEPER_CONFIG"], ' INFLATION_FACTOR ', \
         game_configuration['INFLATION_FACTOR'], " target_fixes: ", target_fixes
 
-    print "Simulating ", len(strategy_maps), " strategy profiles..."
+    logger.info("Simulating " + str(len(strategy_maps)) + " strategy profiles...")
 
     simulation_history = []
 
     if not game_configuration['TWINS_REDUCTION'] and game_configuration["NUMBER_OF_TEAMS"] == len(player_configuration):
-        print "PLAYER AGGREGATION: Agents are not agregated. No player reduction is applied."
+        logger.info("PLAYER AGGREGATION: Agents are not agregated. No player reduction is applied.")
         assign_teams(player_configuration)
 
+    game_desc = get_game_description(game_configuration, priority_queue=priority_queue, dev_team_factor=dev_team_factor)
+
     for index, map_info in enumerate(strategy_maps):
-        print "Simulating profile ", (index + 1), " of ", len(strategy_maps)
+        logger.info("Simulating profile " + str((index + 1)) + " of " + str(len(strategy_maps)))
 
         file_prefix, strategy_map = map_info['name'], map_info['map']
+
+        file_prefix = game_desc + file_prefix
 
         overall_dataframes = []
 
         team_capacity = int(dev_team_size * dev_team_factor)
 
-        print "Team capacity: ", team_capacity, ". After applying the factor of ", dev_team_factor, " to a team of ", dev_team_size
+        logger.info("Team capacity: " + str(team_capacity) + ". After applying the factor of " + str(
+            dev_team_factor) + " to a team of " + str(dev_team_size))
 
         simulation_config = simutils.SimulationConfig(team_capacity=team_capacity,
                                                       ignored_gen=ignored_gen,
@@ -472,7 +481,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                       gatekeeper_config=game_configuration["GATEKEEPER_CONFIG"])
 
         if not gtconfig.parallel:
-            print "PARALLEL EXECUTION: Has been disabled."
+            logger.info("PARALLEL EXECUTION: Has been disabled.")
             simfunction = simutils.launch_simulation
 
         if game_configuration['TWINS_REDUCTION']:
@@ -488,18 +497,16 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                game_configuration["NUMBER_OF_TEAMS"])
         profile_payoffs.append((file_prefix, payoffs))
 
-    game_desc = get_game_description(game_configuration, priority_queue=priority_queue, dev_team_factor=dev_team_factor)
-
-    print "Generating Gambit NFG file ..."
+    logger.info("Generating Gambit NFG file ...")
     gambit_file = gtutils.get_strategic_game_format(game_desc, player_configuration, strategies_catalog,
                                                     profile_payoffs, teams)
-    print "NFG File created at ", gambit_file
+    logger.info("NFG File created at " + gambit_file)
 
     print "Executing Gambit for equilibrium calculation..."
     equilibrium_list = gtutils.calculate_equilibrium(strategies_catalog=strategies_catalog, gambit_file=gambit_file,
                                                      all_equilibria=game_configuration['ALL_EQUILIBRIA'])
 
-    print "Equilibria found: ", len(equilibrium_list), equilibrium_list
+    logger.info("Equilibria found: " + str(len(equilibrium_list)) + str(equilibrium_list))
     return equilibrium_list
 
 

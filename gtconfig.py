@@ -1,14 +1,12 @@
 import logging
 
-git_home = "/Users/carlosgavidiacalderon/Google Drive/phd2/jira_github_ds"
+git_home = "E:/Google Drive/phd2/jira_github_ds"
 all_issues_csv = git_home + "/apache_jira_github_ds.csv"
 
 gambit_folder = "C:\Program Files (x86)\Gambit\\"
 enumerate_equilibria_solver = "gambit-enummixed.exe"
 quantal_response_solver = "gambit-logit.exe"
 
-# replications_per_profile = 1000
-replications_per_profile = 40
 
 report_stream_batching = True
 simple_reporting_model = False
@@ -21,6 +19,8 @@ parallel_blocks = 4
 # Equilibrium experiment configurations. Used by payoffgetter.py and penaltyexp.py
 priority_queues = [True]
 dev_team_factors = [0.5, 1.0]
+exclude_self_fix = False
+replications_per_profile = 40
 
 # Experiment configuration for Gatekeeper. Used by penaltyexp.py
 do_gatekeeper = True

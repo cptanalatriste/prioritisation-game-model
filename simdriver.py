@@ -579,8 +579,9 @@ def get_simulation_input(training_issues=None, disable_ignore=False):
     return resolution_per_priority, ignored_per_priority, priority_generator
 
 
-def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None):
+def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None, exclude_self_fix=True):
     """
+
     Returns the issues valid for simulation analysis. It includes:
 
     - Filtered by project
@@ -588,22 +589,28 @@ def get_valid_reports(project_keys, enhanced_dataframe, exclude_priority=None):
 
     :param project_keys: Project identifiers.
     :param enhanced_dataframe: Bug report dataframe.
-    :return: Filtered dataframe
+    :param exclude_priority: List of priorities to exclude.
+    :param exclude_self_fix: True to exclude self fixes
+    :return:
     """
-    print "Starting analysis for projects ", project_keys, " ..."
+    logger.info("Starting analysis for projects " + str(project_keys) + " ...")
 
     project_bugs = simdata.filter_by_project(enhanced_dataframe, project_keys)
-    print "Total issues for projects ", project_keys, ": ", len(project_bugs.index)
+    logger.info("Total issues for projects " + str(project_keys) + ": " + str(len(project_bugs.index)))
 
-    project_bugs = simdata.exclude_self_fixes(project_bugs)
-    print "After self-fix exclusion: ", project_keys, ": ", len(project_bugs.index)
+    if exclude_self_fix:
+        project_bugs = simdata.exclude_self_fixes(project_bugs)
+        logger.info("After self-fix exclusion: " + str(project_keys) + ": " + str(len(project_bugs.index)))
+    else:
+        logger.info("Self-fixes were not excluded!!")
 
     project_reporters = project_bugs[simdata.REPORTER_COLUMN].value_counts()
-    print "Total Reporters: ", len(project_reporters.index)
+    logger.info("Total Reporters: " + str(len(project_reporters.index)))
 
     if exclude_priority is not None:
         project_bugs = project_bugs[project_bugs[simdata.SIMPLE_PRIORITY_COLUMN] != exclude_priority]
-        print "After Priority exclusion: ", exclude_priority, project_keys, ": ", len(project_bugs.index)
+        logger.info("After Priority exclusion: " + str(exclude_priority) + str(project_keys) + ": " + str(
+            len(project_bugs.index)))
 
     return project_bugs
 
@@ -825,10 +832,10 @@ def train_validate_simulation(project_key, max_iterations, reporters_config, tra
     training_results.to_csv("csv/" + prefix + "_training_val_results.csv")
 
     metrics_on_validation = collect_reporting_metrics(valid_issues=valid_issues, reporters_config=reporters_config,
-                                                  unique_batches=unique_batches)
+                                                      unique_batches=unique_batches)
 
     metrics_on_testing = collect_reporting_metrics(valid_issues=test_issues, reporters_config=reporters_config,
-                                               unique_batches=test_unique_batches)
+                                                   unique_batches=test_unique_batches)
 
     return metrics_on_validation, simulation_result, training_results, metrics_on_testing
 
