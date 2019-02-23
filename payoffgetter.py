@@ -251,7 +251,7 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
         project_keys = game_configuration["PROJECT_FILTER"]
 
     logger.info(
-        "Original projects " + str(total_projects) + "Project Filter: " + str(game_configuration["PROJECT_FILTER"]) + \
+        "Original projects " + str(total_projects) + " Project Filter: " + str(game_configuration["PROJECT_FILTER"]) + \
         " Projects remaining after reduction: " + str(len(project_keys)))
 
     valid_reports = simdriver.get_valid_reports(project_keys=project_keys, enhanced_dataframe=enhanced_dataframe,
@@ -265,7 +265,7 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     reporter_behaviour = None
     if game_configuration["EMPIRICAL_STRATEGIES"]:
         logger.info("Empirical Strategy extraction over " + str(len(all_project_keys)) + " project datasets ...")
-        all_reports = simdriver.get_valid_reports(all_project_keys=all_project_keys,
+        all_reports = simdriver.get_valid_reports(project_keys=all_project_keys,
                                                   enhanced_dataframe=enhanced_dataframe,
                                                   exclude_self_fix=gtconfig.exclude_self_fix)
         all_reporters, _ = simdriver.get_reporter_configuration(all_reports)
