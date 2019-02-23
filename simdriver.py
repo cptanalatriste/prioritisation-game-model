@@ -962,14 +962,15 @@ def simulate_project(project_key, enhanced_dataframe, parallel=True, test_size=N
     return training_results, valid_results, test_results
 
 
-def get_valid_projects(enhanced_dataframe, threshold=0.3):
+def get_valid_projects(enhanced_dataframe, threshold=0.3, exclude_self_fix=True):
     """
     Selects the projects that will be considered in analysis.
     :param enhanced_dataframe: Bug Report dataframe.
     :return: Project key list.
     """
 
-    project_dataframe = defaultabuse.get_default_usage_data(enhanced_dataframe)
+    project_dataframe = defaultabuse.get_default_usage_data(enhanced_dataframe=enhanced_dataframe,
+                                                            exclude_self_fix=exclude_self_fix)
     file_name = "csv/project_filtering_data.csv"
     project_dataframe.to_csv(file_name, index=False)
     logger.info("Project validation information stored in " + file_name)

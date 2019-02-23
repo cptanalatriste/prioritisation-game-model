@@ -227,7 +227,8 @@ def main():
     logger.info("Adding calculated fields...")
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-    valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
+    valid_projects = simdriver.get_valid_projects(enhanced_dataframe=enhanced_dataframe,
+                                                  exclude_self_fix=gtconfig.exclude_self_fix)
 
     per_project = False
     consolidated = True

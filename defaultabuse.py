@@ -16,7 +16,7 @@ if not gtconfig.is_windows:
 from matplotlib import pyplot as plt
 
 
-def get_default_usage_data(enhanced_dataframe):
+def get_default_usage_data(enhanced_dataframe, exclude_self_fix=True):
     """
     Returns a dataframe contaning the non-default usage per project.
 
@@ -30,7 +30,8 @@ def get_default_usage_data(enhanced_dataframe):
     project_dist = []
 
     for project_key in project_lists:
-        valid_reports = simdriver.get_valid_reports([project_key], enhanced_dataframe)
+        valid_reports = simdriver.get_valid_reports(project_keys=[project_key], enhanced_dataframe=enhanced_dataframe,
+                                                    exclude_self_fix=exclude_self_fix)
 
         reporters_config, drive_by_reporters = simdriver.get_reporter_configuration(valid_reports)
 

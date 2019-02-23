@@ -340,9 +340,11 @@ class BasicBugReport:
             resol_time) + " of reporting. Fix effort: " + str(self.fix_effort))
 
         for monitor in resolution_monitors:
-            if isinstance(monitor, dict):
+            logger.debug("monitor: " + str(monitor))
+            if isinstance(monitor, dict) and 'use_reported' not in monitor:
                 monitor[self.real_priority] += 1
             elif isinstance(monitor, dict) and 'use_reported' in monitor:
+                logger.debug("Report with reported priority " + str(self.report_priority) + " was fixed!")
                 monitor[self.report_priority] += 1
             else:
                 monitor.observe(resol_time)

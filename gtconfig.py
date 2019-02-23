@@ -7,13 +7,11 @@ gambit_folder = "C:\Program Files (x86)\Gambit\\"
 enumerate_equilibria_solver = "gambit-enummixed.exe"
 quantal_response_solver = "gambit-logit.exe"
 
-
 report_stream_batching = True
 simple_reporting_model = False
 
 fix_count_criteria = True  # True for ending simulation after a number of fixes. False to use the development time budget.
 parallel = True  # Set to False for debugging purposes
-
 parallel_blocks = 4
 
 # Equilibrium experiment configurations. Used by payoffgetter.py and penaltyexp.py
@@ -21,6 +19,8 @@ priority_queues = [True]
 dev_team_factors = [0.5, 1.0]
 exclude_self_fix = False
 replications_per_profile = 40
+use_empirical_strategies = True  # Disable for quick experimentation
+use_heuristic_strategies = True
 
 # Experiment configuration for Gatekeeper. Used by penaltyexp.py
 do_gatekeeper = True
@@ -32,10 +32,6 @@ inflation_factors = [0.01, 0.03, 0.05, 0.07]
 
 # is_windows = True
 is_windows = False
-
-# This parameters are only used in the experiments module (penaltyexp)
-use_empirical_strategies = True
-use_heuristic_strategies = True
 
 beep = True
 
