@@ -925,7 +925,7 @@ def launch_simulation_parallel(simulation_config,
     pool = Pool(processes=parallel_blocks)
     samples_per_worker = max_iterations / parallel_blocks
 
-    logger.info("Launching " + str(max_iterations) + " replications IN PARALLER. Using " + str(parallel_blocks) +
+    logger.info("Launching " + str(max_iterations) + " replications IN PARALLEL. Using " + str(parallel_blocks) +
                 " workers with " + str(samples_per_worker) + " samples each." )
 
     worker_inputs = []
