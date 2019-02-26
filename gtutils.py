@@ -7,6 +7,7 @@ from string import Template
 from collections import defaultdict
 import fractions
 import gtconfig
+import logging
 
 GAMBIT_FOLDER = gtconfig.gambit_folder
 
@@ -15,6 +16,8 @@ NO_BANNER_OPTION = "-q"
 
 QUANTAL_RESPONSE_SOLVER = gtconfig.quantal_response_solver
 ONLY_NASH_OPTION = "-e"
+
+logger = gtconfig.get_logger("gambit_interface", "gambit_interface.txt", level=logging.INFO)
 
 
 def get_strategic_game_format(game_desc, reporter_configuration, strategies_catalog, profile_payoffs, players):
@@ -77,11 +80,16 @@ def calculate_equilibrium(strategies_catalog, gambit_file, all_equilibria=True, 
         process = GAMBIT_FOLDER + ENUMERATE_EQUILIBRIA_SOLVER
         command_line = [process, NO_BANNER_OPTION, gambit_file]
     else:
-        print "NOTE: Only one equilibrium will be found."
+        logger.info("NOTE: Only one equilibrium will be found.")
         process = GAMBIT_FOLDER + QUANTAL_RESPONSE_SOLVER
         command_line = [process, ONLY_NASH_OPTION, gambit_file]
 
-    print "Calculating equilibrium for: ", gambit_file, " using ", process
+    if gtconfig.is_windows:
+        process += ".exe"
+    else:
+        process = "." + process
+
+    logger.info("Calculating equilibrium for: " + str(gambit_file) + " using " + str(process))
 
     solver_process = subprocess.Popen(command_line, stdout=subprocess.PIPE)
 
@@ -94,16 +102,16 @@ def calculate_equilibrium(strategies_catalog, gambit_file, all_equilibria=True, 
             break
 
     if debug:
-        print "len(nash_equilibrium_strings): ", len(nash_equilibrium_strings)
+        logger.info("len(nash_equilibrium_strings): " + str(len(nash_equilibrium_strings)))
 
     start_index = 3
 
     equilibrium_list = []
     for index, nash_equilibrium in enumerate(nash_equilibrium_strings):
         if debug:
-            print "nash_equilibrium: ", nash_equilibrium
+            logger.info("nash_equilibrium: " + str(nash_equilibrium))
 
-        print "Equilibrium ", str(index + 1), " of ", len(nash_equilibrium_strings)
+        logger.info("Equilibrium " + str(index + 1) + " of " + str(len(nash_equilibrium_strings)))
 
         nash_equilibrium = nash_equilibrium.strip()
         nash_equilibrium = nash_equilibrium[start_index:].split(",")
@@ -115,7 +123,8 @@ def calculate_equilibrium(strategies_catalog, gambit_file, all_equilibria=True, 
         for probability in nash_equilibrium:
 
             strategy_name = strategies_catalog[strategy_index].name
-            print "Team ", team_index, "-> Strategy: ", strategy_name, " \t\tProbability", probability
+            logger.info("Team " + str(team_index) + "-> Strategy: " + str(strategy_name) + " \t\tProbability" + str(
+                probability))
 
             equilibrium_profile[team_index][strategy_name] = probability
 
@@ -128,7 +137,7 @@ def calculate_equilibrium(strategies_catalog, gambit_file, all_equilibria=True, 
         equilibrium_list.append(equilibrium_profile)
 
         if is_symmetric_equilibrium(equilibrium_profile):
-            print "This is a SYMMETRIC EQUILIBRIUM PROFILE!!"
+            logger.info("This is a SYMMETRIC EQUILIBRIUM PROFILE!!")
 
     return equilibrium_list
 

@@ -1,11 +1,12 @@
 import logging
+import os
 
-git_home = "E:/Google Drive/phd2/jira_github_ds"
+git_home = "/home/carlos/Documents/datasets"
 all_issues_csv = git_home + "/apache_jira_github_ds.csv"
 
-gambit_folder = "C:\Program Files (x86)\Gambit\\"
-enumerate_equilibria_solver = "gambit-enummixed.exe"
-quantal_response_solver = "gambit-logit.exe"
+gambit_folder = "/home/carlos/gambit-15.1.1/"
+enumerate_equilibria_solver = "gambit-enummixed"
+quantal_response_solver = "gambit-logit"
 
 report_stream_batching = True
 simple_reporting_model = False
@@ -27,12 +28,10 @@ do_gatekeeper = True
 success_rates = [0.5, 0.9, 1.0]
 
 # Experiment configuration for Throttling. Used by penaltyexp.py
-do_throttling = True
+do_throttling = False
 inflation_factors = [0.01, 0.03, 0.05, 0.07]
 
-# is_windows = True
-is_windows = False
-
+is_windows = (os.name == 'nt')
 beep = True
 
 
