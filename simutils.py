@@ -925,7 +925,8 @@ def launch_simulation_parallel(simulation_config,
     pool = Pool(processes=parallel_blocks)
     samples_per_worker = max_iterations / parallel_blocks
 
-    print "Making {} replications per worker...".format(samples_per_worker)
+    logger.info("Launching " + str(max_iterations) + " replications IN PARALLER. Using " + str(parallel_blocks) +
+                " workers with " + str(samples_per_worker) + " samples each." )
 
     worker_inputs = []
 
@@ -941,7 +942,7 @@ def launch_simulation_parallel(simulation_config,
     worker_inputs[0]['show_progress'] = show_progress
     worker_outputs = pool.map(launch_simulation_wrapper, worker_inputs)
 
-    print "Workers in pool finished. Consolidating outputs..."
+    logger.info(str(max_iterations) + " replications finished. Starting output consolidation.")
     simulation_metrics = SimulationMetrics()
 
     for output in worker_outputs:
