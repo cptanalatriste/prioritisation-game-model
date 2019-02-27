@@ -87,12 +87,12 @@ class SimulationConfig:
         return "Target fixes: " + str(
             self.target_fixes) + " Dev Time Budget " + str(self.dev_time_budget) + " .Throttling enabled: " + str(
             self.quota_system) + " . Inflation penalty: " + str(self.inflation_factor) + " Developers in team: " + str(
-            self.team_capacity) + " Success probabilities: " + str(
+            self.team_capacity) + "\n Success probabilities: " + str(
             self.catcher_generator) + " Gatekeeper Config: " + (
                    gatekeeper_params) + " Max Reporter Probability: " + str(max(
             self.reporter_gen.probabilities)) + " Min Reporter Probability " + str(min(
             self.reporter_gen.probabilities)) + " Priority distribution: " + str(
-            self.priority_generator) + " Severe Ignore Probabilities: " + str(self.ignored_gen[
+            self.priority_generator) + "\n Severe Ignore Probabilities: " + str(self.ignored_gen[
                                                                                   simdata.SEVERE_PRIORITY].probabilities) + " Non-Severe Ignore Probabilities: " + str(
             self.ignored_gen[
                 simdata.NON_SEVERE_PRIORITY].probabilities) + " Priority Queue: " + str(self.priority_queue)
@@ -926,7 +926,7 @@ def launch_simulation_parallel(simulation_config,
     samples_per_worker = max_iterations / parallel_blocks
 
     logger.info("Launching " + str(max_iterations) + " replications IN PARALLEL. Using " + str(parallel_blocks) +
-                " workers with " + str(samples_per_worker) + " samples each." )
+                " workers with " + str(samples_per_worker) + " samples each.")
 
     worker_inputs = []
 
@@ -978,7 +978,7 @@ def print_strategy_report(reporters_config):
     strategies = set(
         [reporter[simmodel.STRATEGY_KEY].name if simmodel.STRATEGY_KEY in reporter else default_strategy for reporter in
          reporters_config])
-    print "Strategies found: ", len(strategies)
+    logger.info("Strategies found: " + str(len(strategies)))
 
     for strategy_name in strategies:
 
@@ -991,7 +991,7 @@ def print_strategy_report(reporters_config):
                                        simmodel.STRATEGY_KEY not in reporter or reporter[
                                            simmodel.STRATEGY_KEY].name == strategy_name]
 
-        print "Strategy: ", strategy_name, " Reporters: ", len(reporters_with_strategy)
+        logger.info("Strategy: " + str(strategy_name) +  " Reporters: " + str(len(reporters_with_strategy)))
 
 
 def launch_simulation(simulation_config, max_iterations, show_progress=True, block_id=-1):
@@ -1013,8 +1013,8 @@ def launch_simulation(simulation_config, max_iterations, show_progress=True, blo
     if show_progress:
         print_strategy_report(simulation_config.reporters_config)
 
-        print "Running ", max_iterations, " replications ..."
-        print str(simulation_config)
+        logger.info("Running " + str(max_iterations) + " replications in a single core ")
+        logger.info("Simulation configuration: " + str(simulation_config))
 
     progress_bar = None
     if show_progress:
@@ -1036,7 +1036,8 @@ def launch_simulation(simulation_config, max_iterations, show_progress=True, blo
             progress_bar.progress(replication_index + 1)
 
     if show_progress:
-        print max_iterations, " replications finished. Execution time: ", (time.time() - start_time), " (s)"
+        logger.info(str(max_iterations) + " single-core replications finished. Execution time: " + str(
+            time.time() - start_time) + " (s)")
 
     return simulation_metrics
 

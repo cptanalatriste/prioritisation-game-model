@@ -6,8 +6,11 @@ import simdata
 import pandas as pd
 
 import scipy.stats as st
+import logging
 
-import simmodel
+import gtconfig
+
+logger = gtconfig.get_logger("sim_data_analysis", "sim_data_analysis.txt", level=logging.INFO)
 
 
 def get_payoff_score(reporter_info, score_map, priority_based=True):
@@ -50,6 +53,10 @@ def consolidate_payoff_results(period, reporter_configuration, simulation_output
 
     simulation_results = simulation_output.get_consolidated_output(reporter_configuration)
 
+    logger.info(
+        "Payoff function parameters: Priority-based " + str(priority_based) + " Severe Score: " + str(
+            score_map[simdata.SEVERE_PRIORITY]) + " Non-Severe Score " + str(score_map[simdata.NON_SEVERE_PRIORITY]))
+
     for reporter_info in simulation_results:
         reporter_info["period"] = period
         payoff_score = get_payoff_score(reporter_info=reporter_info, score_map=score_map, priority_based=priority_based)
@@ -72,8 +79,9 @@ def get_team_metrics(file_prefix, game_period, teams, overall_dataframes, number
 
     consolidated_result = []
 
-    print "Dataframes under analysis: ", len(
-        overall_dataframes), ". Number of runs: ", len(runs), " Number of teams: ", teams
+    logger.info("Dataframes under analysis: " + str(len(overall_dataframes)) + ". Number of runs: " + str(
+        len(runs)) + " Number of teams: " + str(teams))
+
     for run in runs:
 
         team_results = {}
@@ -126,6 +134,8 @@ def get_team_metrics(file_prefix, game_period, teams, overall_dataframes, number
         print file_prefix, ": Confidence Interval Analysis for Team ", team_index, " mean=", mean, " sem=", sem, " df=", df, " alpha=", \
             alpha, " interval=", interval
 
-    print "file_prefix: ", file_prefix, " team_averages\t", team_averages, "\n"
+        logger.info(file_prefix + ": Confidence Interval Analysis for Team " + str(team_index) + " mean=" + str(
+            mean) + " sem=" + str(sem) + " df=" + str(df) + " alpha=", \
+                    str(alpha) + " interval=" + str(interval))
 
     return [str(team_avg) for team_avg in team_averages]

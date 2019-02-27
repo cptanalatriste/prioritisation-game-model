@@ -447,20 +447,20 @@ def consolidate_results(year_month, issues_for_period, resolved_in_month, report
 def get_resolution_time_gen(resolved_issues, desc=""):
     """
     Generates a sample generator for resolution time.
-    :param resolution_time_sample:
+    :param resolved_issues: Dataframe with resolved issues
     :param desc: Description of the sample
     :return: Resolution time generator.
     """
 
     resolution_time_sample = resolved_issues[simdata.RESOLUTION_TIME_COLUMN].dropna()
 
-    print "Resolution times in Training Range for ", desc, ": \n", resolution_time_sample.describe()
+    logger.info("Resolution times in Training Range for " + str(desc) + ": \n" + str(resolution_time_sample.describe()))
 
     description = "RESOL_TIME_" + desc
 
     file_name = "csv/" + description + ".csv"
     resolution_time_sample.to_csv(file_name)
-    print "Resolution time samples stored in ", file_name
+    logger.info("Resolution time samples stored in " + str(file_name))
 
     best_fit = siminput.launch_input_analysis(resolution_time_sample, description,
                                               show_data_plot=False, save_plot=False)
@@ -468,13 +468,13 @@ def get_resolution_time_gen(resolved_issues, desc=""):
 
     # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2 - Page 46)
     if best_fit["ks_p_value"] >= MINIMUM_P_VALUE:
-        print "Using ", best_fit["dist_name"], " for ", desc, " Resolution Time with parameters ", \
-            best_fit["parameters"], " with p-value ", best_fit["ks_p_value"]
+        logger.info("Using " + str(best_fit["dist_name"]) + " for " + str(desc) + " Resolution Time with parameters " + \
+                    str(best_fit["parameters"]) + " with p-value " + str(best_fit["ks_p_value"]))
         resolution_time_gen = simutils.ContinuousEmpiricalDistribution(distribution=best_fit["distribution"],
                                                                        parameters=best_fit["parameters"],
                                                                        observations=resolution_time_sample)
     elif len(resolution_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
-        print "Using an Empirical Distribution for ", desc, " Resolution Time"
+        logger.info("Using an Empirical Distribution for " + str(desc) +  " Resolution Time")
         resolution_time_gen = simutils.ContinuousEmpiricalDistribution(observations=resolution_time_sample)
 
     return resolution_time_gen

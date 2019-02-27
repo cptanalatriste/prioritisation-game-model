@@ -8,7 +8,10 @@ import pandas as pd
 
 import simcruncher
 import simmodel
-import simutils
+import gtconfig
+import logging
+
+logger = gtconfig.get_logger("twins_data_analysis", "twins_data_analysis.txt", level=logging.INFO)
 
 
 def aggregate_players(agent_team, reporter_configuration, aggregate_agent_team):
@@ -58,9 +61,9 @@ def get_simulation_results(file_prefix, strategy_map, player_configuration, game
     """
     overall_dataframes = []
     for team, strategy in strategy_map.iteritems():
-        print "Getting payoff for team ", team, " on profile ", file_prefix
+        logger.info("Getting payoff for team " + str(team) + " on profile " + str(file_prefix))
 
-        print "PLAYER AGGREGATION: Assigning players to teams according to profile "
+        logger.info("PLAYER AGGREGATION: Assigning players to teams according to profile ")
 
         aggregate_players(team, player_configuration, game_configuration["AGGREGATE_AGENT_TEAM"])
         twins_strategy_map = get_twins_strategy_map(team, strategy_map,
@@ -74,7 +77,8 @@ def get_simulation_results(file_prefix, strategy_map, player_configuration, game
                                                      aggregate_team)
 
         if overall_dataframe is None:
-            print "Preparing simulation for getting the payoff for team ", team, " in profile: ", twins_strategy_map
+            logger.info("Preparing simulation for getting the payoff for team " + str(team) + " in profile: " + str(
+                twins_strategy_map))
 
             simulation_output = simfunction(
                 simulation_config=simulation_config,
@@ -88,10 +92,13 @@ def get_simulation_results(file_prefix, strategy_map, player_configuration, game
             simulation_history.append(overall_dataframe)
 
         else:
-            print "Profile ", twins_strategy_map, " has being already executed. Team ", team, " payoff will be recycled."
+            logger.info("Profile " + str(twins_strategy_map) + " has being already executed. Team " + str(
+                team) + " payoff will be recycled.")
 
-        overall_dataframe.to_csv("csv/agent_team_" + str(team) + "_" + file_prefix + '_simulation_results.csv',
-                                 index=False)
+        file_name = "csv/agent_team_" + str(team) + "_" + file_prefix + '_simulation_results.csv'
+        overall_dataframe.to_csv(file_name, index=False)
+        logger.info("Detailled metrics per agent and run were stored at " + file_name)
+
         overall_dataframes.append(overall_dataframe)
 
     return overall_dataframes

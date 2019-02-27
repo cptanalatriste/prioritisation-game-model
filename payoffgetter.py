@@ -35,9 +35,9 @@ DEFAULT_CONFIGURATION = {
     # Payoff function parameters
     'PRIORITY_SCORING': True,
     'SCORE_MAP': {
-        simdata.NON_SEVERE_PRIORITY: 10,
+        simdata.NON_SEVERE_PRIORITY: gtconfig.nonsevere_fix_weight,
         simdata.NORMAL_PRIORITY: 10 * 2,
-        simdata.SEVERE_PRIORITY: 10 * 5
+        simdata.SEVERE_PRIORITY: gtconfig.severe_fix_weight
     },
 
     # Throtling configuration parameters.
@@ -82,15 +82,18 @@ def select_reporters_for_simulation(reporter_configuration, game_configuration):
                                       config['with_modified_priority'] > 0]
 
         corrections_size = len(reporters_with_corrections)
-        print "PLAYER SELECTION CRITERIA: 3RD_PARTY_CORRECTIONS Original Reporters: ", len(
-            reporter_configuration), " Reporters with corrected priorities: ", corrections_size
+        logger.info("PLAYER SELECTION CRITERIA: 3RD_PARTY_CORRECTIONS Original Reporters: " + str(len(
+            reporter_configuration)) + " Reporters with corrected priorities: " + str(corrections_size))
 
         if corrections_size == 0:
-            print "In the current dataset there is NO THIRD PARTY CORRECTIONS. Using the unfiltered reporters for simulation"
+            logger.info("In the current dataset there is NO THIRD PARTY CORRECTIONS." +
+                        " Using the unfiltered reporters for simulation")
+
             return reporter_configuration
 
     elif selection_criteria == 'TOP_FROM_TEAMS':
-        print "PLAYER SELECTION CRITERIA: Top ", game_configuration["NUMBER_OF_TEAMS"], " most productive testers."
+        logger.info("PLAYER SELECTION CRITERIA: Top " + str(
+            game_configuration["NUMBER_OF_TEAMS"]) + " most productive testers.")
         sorted_by_productivity = sorted(reporter_configuration, key=lambda reporter: reporter['reports'], reverse=True)
         return sorted_by_productivity[: game_configuration["NUMBER_OF_TEAMS"]]
 
@@ -302,6 +305,9 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     valid_reports = simdata.filter_by_reporter(valid_reports, engaged_testers)
     logger.info("Issues in training after reporter filtering: " + str(len(valid_reports.index)))
 
+    logger.info(str(len(valid_reports.index)) + " reports where considered for simulation. Those reports where made by"
+                + str(len(engaged_testers)) + " reporters.")
+
     logger.info("Starting simulation for project " + str(project_keys))
 
     # When NOT dealing with a priority queue, the ignore behaviour is disabled
@@ -431,15 +437,6 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
     simulation_time = sys.maxint
 
     profile_payoffs = []
-
-    print "Simulation configuration: REPLICATIONS_PER_PROFILE ", game_configuration["REPLICATIONS_PER_PROFILE"], \
-        " THROTTLING_ENABLED ", game_configuration["THROTTLING_ENABLED"], " PRIORITY_SCORING ", \
-        game_configuration["PRIORITY_SCORING"], " PROJECT_FILTER ", game_configuration["PROJECT_FILTER"], \
-        " EMPIRICAL_STRATEGIES ", game_configuration["EMPIRICAL_STRATEGIES"], " HEURISTIC_STRATEGIES ", \
-        game_configuration["HEURISTIC_STRATEGIES"], " N_CLUSTERS ", game_configuration["N_CLUSTERS"], \
-        " GATEKEEPER_CONFIG ", game_configuration["GATEKEEPER_CONFIG"], ' INFLATION_FACTOR ', \
-        game_configuration['INFLATION_FACTOR'], " target_fixes: ", target_fixes
-
     logger.info("Simulating " + str(len(strategy_maps)) + " strategy profiles...")
 
     simulation_history = []
@@ -451,7 +448,8 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
     game_desc = get_game_description(game_configuration, priority_queue=priority_queue, dev_team_factor=dev_team_factor)
 
     for index, map_info in enumerate(strategy_maps):
-        logger.info("Simulating profile " + str((index + 1)) + " of " + str(len(strategy_maps)))
+        logger.info("Current scenario: " + game_desc + ". Simulating profile " + str((index + 1)) + " of " + str(
+            len(strategy_maps)))
 
         file_prefix, strategy_map = map_info['name'], map_info['map']
 
