@@ -500,7 +500,7 @@ def run_simulation(strategy_maps, strategies_catalog, player_configuration, dev_
                                                     profile_payoffs, teams)
     logger.info("NFG File created at " + gambit_file)
 
-    print "Executing Gambit for equilibrium calculation..."
+    logger.info("Executing Gambit for equilibrium calculation...")
     equilibrium_list = gtutils.calculate_equilibrium(strategies_catalog=strategies_catalog, gambit_file=gambit_file,
                                                      all_equilibria=game_configuration['ALL_EQUILIBRIA'])
 

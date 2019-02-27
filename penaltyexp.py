@@ -83,14 +83,14 @@ def simulate_and_obtain_equilibria(input_params, game_configuration, prefix="", 
                                                    game_configuration=game_configuration)
 
     symmetric_equilibrium = [profile for profile in equilibrium_list if gtutils.is_symmetric_equilibrium(profile)]
-    print "Symmetric Equilibria: ", len(symmetric_equilibrium)
+    logger.info("Symmetric Equilibria: " + str(len(symmetric_equilibrium)))
 
     if file_name is None:
         file_name = "csv/" + prefix + "_equilibrium_results.csv"
     pd.DataFrame(
         [gtutils.get_equilibrium_as_dict(identifier=prefix, profile=profile) for profile in equilibrium_list]).to_csv(
         file_name)
-    print "Equilibrium results stored in ", file_name
+    logger.info("Equilibrium results stored in " + str(file_name))
 
     return equilibrium_list, symmetric_equilibrium
 
@@ -135,7 +135,7 @@ def do_penalty_experiments(input_params, game_configuration, priority_queue=Fals
                    "priority_queue": priority_queue,
                    "dev_team_factor": dev_team_factor}
 
-        print "results ", results
+        logger.info("results: " + str(results))
 
         experiment_results.append(results)
 
@@ -147,7 +147,7 @@ def do_penalty_experiments(input_params, game_configuration, priority_queue=Fals
 
     filename = "csv/" + project_prefix + "_" + prefix + "_penalty_experiment_results.csv"
     dataframe.to_csv(filename, index=False)
-    print "Penalty experiment results stored in ", filename
+    logger.info("Penalty experiment results stored in " + filename)
 
 
 def do_gatekeeper_experiments(input_params, game_configuration, priority_queue=False, dev_team_factor=1.0):

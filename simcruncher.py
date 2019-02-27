@@ -131,9 +131,6 @@ def get_team_metrics(file_prefix, game_period, teams, overall_dataframes, number
         alpha = 0.95
 
         interval = st.t.interval(alpha=alpha, df=df, loc=mean, scale=sem)
-        print file_prefix, ": Confidence Interval Analysis for Team ", team_index, " mean=", mean, " sem=", sem, " df=", df, " alpha=", \
-            alpha, " interval=", interval
-
         logger.info(file_prefix + ": Confidence Interval Analysis for Team " + str(team_index) + " mean=" + str(
             mean) + " sem=" + str(sem) + " df=" + str(df) + " alpha=" + str(alpha) + " interval=" + str(interval))
 

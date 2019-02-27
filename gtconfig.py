@@ -34,7 +34,7 @@ success_rates = [0.5, 0.9, 1.0]
 
 # Experiment configuration for Throttling. Used by penaltyexp.py
 do_throttling = False
-inflation_factors = [0.01, 0.03, 0.05, 0.07]
+inflation_factors = [0.05, 0.06, 0.07]
 
 is_windows = (os.name == 'nt')
 beep = True
