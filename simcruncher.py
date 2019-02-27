@@ -135,7 +135,6 @@ def get_team_metrics(file_prefix, game_period, teams, overall_dataframes, number
             alpha, " interval=", interval
 
         logger.info(file_prefix + ": Confidence Interval Analysis for Team " + str(team_index) + " mean=" + str(
-            mean) + " sem=" + str(sem) + " df=" + str(df) + " alpha=", \
-                    str(alpha) + " interval=" + str(interval))
+            mean) + " sem=" + str(sem) + " df=" + str(df) + " alpha=" + str(alpha) + " interval=" + str(interval))
 
     return [str(team_avg) for team_avg in team_averages]

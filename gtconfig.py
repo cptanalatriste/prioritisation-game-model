@@ -24,16 +24,16 @@ nonsevere_fix_weight = 0
 severe_fix_weight = 1
 
 # Adjust these settings for quick experimentation
-replications_per_profile = 20
-use_empirical_strategies = False
-exclude_self_fix = True
+replications_per_profile = 40
+use_empirical_strategies = True
+exclude_self_fix = False
 
 # Experiment configuration for Gatekeeper. Used by penaltyexp.py
-do_gatekeeper = True
+do_gatekeeper = False
 success_rates = [0.5, 0.9, 1.0]
 
 # Experiment configuration for Throttling. Used by penaltyexp.py
-do_throttling = True
+do_throttling = False
 inflation_factors = [0.01, 0.03, 0.05, 0.07]
 
 is_windows = (os.name == 'nt')
@@ -70,5 +70,6 @@ def get_logger(name="gtbugreporting", filename="gtbugreporting.log", level=loggi
     else:
         return global_logger
 
+
 # Remove for per-module logging
-global_logger = get_logger()
+global_logger = get_logger(name="up_equilibrium", filename="up_equilibrium.log")
