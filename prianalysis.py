@@ -3,7 +3,6 @@ This modules analyses priority behaviour in our dataset
 """
 import logging
 import math
-import winsound
 
 import pandas as pd
 import numpy as np
@@ -14,6 +13,10 @@ import time
 
 import simdata
 import simdriver
+
+if gtconfig.is_windows:
+    import winsound
+
 
 logger = gtconfig.get_logger("priority_analysis", "priority_analysis.txt", level=logging.INFO)
 

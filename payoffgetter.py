@@ -260,7 +260,22 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
     valid_reports = simdriver.get_valid_reports(project_keys=project_keys, enhanced_dataframe=enhanced_dataframe,
                                                 exclude_self_fix=gtconfig.exclude_self_fix)
     valid_reporters, _ = simdriver.get_reporter_configuration(valid_reports)
-    logger.info("Reporters after drive-in tester removal ..." + str(len(valid_reporters)))
+
+    # Only for logging purposes
+    after_driveby_reports = simdata.filter_by_reporter(valid_reports,
+                                                       [reporter_config['name'] for reporter_config in valid_reporters])
+    logger.info("Simulation Inputs: Reporters after drive-by tester removal " + str(len(valid_reporters)))
+    logger.info("Simulation Inputs after drive-by filtering: Number of issues " + str(len(after_driveby_reports.index)))
+    logger.info(
+        "Simulation Inputs after drive-by filtering: Number of reporters " + str(
+            after_driveby_reports[simdata.REPORTER_COLUMN].nunique()))
+    logger.info("Simulation Inputs after drive-by filtering: Report Start " + str(
+        after_driveby_reports[simdata.CREATED_DATE_COLUMN].min()))
+    logger.info("Simulation Inputs after drive-by filtering: Report End " + str(
+        after_driveby_reports[simdata.CREATED_DATE_COLUMN].max()))
+    logger.info(
+        "Simulation Inputs after drive-by filtering: Number of projects " + str(
+            after_driveby_reports[simdata.PROJECT_KEY_COUMN].nunique()))
 
     strategies_catalog = []
 
@@ -303,10 +318,18 @@ def prepare_simulation_inputs(enhanced_dataframe, all_project_keys, game_configu
 
     engaged_testers = [reporter_config['name'] for reporter_config in reporter_configuration]
     valid_reports = simdata.filter_by_reporter(valid_reports, engaged_testers)
-    logger.info("Issues in training after reporter filtering: " + str(len(valid_reports.index)))
 
-    logger.info(str(len(valid_reports.index)) + " reports where considered for simulation. Those reports where made by"
-                + str(len(engaged_testers)) + " reporters.")
+    logger.info("Simulation Inputs after correction filtering: Number of issues " + str(len(valid_reports.index)))
+    logger.info(
+        "Simulation Inputs after correction filtering: Number of reporters " + str(
+            valid_reports[simdata.REPORTER_COLUMN].nunique()))
+    logger.info("Simulation Inputs after correction filtering: Report Start " + str(
+        valid_reports[simdata.CREATED_DATE_COLUMN].min()))
+    logger.info("Simulation Inputs after correction filtering: Report End " + str(
+        valid_reports[simdata.CREATED_DATE_COLUMN].max()))
+    logger.info(
+        "Simulation Inputs after correction filtering: Number of projects " + str(
+            valid_reports[simdata.PROJECT_KEY_COUMN].nunique()))
 
     logger.info("Starting simulation for project " + str(project_keys))
 
