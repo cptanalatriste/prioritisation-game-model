@@ -474,7 +474,7 @@ def get_resolution_time_gen(resolved_issues, desc=""):
                                                                        parameters=best_fit["parameters"],
                                                                        observations=resolution_time_sample)
     elif len(resolution_time_sample.index) >= simutils.MINIMUM_OBSERVATIONS:
-        logger.info("Using an Empirical Distribution for " + str(desc) +  " Resolution Time")
+        logger.info("Using an Empirical Distribution for " + str(desc) + " Resolution Time")
         resolution_time_gen = simutils.ContinuousEmpiricalDistribution(observations=resolution_time_sample)
 
     return resolution_time_gen
@@ -1059,17 +1059,18 @@ def main():
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     max_iterations = gtconfig.replications_per_profile
-    valid_projects = get_valid_projects(enhanced_dataframe, threshold=VALID_THRESHOLD)
+    valid_projects = get_valid_projects(enhanced_dataframe, threshold=VALID_THRESHOLD,
+                                        exclude_self_fix=gtconfig.exclude_self_fix)
     parallel = gtconfig.parallel
     test_sizes = [TEST_SIZE]
     per_project = False
     consolidated = True
 
-    for priority_queue in [True, False]:
+    for priority_queue in gtconfig.priority_queues:
 
         consolidated_results = []
 
-        for disable_ignore in [True, False]:
+        for disable_ignore in [False]:
 
             try:
                 project_name = None

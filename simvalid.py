@@ -5,12 +5,17 @@ This module contains the procedures for the validation of the simulation.
 import simutils
 import simdata
 
+import logging
 import pandas as pd
 import numpy as np
 from scipy import stats
 from statsmodels.stats import power
 
+import gtconfig
+
 PLOT = None
+
+logger = gtconfig.get_logger("exp_equilibrium_results", "exp_equilibrium_results.txt", level=logging.INFO)
 
 
 def get_data_priority_value(metrics_on_test, data_item, target_priority):
@@ -60,14 +65,14 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
     resolved_bugs = [data['true_resolved'] for data in metrics_on_test]
     resolved_samples = simulation_result['resolved_samples']
     desc = prefix + "_" + "RESOLVED_BUGS"
-    print "Response variable: ", desc
+    logger.info("Response variable: " + desc)
     validation_results.append(statistical_validation(resolved_bugs, resolved_samples, desc=desc, difference=difference))
 
     # TODO: Now this screams refactoring
     reporting_times = [data['reporting_time'] for data in metrics_on_test]
     reporting_times_samples = simulation_result['reporting_times_samples']
     desc = prefix + "_" + "REPORTING_TIME"
-    print "Response variable: ", desc
+    logger.info("Response variable: " + desc)
     validation_results.append(
         statistical_validation(reporting_times, reporting_times_samples, desc=desc, difference=difference))
 
@@ -78,7 +83,7 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
         resolved_in_data['Priority_' + str(target_priority)] = resolved_bugs
         resolved_samples = get_simulation_priority_value(simulation_result, 'resolved_samples', target_priority)
         desc = prefix + "_" + "RESOLVED_BUGS_FROM_PRIORITY_" + str(target_priority)
-        print "Response variable: ", desc
+        logger.info("Response variable: " + desc)
 
         result = statistical_validation(resolved_bugs, resolved_samples, desc=desc, difference=difference)
         validation_results.append(result)
@@ -86,7 +91,7 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
         time_ratios = get_data_priority_value(metrics_on_test, 'true_time_ratio', target_priority)
         time_ratio_samples = get_simulation_priority_value(simulation_result, 'time_ratio_samples', target_priority)
         desc = prefix + "_" + "TIME_RATIO_FROM_PRIORITY_" + str(target_priority)
-        print "Response variable: ", desc
+        logger.info("Response variable: " + desc)
         ratio_difference = 0.2
         result = statistical_validation(time_ratios, time_ratio_samples, desc=desc, difference=ratio_difference)
         validation_results.append(result)
@@ -94,13 +99,13 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
         fix_ratios = get_data_priority_value(metrics_on_test, 'true_fixed_ratio', target_priority)
         fix_ratio_samples = get_simulation_priority_value(simulation_result, 'fixed_ratio_samples', target_priority)
         desc = prefix + "_" + "FIX_RATIO_FROM_PRIORITY_" + str(target_priority)
-        print "Response variable: ", desc
+        logger.info("Response variable: " + desc)
         result = statistical_validation(fix_ratios, fix_ratio_samples, desc=desc, difference=ratio_difference)
         validation_results.append(result)
 
     file_name = "csv/" + prefix + "_resolved_in_population.csv"
     pd.DataFrame(resolved_in_data).to_csv(file_name)
-    print "Resolution report stored in ", file_name
+    logger.info("Resolution report stored in " + file_name)
 
     return validation_results
 
@@ -132,13 +137,15 @@ def statistical_validation(population_data, sample_data, alpha=0.05, difference=
     population_mean = np.mean(population_data)
     population_std = np.std(population_data)
 
-    print desc, ": Population data information: len ", len(
-        population_data), " mean ", population_mean, " std ", population_std
+    logger.info(desc + ": Population data information: len " + str(len(
+        population_data)) + " mean " + str(population_mean) + " std " + str(population_std))
 
     sample_mean = np.mean(sample_data)
     sample_size = len(sample_data)
     sample_std = np.std(sample_data)
-    print desc, ": Samples from simulation: len ", sample_size, " mean ", sample_mean, " std ", sample_std
+    logger.info(
+        desc + ": Samples from simulation: len " + str(sample_size) + " mean " + str(sample_mean) + " std " + str(
+            sample_std))
 
     reject_null, test_power = apply_t_test(sample_data, population_mean, alpha=alpha, difference=difference, desc=desc)
     accept_simulation, more_replications, lower_bound, upper_bound = analyze_confidence_interval(sample_data,
@@ -168,7 +175,7 @@ def apply_t_test(samples, population_mean, alpha=0.05, difference=1.0, desc=""):
     :return: None
     """
     t_stat, two_tail_prob = stats.ttest_1samp(samples, population_mean)
-    print desc, ": Two-Sample T-test: t-statistic ", t_stat, " p-value ", two_tail_prob
+    logger.info(desc + ": Two-Sample T-test: t-statistic " + str(t_stat) + " p-value " + str(two_tail_prob))
 
     sample_mean = np.mean(samples)
     sample_size = len(samples)
@@ -177,7 +184,8 @@ def apply_t_test(samples, population_mean, alpha=0.05, difference=1.0, desc=""):
 
     # FYI: The examples on Discrete-Event Simulation by Jerry Banks were replicated using the following python code.
     threshold = stats.t.ppf(1 - alpha / 2, df)
-    print desc, ": Critical value of t: ", threshold, " for a level of significance (alpha) ", alpha, " and degrees of freedom ", df
+    logger.info(desc + ": Critical value of t: " + str(threshold) + " for a level of significance (alpha) " + str(
+        alpha) + " and degrees of freedom " + str(df))
 
     null_hypothesis = "The mean of the sample (" + str(sample_mean) + ") is equal to the population mean ( " + str(
         population_mean) + ")"
@@ -185,16 +193,16 @@ def apply_t_test(samples, population_mean, alpha=0.05, difference=1.0, desc=""):
     reject_null = None
     if abs(t_stat) > threshold:
         reject_null = True
-        print desc, ": We REJECT the null hypothesis: ", null_hypothesis
+        logger.info(desc + ": We REJECT the null hypothesis: " + null_hypothesis)
     else:
         reject_null = False
-        print desc, ": We CANNOT REJECT the null hypothesis ", null_hypothesis
+        logger.info(desc + ": We CANNOT REJECT the null hypothesis " + null_hypothesis)
 
     effect_size = difference / sample_std
-    print desc, ": Effect size for a difference of ", difference, ": ", effect_size
+    logger.info(desc + ": Effect size for a difference of " + str(difference) + ": " + str(effect_size))
 
     test_power = power.tt_solve_power(effect_size=effect_size, alpha=alpha, nobs=sample_size)
-    print desc, ": Test power: ", test_power
+    logger.info(desc + ": Test power: " + str(test_power))
 
     return reject_null, test_power
 
@@ -217,7 +225,7 @@ def analyze_confidence_interval(samples, population_mean, alpha=0.05, difference
 
     df = sample_size - 1
     lower_bound, upper_bound = stats.t.interval(alpha=conf_alpha, df=df, loc=sample_mean, scale=sample_sem)
-    print desc, " : confidence_interval: ( ", lower_bound, ", ", upper_bound, ")"
+    logger.info(desc + " : confidence_interval: ( " + str(lower_bound) + ", " + str(upper_bound) + ")")
 
     one_error = abs(population_mean - lower_bound)
     other_error = abs(population_mean - upper_bound)
@@ -229,30 +237,31 @@ def analyze_confidence_interval(samples, population_mean, alpha=0.05, difference
     more_simulation_msg = desc + ": Additional simulation replications are necessary until a conclussion can be reached"
     refine_msg = desc + ": We need to refine the simulation model :("
 
-    print desc, ": Difference: ", difference, " best-case error ", best_case_error, " worst-case error ", worst_case_error
+    logger.info(desc + ": Difference: " + str(difference) + " best-case error " + str(
+        best_case_error) + " worst-case error " + str(worst_case_error))
 
     accept_simulation = False
     more_replications = None
 
     if lower_bound <= population_mean <= upper_bound:
         if best_case_error > difference or worst_case_error > difference:
-            print more_simulation_msg
+            logger.info(more_simulation_msg)
             more_replications = True
 
         if worst_case_error <= difference:
-            print accept_msg
+            logger.info(accept_msg)
             accept_simulation = True
     else:
         if best_case_error > difference:
-            print refine_msg
+            logger.info(refine_msg)
             accept_simulation = False
 
         if worst_case_error <= difference:
-            print accept_msg
+            logger.info(accept_msg)
             accept_simulation = True
 
         if best_case_error <= difference < worst_case_error:
-            print more_simulation_msg
+            logger.info(more_simulation_msg)
             more_replications = True
 
     return accept_simulation, more_replications, lower_bound, upper_bound
