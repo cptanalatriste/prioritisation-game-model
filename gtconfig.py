@@ -15,26 +15,31 @@ fix_count_criteria = True  # True for ending simulation after a number of fixes.
 parallel = True  # Set to False for debugging purposes
 parallel_blocks = 4
 
+# Test dataset size for validation experiments
+valid_test_sizes = [0.4]
+valid_ignore_config = [False]
+
 # Equilibrium experiment configurations. Used by payoffgetter.py and penaltyexp.py
-priority_queues = [True]
+priority_queues = [False] # Also used in simdriver.py
 dev_team_factors = [0.5, 1.0]
 use_heuristic_strategies = True
 # Payoff function parameters
 nonsevere_fix_weight = 0
 severe_fix_weight = 1
+epsilon_for_validation = 1
 
 # Adjust these settings for quick experimentation
-replications_per_profile = 40
-use_empirical_strategies = True
 exclude_self_fix = False
+replications_per_profile = 1000 # Also used in simdriver.py
+use_empirical_strategies = True
 
 # Experiment configuration for Gatekeeper. Used by penaltyexp.py
 do_gatekeeper = False
 success_rates = [0.5, 0.9, 1.0]
 
 # Experiment configuration for Throttling. Used by penaltyexp.py
-do_throttling = False
-inflation_factors = [0.05, 0.06, 0.07]
+do_throttling = True
+inflation_factors = [0.04, 0.05]
 
 is_windows = (os.name == 'nt')
 beep = True
@@ -72,4 +77,4 @@ def get_logger(name="gtbugreporting", filename="gtbugreporting.log", level=loggi
 
 
 # Remove for per-module logging
-global_logger = get_logger(name="up_equilibrium", filename="up_equilibrium.log")
+global_logger = get_logger(name="validation", filename="validation.log")

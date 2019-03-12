@@ -27,9 +27,8 @@ if gtconfig.is_windows:
 DEBUG = False
 
 TARGET_FIXES = 10
-DIFFERENCE = 2
+DIFFERENCE = gtconfig.epsilon_for_validation
 
-TEST_SIZE = .2
 VALID_THRESHOLD = .3
 
 # According to  Modelling and Simulation Fundamentals by J. Sokolowski (Chapter 2)
@@ -1062,15 +1061,15 @@ def main():
     valid_projects = get_valid_projects(enhanced_dataframe, threshold=VALID_THRESHOLD,
                                         exclude_self_fix=gtconfig.exclude_self_fix)
     parallel = gtconfig.parallel
-    test_sizes = [TEST_SIZE]
+    test_sizes = gtconfig.valid_test_sizes
     per_project = False
     consolidated = True
 
     for priority_queue in gtconfig.priority_queues:
 
-        consolidated_results = []
+        for disable_ignore in gtconfig.valid_ignore_config:
 
-        for disable_ignore in [False]:
+            consolidated_results = []
 
             try:
                 project_name = None
