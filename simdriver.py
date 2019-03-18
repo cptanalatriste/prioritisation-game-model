@@ -972,7 +972,8 @@ def get_valid_projects(enhanced_dataframe, threshold=0.3, exclude_self_fix=True)
                                                             exclude_self_fix=exclude_self_fix)
     file_name = "csv/project_filtering_data.csv"
     project_dataframe.to_csv(file_name, index=False)
-    logger.info("Project validation information stored in " + file_name)
+    logger.info("Project validation information stored in " + file_name + " . Corresponding to " +
+                str(len(enhanced_dataframe.index)) + " issues...")
 
     using_priorities = project_dataframe[project_dataframe['non_default_ratio'] >= threshold]
     project_keys = using_priorities['project_key'].unique()

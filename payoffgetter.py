@@ -559,7 +559,7 @@ def main():
     logger.info("Loading information from " + str(simdata.ALL_ISSUES_CSV))
     all_issues = pd.read_csv(simdata.ALL_ISSUES_CSV)
 
-    logger.info("Adding calculated fields...")
+    logger.info("Adding calculated fields to " + str(len(all_issues.index)) + " issues ...")
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
     all_valid_projects = simdriver.get_valid_projects(enhanced_dataframe=enhanced_dataframe,
