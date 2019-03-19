@@ -197,7 +197,7 @@ def do_throttling(simulation_configuration, simfunction, input_params, empirical
                                        desc=equilibrium_result["desc"], empirical_profile=empirical_profile)
 
 
-def gather_experiment_inputs():
+def gather_experiment_inputs(priority_queue):
     """
     It gathers all the data items needed for the performance measure experiments.
     :return: Base simulation configuration, simulation function, simulation inputs and empirical strategy profile.
@@ -208,7 +208,7 @@ def gather_experiment_inputs():
     logger.info("Adding calculated fields...")
     enhanced_dataframe = simdata.enhace_report_dataframe(all_issues)
 
-    all_valid_projects = simdriver.get_valid_projects(enhanced_dataframe)
+    all_valid_projects = simdriver.get_valid_projects(enhanced_dataframe, exclude_self_fix=gtconfig.exclude_self_fix)
 
     simulation_configuration = dict(payoffgetter.DEFAULT_CONFIGURATION)
     simulation_configuration['REPLICATIONS_PER_PROFILE'] = gtconfig.replications_per_profile
@@ -219,7 +219,7 @@ def gather_experiment_inputs():
     simulation_configuration['TWINS_REDUCTION'] = False
 
     input_params = payoffgetter.prepare_simulation_inputs(enhanced_dataframe, all_valid_projects,
-                                                          simulation_configuration)
+                                                          simulation_configuration, priority_queue)
 
     simfunction = simutils.launch_simulation_parallel
     if not gtconfig.parallel:

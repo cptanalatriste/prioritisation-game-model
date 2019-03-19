@@ -1,6 +1,7 @@
 """
 This module contains the equilibrium list used for performance comparison.
 """
+import gtconfig
 import penaltyexp
 import simmodel
 import pandas as pd
@@ -9,29 +10,31 @@ import pandas as pd
 import simutils
 
 EMPIRICAL_HONEST = {"name": "empirical_honest",
-                    "as_string": "EMPIRICAL0_INF5%DEF1%",
+                    "as_string": "EMPIRICAL0_INF5%DEF2%",
                     simmodel.NON_SEVERE_INFLATED_COLUMN: 0.05,
-                    simmodel.SEVERE_DEFLATED_COLUMN: 0.01}
+                    simmodel.SEVERE_DEFLATED_COLUMN: 0.02}
 
 PERSISTENT_DEFLATOR = {"name": "persistent_deflator",
-                       "as_string": "EMPIRICAL1_INF8%DEF100%",
-                       simmodel.NON_SEVERE_INFLATED_COLUMN: 0.08,
+                       "as_string": "EMPIRICAL4_INF10%DEF100%",
+                       simmodel.NON_SEVERE_INFLATED_COLUMN: 0.1,
                        simmodel.SEVERE_DEFLATED_COLUMN: 1.00}
 
 REGULAR_DEFLATOR = {"name": "regular_deflator",
-                    "as_string": "EMPIRICAL2_INF4%DEF58%",
-                    simmodel.NON_SEVERE_INFLATED_COLUMN: 0.04,
-                    simmodel.SEVERE_DEFLATED_COLUMN: 0.58}
+                    "as_string": "EMPIRICAL1_INF3%DEF56%",
+                    simmodel.NON_SEVERE_INFLATED_COLUMN: 0.03,
+                    simmodel.SEVERE_DEFLATED_COLUMN: 0.56}
 
 EMPIRICAL_INFLATOR = {"name": "empirical_inflator",
-                      "as_string": "EMPIRICAL3_INF19%DEF2%",
-                      simmodel.NON_SEVERE_INFLATED_COLUMN: 0.19,
+                      "as_string": "EMPIRICAL3_INF20%DEF2%",
+                      simmodel.NON_SEVERE_INFLATED_COLUMN: 0.2,
                       simmodel.SEVERE_DEFLATED_COLUMN: 0.02}
 
 OCCASSIONAL_DEFLATOR = {"name": "occasional_deflator",
-                        "as_string": "EMPIRICAL4_INF6%DEF26%",
-                        simmodel.NON_SEVERE_INFLATED_COLUMN: 0.06,
-                        simmodel.SEVERE_DEFLATED_COLUMN: 0.26}
+                        "as_string": "EMPIRICAL2_INF4%DEF23%",
+                        simmodel.NON_SEVERE_INFLATED_COLUMN: 0.04,
+                        simmodel.SEVERE_DEFLATED_COLUMN: 0.23}
+
+logger = gtconfig.get_logger("eq_catalog", "eq_catalog.txt")
 
 
 def get_profiles_from_file(filename, scenario_desc, input_params):
@@ -41,7 +44,7 @@ def get_profiles_from_file(filename, scenario_desc, input_params):
     :return:
     """
 
-    print "Extracting equilibria from: " + filename
+    logger.info("Extracting equilibria from: " + filename)
 
     profiles_dataframe = pd.read_csv(filename)
     symmetric_profile_df = profiles_dataframe[profiles_dataframe["SYMMETRIC"] == True]
@@ -94,59 +97,57 @@ def get_throttling_equilibria(simulation_config, input_params, priority_queue=Tr
     :param input_params:
     :return:
     """
-    desc_inf001 = "THROTTLING_INF001"
+    desc_inf003 = "THROTTLING_INF003"
 
-    process_configuration_inf001 = dict(simulation_config)
-    process_configuration_inf001["THROTTLING_ENABLED"] = True
-    process_configuration_inf001["GATEKEEPER_CONFIG"] = None
-    process_configuration_inf001["INFLATION_FACTOR"] = 0.01
-    process_configuration_inf001["SUCCESS_RATE"] = 0.95
+    process_configuration_inf003 = dict(simulation_config)
+    process_configuration_inf003["THROTTLING_ENABLED"] = True
+    process_configuration_inf003["GATEKEEPER_CONFIG"] = None
+    process_configuration_inf003["INFLATION_FACTOR"] = 0.03
+    process_configuration_inf003["SUCCESS_RATE"] = 0.95
 
     if priority_queue and dev_team_factor == 0.5:
-        filename_inf001 = "INF1.0_PRIQUEUE_True_DEVFACTOR_0.5_equilibrium_results.csv"
         filename_inf003 = "INF3.0_PRIQUEUE_True_DEVFACTOR_0.5_equilibrium_results.csv"
-        filename_inf005 = "INF5.0_PRIQUEUE_True_DEVFACTOR_0.5_equilibrium_results.csv"
+        filename_inf010 = "INF10.0_PRIQUEUE_True_DEVFACTOR_0.5_equilibrium_results.csv"
+        filename_inf020 = "INF20.0_PRIQUEUE_True_DEVFACTOR_0.5_equilibrium_results.csv"
     elif priority_queue and dev_team_factor == 1.0:
-        filename_inf001 = "INF1.0_PRIQUEUE_True_DEVFACTOR_1.0_equilibrium_results.csv"
         filename_inf003 = "INF3.0_PRIQUEUE_True_DEVFACTOR_1.0_equilibrium_results.csv"
-        filename_inf005 = "INF5.0_PRIQUEUE_True_DEVFACTOR_1.0_equilibrium_results.csv"
+        filename_inf010 = "INF10.0_PRIQUEUE_True_DEVFACTOR_1.0_equilibrium_results.csv"
+        filename_inf020 = "INF20.0_PRIQUEUE_True_DEVFACTOR_1.0_equilibrium_results.csv"
 
     elif not priority_queue and dev_team_factor == 0.5:
-        filename_inf001 = "INF1.0_PRIQUEUE_False_DEVFACTOR_0.5_equilibrium_results.csv"
         filename_inf003 = "INF3.0_PRIQUEUE_False_DEVFACTOR_0.5_equilibrium_results.csv"
-        filename_inf005 = "INF5.0_PRIQUEUE_False_DEVFACTOR_0.5_equilibrium_results.csv"
+        filename_inf010 = "INF10.0_PRIQUEUE_False_DEVFACTOR_0.5_equilibrium_results.csv"
+        filename_inf020 = "INF20.0_PRIQUEUE_False_DEVFACTOR_0.5_equilibrium_results.csv"
 
     elif not priority_queue and dev_team_factor == 1.0:
-        filename_inf001 = "INF1.0_PRIQUEUE_False_DEVFACTOR_1.0_equilibrium_results.csv"
         filename_inf003 = "INF3.0_PRIQUEUE_False_DEVFACTOR_1.0_equilibrium_results.csv"
-        filename_inf005 = "INF5.0_PRIQUEUE_False_DEVFACTOR_1.0_equilibrium_results.csv"
-
-    equilibrium_profiles_inf001 = get_profiles_from_file("csv/" + filename_inf001, scenario_desc=desc_inf001,
-                                                         input_params=input_params)
-
-    desc_inf003 = "THROTTLING_INF003"
-    process_configuration_inf003 = dict(process_configuration_inf001)
-    process_configuration_inf003["INFLATION_FACTOR"] = 0.03
+        filename_inf010 = "INF10.0_PRIQUEUE_False_DEVFACTOR_1.0_equilibrium_results.csv"
+        filename_inf020 = "INF20.0_PRIQUEUE_False_DEVFACTOR_1.0_equilibrium_results.csv"
 
     equilibrium_profiles_inf003 = get_profiles_from_file("csv/" + filename_inf003, scenario_desc=desc_inf003,
                                                          input_params=input_params)
 
-    desc_inf005 = "THROTTLING_INF005"
-    process_configuration_inf005 = dict(process_configuration_inf001)
-    process_configuration_inf005["INFLATION_FACTOR"] = 0.05
-
-    equilibrium_profiles_inf005 = get_profiles_from_file("csv/" + filename_inf005, scenario_desc=desc_inf005,
+    desc_inf010 = "THROTTLING_INF010"
+    process_configuration_inf010 = dict(process_configuration_inf003)
+    process_configuration_inf010["INFLATION_FACTOR"] = 0.10
+    equilibrium_profiles_inf010 = get_profiles_from_file("csv/" + filename_inf010, scenario_desc=desc_inf010,
                                                          input_params=input_params)
 
-    return [{"desc": desc_inf001,
-             "simulation_configuration": process_configuration_inf001,
-             "equilibrium_profiles": equilibrium_profiles_inf001},
-            {"desc": desc_inf003,
+    desc_inf020 = "THROTTLING_INF020"
+    process_configuration_inf020 = dict(process_configuration_inf003)
+    process_configuration_inf020["INFLATION_FACTOR"] = 0.20
+    equilibrium_profiles_inf020 = get_profiles_from_file("csv/" + filename_inf020, scenario_desc=desc_inf020,
+                                                         input_params=input_params)
+
+    return [{"desc": desc_inf003,
              "simulation_configuration": process_configuration_inf003,
              "equilibrium_profiles": equilibrium_profiles_inf003},
-            {"desc": desc_inf005,
-             "simulation_configuration": process_configuration_inf005,
-             "equilibrium_profiles": equilibrium_profiles_inf005}]
+            {"desc": desc_inf010,
+             "simulation_configuration": process_configuration_inf010,
+             "equilibrium_profiles": equilibrium_profiles_inf010},
+            {"desc": desc_inf020,
+             "simulation_configuration": process_configuration_inf020,
+             "equilibrium_profiles": equilibrium_profiles_inf020}]
 
 
 def get_unsupervised_prioritization_equilibria(simulation_configuration, input_params, priority_queue=False,

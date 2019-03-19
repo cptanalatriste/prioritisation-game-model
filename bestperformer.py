@@ -164,7 +164,7 @@ def compare_with_best_performer(samples, experiment_desc, initial_sample_size, d
 
 
 def main():
-    initial_sample_size = 120
+    initial_sample_size = gtconfig.replications_per_profile
 
     confidence = 0.95
     severe_fixed_difference = 0.05
@@ -172,18 +172,19 @@ def main():
     # This is in hours
     severe_restime_difference = 5
 
-    dev_team_factors = [0.5, 1.0]
-    # priority_disciplines = [False, True]
-    priority_disciplines = [True]
-
-    simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs()
-    simulation_configuration["REPLICATIONS_PER_PROFILE"] = initial_sample_size
-    original_team_size = input_params.dev_team_size
-
-    logger.info("Initial sample size: " + str(initial_sample_size))
-    logger.info("Original team size: " + str(original_team_size))
+    dev_team_factors = gtconfig.dev_team_factors
+    priority_disciplines = gtconfig.priority_queues
 
     for priority_discipline in priority_disciplines:
+        simulation_configuration, simfunction, input_params, empirical_profile = syseval.gather_experiment_inputs(
+            priority_discipline)
+
+        simulation_configuration["REPLICATIONS_PER_PROFILE"] = initial_sample_size
+        original_team_size = input_params.dev_team_size
+
+        logger.info("Initial sample size: " + str(initial_sample_size))
+        logger.info("Original team size: " + str(original_team_size))
+
         simulation_configuration["PRIORITY_QUEUE"] = priority_discipline
 
         logger.info("Using Priority Queue? " + str(priority_discipline))
