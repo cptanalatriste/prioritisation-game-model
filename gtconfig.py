@@ -1,8 +1,8 @@
 import logging
 import os
 
-git_home = "/Users/carlosgavidiacalderon/Google Drive/phd2/jira_github_ds/"
-gambit_folder = "/Applications/Gambit.app/Contents/MacOS/"
+git_home = "E:/Google Drive/phd2/jira_github_ds/"
+gambit_folder = "C:/Program Files (x86)/Gambit/"
 
 all_issues_csv = git_home + "apache_jira_github_ds.csv"
 enumerate_equilibria_solver = "gambit-enummixed"
@@ -15,9 +15,12 @@ fix_count_criteria = True  # True for ending simulation after a number of fixes.
 parallel = True  # Set to False for debugging purposes
 parallel_blocks = 4
 
-# Test dataset size for validation experiments
+# Simulation validation parameters for simdriver.py
 valid_test_sizes = [0.4]
-valid_ignore_config = [False]
+valid_ignore_config = [True]
+epsilon_for_counts = 1
+epsilon_for_ratios = 0.2
+
 
 # Equilibrium experiment configurations. Used by payoffgetter.py and penaltyexp.py
 priority_queues = [True] # Also used in simdriver.py
@@ -26,11 +29,10 @@ use_heuristic_strategies = True
 # Payoff function parameters
 nonsevere_fix_weight = 0
 severe_fix_weight = 1
-epsilon_for_validation = 1
 
 # Adjust these settings for quick experimentation
 exclude_self_fix = False
-replications_per_profile = 120 # Also used in simdriver.py and bestperformer.py
+replications_per_profile = 1000 # Also used in simdriver.py and bestperformer.py
 use_empirical_strategies = True
 
 # Experiment configuration for Gatekeeper. Used by penaltyexp.py

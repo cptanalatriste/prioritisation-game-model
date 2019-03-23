@@ -27,7 +27,7 @@ if gtconfig.is_windows:
 DEBUG = False
 
 TARGET_FIXES = 10
-DIFFERENCE = gtconfig.epsilon_for_validation
+DIFFERENCE = gtconfig.epsilon_for_counts
 
 VALID_THRESHOLD = .3
 

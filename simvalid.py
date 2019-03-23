@@ -92,7 +92,7 @@ def analyse_input_output(metrics_on_test, simulation_result, difference=2.0, pre
         time_ratio_samples = get_simulation_priority_value(simulation_result, 'time_ratio_samples', target_priority)
         desc = prefix + "_" + "TIME_RATIO_FROM_PRIORITY_" + str(target_priority)
         logger.info("Response variable: " + desc)
-        ratio_difference = 0.2
+        ratio_difference = gtconfig.epsilon_for_ratios
         result = statistical_validation(time_ratios, time_ratio_samples, desc=desc, difference=ratio_difference)
         validation_results.append(result)
 
