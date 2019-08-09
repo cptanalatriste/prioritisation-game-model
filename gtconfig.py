@@ -1,8 +1,8 @@
 import logging
 import os
 
-git_home = "E:/Google Drive/phd2/jira_github_ds/"
-gambit_folder = "C:/Program Files (x86)/Gambit/"
+git_home = "/home/carlos/Documents/datasets/"
+gambit_folder = "/home/carlos/gambit-15.1.1/"
 
 all_issues_csv = git_home + "apache_jira_github_ds.csv"
 enumerate_equilibria_solver = "gambit-enummixed"
@@ -21,10 +21,9 @@ valid_ignore_config = [True]
 epsilon_for_counts = 1
 epsilon_for_ratios = 0.2
 
-
 # Equilibrium experiment configurations. Used by payoffgetter.py and penaltyexp.py
-priority_queues = [True] # Also used in simdriver.py
-dev_team_factors = [0.5, 1.0] # Also used in bestperformer.py
+priority_queues = [True]  # Also used in simdriver.py
+dev_team_factors = [0.5, 1.0]  # Also used in bestperformer.py
 use_heuristic_strategies = True
 # Payoff function parameters
 nonsevere_fix_weight = 0
@@ -32,7 +31,10 @@ severe_fix_weight = 1
 
 # Adjust these settings for quick experimentation
 exclude_self_fix = False
-replications_per_profile = 1000 # Also used in simdriver.py and bestperformer.py
+only_using_priorities = False
+exclude_drive_by = False
+
+replications_per_profile = 1000  # Also used in simdriver.py and bestperformer.py
 use_empirical_strategies = True
 
 # Experiment configuration for Gatekeeper. Used by penaltyexp.py

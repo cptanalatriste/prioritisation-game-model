@@ -73,10 +73,10 @@ def split_bug_dataset(enhanced_dataframe, test_size, valid_projects):
         training_issues = issues_in_range[issues_in_range[simdata.ISSUE_KEY_COLUMN].isin(keys_train)]
         logger.info("Issues in training: " + str(len(training_issues.index)))
 
-        reporters_config, _ = get_reporter_configuration(training_issues, drive_by_filter=True)
+        reporters_config, _ = get_reporter_configuration(training_issues)
         if len(reporters_config) == 0:
             logger.info(
-                "Project " + valid_projects + ": No reporters left on training dataset after drive-by filtering.")
+                "Project " + valid_projects + ": No reporters left on training dataset.")
             return None, None, None
 
         try:
@@ -118,7 +118,7 @@ def get_reporter_groups(bug_dataset):
     return tester_groups
 
 
-def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_filter=True,
+def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_filter=gtconfig.exclude_drive_by,
                                debug=False, window_size=1):
     """
     Returns the reporting information required for the simulation to run.
@@ -138,9 +138,10 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
     batching = gtconfig.report_stream_batching
 
     if batching:
-        print "REPORT STREAM: The bug report arrival will be batched using a window size of ", window_size, " days"
+        logger.info("REPORT STREAM: The bug report arrival will be batched using a window size of " + str(
+            window_size) + " days")
     else:
-        print "REPORT STREAM: No batching is made for the bug arrival."
+        logger.info("REPORT STREAM: No batching is made for the bug arrival.")
 
     for index, reporter_list in enumerate(tester_groups):
 
@@ -196,11 +197,14 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
                 inflation_records["priority_" + str(priority) + "_false"] = len(inflated_reports.index)
 
             if debug:
-                print "Reports made ", reports, "Interrival-time for tester ", reporter_name, " mean: ", np.mean(
-                    inter_arrival_sample), " std: ", np.std(
-                    inter_arrival_sample), "Batch-size", reporter_name, " mean: ", np.mean(
-                    batch_sizes_sample), " std: ", np.std(
-                    batch_sizes_sample), " priority_map ", priority_map, " with_modified_priority ", with_modified_priority
+                logger.debug(
+                    "Reports made " + str(reports) + "Interrival-time for tester " + str(reporter_name) + " mean: " +
+                    str(np.mean(
+                        inter_arrival_sample)) + " std: " + str(np.std(
+                        inter_arrival_sample)) + "Batch-size" + str(reporter_name) + " mean: " + str(np.mean(
+                        batch_sizes_sample)) + " std: " + str(np.std(
+                        batch_sizes_sample)) + " priority_map " + str(priority_map) + " with_modified_priority " +
+                    str(with_modified_priority))
 
             config = {'name': reporter_name,
                       'interarrival_time_gen': inter_arrival_time_gen,
@@ -217,18 +221,20 @@ def get_reporter_configuration(training_dataset, tester_groups=None, drive_by_fi
 
         except ValueError as _:
             if debug:
-                print "Reporters ", reporter_list, " could not be added. Possible because insufficient samples."
+                logger.error(
+                    "Reporters " + str(reporter_list) + " could not be added. Possible because insufficient samples.")
 
+    drive_by_reporters = []
     if drive_by_filter:
         original_reporters = len(reporters_config)
         reporters_config, drive_by_reporters = simutils.remove_drive_in_testers(reporters_config, min_reports=10)
-        print "Original reporters: ", original_reporters, "Number of reporters after drive-by filtering: ", len(
-            reporters_config)
-        return reporters_config, drive_by_reporters
+        logger.info(
+            "Original reporters: " + str(original_reporters) + "Number of reporters after drive-by filtering: " +
+            str(len(reporters_config)))
     else:
-        print "No drive-by filtering was performed."
+        logger.info("No drive-by filtering was performed!!! Reporters: " + str(len(reporters_config)))
 
-    return reporters_config
+    return reporters_config, drive_by_reporters
 
 
 def fit_reporter_distributions(reporters_config):
@@ -739,7 +745,7 @@ def get_report_stream_params(training_issues, reporters_config, symmetric=False)
     reporter_gen = get_reporter_generator(reporters_config, symmetric=symmetric)
 
     all_reporters = [config['name'] for config in reporters_config]
-    global_reporter_config = get_reporter_configuration(training_issues, [all_reporters], drive_by_filter=False)
+    global_reporter_config, _ = get_reporter_configuration(training_issues, [all_reporters], drive_by_filter=False)
     fit_reporter_distributions(global_reporter_config)
 
     batch_size_gen = global_reporter_config[0]['batch_size_gen']
@@ -975,11 +981,16 @@ def get_valid_projects(enhanced_dataframe, threshold=0.3, exclude_self_fix=True)
     logger.info("Project validation information stored in " + file_name + " . Corresponding to " +
                 str(len(enhanced_dataframe.index)) + " issues...")
 
-    using_priorities = project_dataframe[project_dataframe['non_default_ratio'] >= threshold]
-    project_keys = using_priorities['project_key'].unique()
+    project_keys = project_dataframe['project_key'].unique()
 
-    logger.info("Filtering priorities using threshold " + str(threshold) + " Before filtering: " + str(
-        len(project_dataframe)) + " After filtering " + str(len(project_keys)))
+    if not gtconfig.only_using_priorities:
+        logger.info("No priority usage filtering!!! Available projects " + str(len(project_keys)))
+    else:
+        using_priorities = project_dataframe[project_dataframe['non_default_ratio'] >= threshold]
+        project_keys = using_priorities['project_key'].unique()
+
+        logger.info("Filtering priorities using threshold " + str(threshold) + " Before filtering: " + str(
+            len(project_dataframe)) + " After filtering " + str(len(project_keys)))
 
     return project_keys
 
