@@ -166,11 +166,9 @@ def compare_with_best_performer(samples, experiment_desc, initial_sample_size, d
 def main():
     initial_sample_size = gtconfig.replications_per_profile
 
-    confidence = 0.95
-    severe_fixed_difference = 0.05
-
-    # This is in hours
-    severe_restime_difference = 5
+    confidence = gtconfig.confidence
+    severe_fixed_difference = gtconfig.ratio_difference
+    severe_restime_difference = gtconfig.count_difference  # This is in DAYS
 
     dev_team_factors = gtconfig.dev_team_factors
     priority_disciplines = gtconfig.priority_queues
@@ -233,12 +231,14 @@ def main():
                     severe_fixed_samples[sample_key] = simulation_output.get_fixed_ratio_per_priority(
                         simdata.SEVERE_PRIORITY)
                     logger.info(
-                        str(len(severe_fixed_samples[sample_key])) + " fixed ratio samples obtained for " + sample_key)
+                        str(len(severe_fixed_samples[sample_key])) + " fixed ratio samples obtained for " + sample_key +
+                        " Sample mean: " + str(np.mean(severe_fixed_samples[sample_key])))
 
                     severe_restime_samples[sample_key] = simulation_output.get_avg_fix_delivery_time(
                         simdata.SEVERE_PRIORITY)
                     logger.info(str(
-                        len(severe_restime_samples[sample_key])) + " delivery time samples obtained for " + sample_key)
+                        len(severe_restime_samples[sample_key])) + " delivery time samples obtained for " + sample_key +
+                                " Sample mean: " + str(np.mean(severe_restime_samples[sample_key])))
 
             experiment_desc_suffix = "priority_queue_" + str(priority_discipline) + "_dev_team_factor_" + str(
                 dev_team_factor)

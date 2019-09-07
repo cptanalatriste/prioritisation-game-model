@@ -21,10 +21,15 @@ valid_ignore_config = [True]
 epsilon_for_counts = 1
 epsilon_for_ratios = 0.2
 
+# Parameters for the "select best system" experiment in bestperformer.py.
+confidence = 0.95
+ratio_difference = 0.05
+count_difference = 5
 
 # Equilibrium experiment configurations. Used by payoffgetter.py and penaltyexp.py
 priority_queues = [True] # Also used in simdriver.py
-dev_team_factors = [0.5, 1.0] # Also used in bestperformer.py
+# dev_team_factors = [0.5, 1.0] # Also used in bestperformer.py
+dev_team_factors = [0.5]
 use_heuristic_strategies = True
 # Payoff function parameters
 nonsevere_fix_weight = 0
@@ -32,7 +37,8 @@ severe_fix_weight = 1
 
 # Adjust these settings for quick experimentation
 exclude_self_fix = False
-replications_per_profile = 1000 # Also used in simdriver.py and bestperformer.py
+# replications_per_profile = 1000 # Also used in simdriver.py and bestperformer.py
+replications_per_profile = 12
 use_empirical_strategies = True
 
 # Experiment configuration for Gatekeeper. Used by penaltyexp.py
