@@ -1,8 +1,8 @@
 import logging
 import os
 
-git_home = "E:/Google Drive/phd2/jira_github_ds/"
-gambit_folder = "C:/Program Files (x86)/Gambit/"
+git_home = "/home/carlos/Documents/datasets/"
+gambit_folder = "/home/carlos/gambit-15.1.1/"
 
 all_issues_csv = git_home + "apache_jira_github_ds.csv"
 enumerate_equilibria_solver = "gambit-enummixed"
@@ -37,8 +37,10 @@ severe_fix_weight = 1
 
 # Adjust these settings for quick experimentation
 exclude_self_fix = False
-# replications_per_profile = 1000 # Also used in simdriver.py and bestperformer.py
-replications_per_profile = 12
+only_using_priorities = False
+exclude_drive_by = False
+
+replications_per_profile = 1000  # Also used in simdriver.py and bestperformer.py
 use_empirical_strategies = True
 
 # Experiment configuration for Gatekeeper. Used by penaltyexp.py
