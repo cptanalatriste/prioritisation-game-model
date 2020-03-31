@@ -5,3 +5,4 @@
 *.pyc
 *.png
 gtconfig.py
+.Rproj.user
