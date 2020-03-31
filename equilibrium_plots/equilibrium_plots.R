@@ -13,9 +13,12 @@ all_equilibria <- data_file %>%
 full_bandwidth <- filter(all_equilibria, Scenario == "Full Bandwidth")
 reduced_bandwith <- filter(all_equilibria, Scenario == "Reduced Bandwidth")
 
-data_for_plot <- reduced_bandwith
+data_for_plot <- full_bandwidth
 bar_position <- "dodge"
 bar_position <- "fill"
+font_size <- 15
+
 ggplot(data = data_for_plot) + 
   geom_bar(mapping = aes(x = Configuration, y = Probability, fill = Strategy),
-           position = bar_position, stat = "identity")
+           position = bar_position, stat = "identity") +
+           theme_classic(base_size = font_size)
