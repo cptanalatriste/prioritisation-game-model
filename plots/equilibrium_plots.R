@@ -7,18 +7,16 @@ all_equilibria <- data_file %>%
   mutate(ProcessCode = recode(Process, `Distributed Prioritisation` = "DP", Gatekeeper = "GK",
                               `Assessor-Throttling` = "AT")) %>%
   mutate(ConfigurationDesc = str_c(ProcessCode, Parameters, EquilibriumId, sep = " ")) %>%
-  mutate(Configuration = factor(ConfigurationDesc, levels = unique(ConfigurationDesc)))   
+  mutate(Prioritisation_Process = factor(ConfigurationDesc, levels = unique(ConfigurationDesc)))   
   
 
 full_bandwidth <- filter(all_equilibria, Scenario == "Full Bandwidth")
 reduced_bandwith <- filter(all_equilibria, Scenario == "Reduced Bandwidth")
 
 data_for_plot <- full_bandwidth
-bar_position <- "dodge"
-bar_position <- "fill"
-font_size <- 15
+font_size <- 11
 
 ggplot(data = data_for_plot) + 
-  geom_bar(mapping = aes(x = Configuration, y = Probability, fill = Strategy),
+  geom_bar(mapping = aes(x = Prioritisation_Process, y = Probability, fill = Strategy),
            position = bar_position, stat = "identity") +
-           theme_classic(base_size = font_size)
+  theme_classic(base_size = font_size)
