@@ -1,5 +1,5 @@
-# Equilibrium Analysis for Bug Reporting
-This collection of Python scripts make use of a simulation model of bug reporting for obtaining the Nash-Equilibrium of its empirical game-theoretic model.
+# Equilibrium Analysis for Task Prioritisation
+This collection of Python scripts make use of a simulation model of task prioritisation for obtaining the Nash-Equilibrium of its empirical game-theoretic model.
 
 ## Pre-requisites
 The code was built and tested using the [Anaconda distribution for Python 2.7](https://www.continuum.io/DOWNLOADS). For equilibrium calculation, it relies on the [Gambit Software version 15](http://www.gambit-project.org/).
