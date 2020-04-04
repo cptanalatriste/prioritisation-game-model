@@ -1,4 +1,7 @@
 # Equilibrium Analysis for Task Prioritisation
+
+*For an in-depht discussion of our empirical game-theoretic model, you can read our paper in the IEEE Transactions on Software Engineering: https://ieeexplore.ieee.org/abstract/document/8852726 *
+
 This collection of Python scripts make use of a simulation model of task prioritisation for obtaining the Nash-Equilibrium of its empirical game-theoretic model.
 
 ## Pre-requisites
