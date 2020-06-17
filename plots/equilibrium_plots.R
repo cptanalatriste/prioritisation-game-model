@@ -13,10 +13,11 @@ all_equilibria <- data_file %>%
 full_bandwidth <- filter(all_equilibria, Scenario == "Full Bandwidth")
 reduced_bandwith <- filter(all_equilibria, Scenario == "Reduced Bandwidth")
 
-data_for_plot <- full_bandwidth
-font_size <- 11
+#data_for_plot <- filter(reduced_bandwith)
+data_for_plot <- filter(reduced_bandwith, Process == "Gatekeeper")
+font_size <- 20
 
 ggplot(data = data_for_plot) + 
   geom_bar(mapping = aes(x = Prioritisation_Process, y = Probability, fill = Strategy),
            position = bar_position, stat = "identity") +
-  theme_classic(base_size = font_size)
+  theme(text = element_text(size = font_size))
